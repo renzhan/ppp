@@ -589,4 +589,7 @@ export interface EnvConfig {
   PUGONGYING_NOTE_BASE_URL: string;
   PUGONGYING_COMMENT_BASE_URL: string;
   PUGONGYING_API_KEY: string;
+  /** 聚光 API */
+  JUGUANG_BASE_URL: string;
+  JUGUANG_API_KEY: string;
 }

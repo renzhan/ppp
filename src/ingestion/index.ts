@@ -44,11 +44,16 @@ export class DataIngestionService {
       noteBaseUrl: envConfig.PUGONGYING_NOTE_BASE_URL,
       apiKey: envConfig.PUGONGYING_API_KEY,
     };
+    const juguangConfig = {
+      baseUrl: envConfig.JUGUANG_BASE_URL,
+      apiKey: envConfig.JUGUANG_API_KEY,
+    };
     this.paichachaClient = paichachaClient ?? new PaichachaClient(
       envConfig.PAICHACHA_BASE_URL,
       envConfig.PAICHACHA_API_KEY,
       undefined,
       pgyConfig,
+      juguangConfig,
     );
     this.persistenceService = persistenceService ?? new PrismaDataPersistenceService();
   }
@@ -74,9 +79,13 @@ export class DataIngestionService {
       errors.push(`Failed to fetch pugongying data: ${message}`);
     }
 
-    // Fetch juguang data
+    // Fetch juguang data（参数后续由前端传入，当前写死联调用）
     try {
-      juguangNotes = await this.paichachaClient.fetchJuguangData(noteIds);
+      juguangNotes = await this.paichachaClient.fetchJuguangData(
+        726286,          // advertiser_id
+        '2026-04-12',    // start_date
+        '2026-04-18',    // end_date
+      );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       errors.push(`Failed to fetch juguang data: ${message}`);
@@ -124,7 +133,7 @@ export class DataIngestionService {
 
 // ---- Re-exports ----
 
-export { PaichachaClient, PaichachaValidationError } from './paichacha-client.js';
+export { PaichachaClient } from './paichacha-client.js';
 export type { IPaichachaClient } from './paichacha-client.js';
 export { normalizeAmount } from './currency.js';
 export { PrismaDataPersistenceService } from './persistence-service.js';

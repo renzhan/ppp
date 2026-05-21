@@ -55,6 +55,8 @@ export function loadEnvConfig(): EnvConfig {
     PUGONGYING_NOTE_BASE_URL: process.env.PUGONGYING_NOTE_BASE_URL || '',
     PUGONGYING_COMMENT_BASE_URL: process.env.PUGONGYING_COMMENT_BASE_URL || '',
     PUGONGYING_API_KEY: process.env.PUGONGYING_API_KEY || '',
+    JUGUANG_BASE_URL: process.env.JUGUANG_BASE_URL || '',
+    JUGUANG_API_KEY: process.env.JUGUANG_API_KEY || '',
   };
 }
 

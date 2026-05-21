@@ -18,6 +18,8 @@ function createIngestionService(): DataIngestionService {
   const apiKey = process.env.PAICHACHA_API_KEY || '';
   const pgyNoteBaseUrl = process.env.PUGONGYING_NOTE_BASE_URL || '';
   const pgyApiKey = process.env.PUGONGYING_API_KEY || '';
+  const juguangBaseUrl = process.env.JUGUANG_BASE_URL || '';
+  const juguangApiKey = process.env.JUGUANG_API_KEY || '';
 
   if (!baseUrl || !apiKey) {
     throw new Error('派查查 API 配置缺失: PAICHACHA_BASE_URL 和 PAICHACHA_API_KEY 为必填项');
@@ -27,9 +29,14 @@ function createIngestionService(): DataIngestionService {
     throw new Error('蒲公英 API 配置缺失: PUGONGYING_NOTE_BASE_URL 和 PUGONGYING_API_KEY 为必填项');
   }
 
-  const pgyConfig = { noteBaseUrl: pgyNoteBaseUrl, apiKey: pgyApiKey };
+  if (!juguangBaseUrl || !juguangApiKey) {
+    throw new Error('聚光 API 配置缺失: JUGUANG_BASE_URL 和 JUGUANG_API_KEY 为必填项');
+  }
 
-  const client = new PaichachaClient(baseUrl, apiKey, undefined, pgyConfig);
+  const pgyConfig = { noteBaseUrl: pgyNoteBaseUrl, apiKey: pgyApiKey };
+  const juguangConfig = { baseUrl: juguangBaseUrl, apiKey: juguangApiKey };
+
+  const client = new PaichachaClient(baseUrl, apiKey, undefined, pgyConfig, juguangConfig);
   const persistenceService = new PrismaDataPersistenceService();
   return new DataIngestionService(client, persistenceService);
 }
