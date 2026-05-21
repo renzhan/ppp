@@ -240,6 +240,27 @@ function parsePugongyingSheet(rows: unknown[][]): { data: import('@/shared/types
       heatReadNum: parseNumber(row[heatReadCol]),
       isUnderwater: false,
       underwaterPrice: 0,
+      // 0521 新字段 — Excel 不提供，填默认值
+      notePublishTime: null,
+      cooperateType: null,
+      duration: 0,
+      originImpNum: 0,
+      originReadNum: 0,
+      promotionImpNum: 0,
+      promotionReadNum: 0,
+      readUv: 0,
+      engageRate: null,
+      readCost: 0,
+      engageCost: 0,
+      avgViewTime: null,
+      videoPlay5sRate: null,
+      picRead3sRate: null,
+      finishRate: null,
+      cp: 0,
+      cpRate: null,
+      cpcp: 0,
+      orderId: null,
+      effect: null,
     });
   }
   return { data, errors };

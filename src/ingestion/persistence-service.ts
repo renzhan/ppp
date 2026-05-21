@@ -39,6 +39,26 @@ export interface DataPersistenceService {
  */
 export class PrismaDataPersistenceService implements DataPersistenceService {
   /**
+   * Look up existing notes for the given project and note IDs,
+   * returning only fields that other data sources may have populated.
+   */
+  async findPugongyingNoteIds(
+    projectId: string,
+    noteIds: string[],
+  ): Promise<{ noteId: string; isUnderwater: boolean; underwaterPrice: number }[]> {
+    if (noteIds.length === 0) return [];
+    const rows = await prisma.note.findMany({
+      where: { projectId, noteId: { in: noteIds } },
+      select: { noteId: true, isUnderwater: true, underwaterPrice: true },
+    });
+    return rows.map((r) => ({
+      noteId: r.noteId,
+      isUnderwater: r.isUnderwater,
+      underwaterPrice: Number(r.underwaterPrice),
+    }));
+  }
+
+  /**
    * Upsert pugongying notes to PostgreSQL.
    * Uses Prisma transaction with upsert for each note (unique on project_id + note_id).
    */
@@ -80,6 +100,26 @@ export class PrismaDataPersistenceService implements DataPersistenceService {
             isUnderwater: note.isUnderwater,
             underwaterPrice: note.underwaterPrice,
             components: note.components ? JSON.parse(JSON.stringify(note.components)) : undefined,
+            notePublishTime: note.notePublishTime ?? undefined,
+            cooperateType: note.cooperateType ?? undefined,
+            duration: note.duration ?? 0,
+            originImpNum: note.originImpNum,
+            originReadNum: note.originReadNum,
+            promotionImpNum: note.promotionImpNum,
+            promotionReadNum: note.promotionReadNum,
+            readUv: note.readUv,
+            engageRate: note.engageRate ?? undefined,
+            readCost: note.readCost,
+            engageCost: note.engageCost,
+            avgViewTime: note.avgViewTime ?? undefined,
+            videoPlay5sRate: note.videoPlay5sRate ?? undefined,
+            picRead3sRate: note.picRead3sRate ?? undefined,
+            finishRate: note.finishRate ?? undefined,
+            cp: note.cp,
+            cpRate: note.cpRate ?? undefined,
+            cpcp: note.cpcp,
+            orderId: note.orderId ?? undefined,
+            effect: note.effect ?? undefined,
           },
           update: {
             brandUserName: note.brandUserName,
@@ -104,6 +144,26 @@ export class PrismaDataPersistenceService implements DataPersistenceService {
             isUnderwater: note.isUnderwater,
             underwaterPrice: note.underwaterPrice,
             components: note.components ? JSON.parse(JSON.stringify(note.components)) : undefined,
+            notePublishTime: note.notePublishTime ?? undefined,
+            cooperateType: note.cooperateType ?? undefined,
+            duration: note.duration ?? 0,
+            originImpNum: note.originImpNum,
+            originReadNum: note.originReadNum,
+            promotionImpNum: note.promotionImpNum,
+            promotionReadNum: note.promotionReadNum,
+            readUv: note.readUv,
+            engageRate: note.engageRate ?? undefined,
+            readCost: note.readCost,
+            engageCost: note.engageCost,
+            avgViewTime: note.avgViewTime ?? undefined,
+            videoPlay5sRate: note.videoPlay5sRate ?? undefined,
+            picRead3sRate: note.picRead3sRate ?? undefined,
+            finishRate: note.finishRate ?? undefined,
+            cp: note.cp,
+            cpRate: note.cpRate ?? undefined,
+            cpcp: note.cpcp,
+            orderId: note.orderId ?? undefined,
+            effect: note.effect ?? undefined,
           },
         })
       )

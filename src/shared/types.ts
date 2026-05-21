@@ -113,14 +113,35 @@ export interface PugongyingNote {
   cmtNum: number;
   shareNum: number;
   followNum: number;
-  kolPrice: number;              // 元（已从分转换）
-  serviceFee: number;            // 元
-  totalPlatformPrice: number;    // 元（已从分转换）
+  kolPrice: number;              // 元
+  serviceFee: number;            // 元（API total_platform_price → 服务费）
+  totalPlatformPrice: number;    // 元（kolPrice + serviceFee，计算得出）
   heatImpNum: number;
   heatReadNum: number;
   isUnderwater: boolean;
   underwaterPrice: number;       // 元
   components?: ComponentData[];
+  // 0521 新字段
+  notePublishTime?: Date | null;
+  cooperateType?: string | null;
+  duration?: number | null;
+  originImpNum: number;
+  originReadNum: number;
+  promotionImpNum: number;
+  promotionReadNum: number;
+  readUv: number;
+  engageRate?: number | null;
+  readCost: number;
+  engageCost: number;
+  avgViewTime?: number | null;
+  videoPlay5sRate?: number | null;
+  picRead3sRate?: number | null;
+  finishRate?: number | null;
+  cp: number;
+  cpRate?: number | null;
+  cpcp: number;
+  orderId?: string | null;
+  effect?: string | null;
 }
 
 /**
@@ -564,6 +585,8 @@ export interface EnvConfig {
   /** 派查查 API */
   PAICHACHA_API_KEY: string;
   PAICHACHA_BASE_URL: string;
-  /** Used for encrypting sensitive data (API keys) in the Agent management system */
-  ENCRYPTION_KEY: string;
+  /** 蒲公英 API */
+  PUGONGYING_NOTE_BASE_URL: string;
+  PUGONGYING_COMMENT_BASE_URL: string;
+  PUGONGYING_API_KEY: string;
 }

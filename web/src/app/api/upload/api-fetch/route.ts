@@ -16,12 +16,20 @@ interface ApiFetchRequestBody {
 function createIngestionService(): DataIngestionService {
   const baseUrl = process.env.PAICHACHA_BASE_URL || '';
   const apiKey = process.env.PAICHACHA_API_KEY || '';
+  const pgyNoteBaseUrl = process.env.PUGONGYING_NOTE_BASE_URL || '';
+  const pgyApiKey = process.env.PUGONGYING_API_KEY || '';
 
   if (!baseUrl || !apiKey) {
     throw new Error('派查查 API 配置缺失: PAICHACHA_BASE_URL 和 PAICHACHA_API_KEY 为必填项');
   }
 
-  const client = new PaichachaClient(baseUrl, apiKey);
+  if (!pgyNoteBaseUrl || !pgyApiKey) {
+    throw new Error('蒲公英 API 配置缺失: PUGONGYING_NOTE_BASE_URL 和 PUGONGYING_API_KEY 为必填项');
+  }
+
+  const pgyConfig = { noteBaseUrl: pgyNoteBaseUrl, apiKey: pgyApiKey };
+
+  const client = new PaichachaClient(baseUrl, apiKey, undefined, pgyConfig);
   const persistenceService = new PrismaDataPersistenceService();
   return new DataIngestionService(client, persistenceService);
 }

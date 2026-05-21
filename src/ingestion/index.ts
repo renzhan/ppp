@@ -40,15 +40,21 @@ export class DataIngestionService {
     paichachaClient?: PaichachaClient,
     persistenceService?: PrismaDataPersistenceService,
   ) {
+    const pgyConfig = {
+      noteBaseUrl: envConfig.PUGONGYING_NOTE_BASE_URL,
+      apiKey: envConfig.PUGONGYING_API_KEY,
+    };
     this.paichachaClient = paichachaClient ?? new PaichachaClient(
       envConfig.PAICHACHA_BASE_URL,
       envConfig.PAICHACHA_API_KEY,
+      undefined,
+      pgyConfig,
     );
     this.persistenceService = persistenceService ?? new PrismaDataPersistenceService();
   }
 
   /**
-   * Ingest data from Paichacha API for a given project.
+   * Ingest data from Pugongying & Juguang APIs for a given project.
    * Fetches both pugongying and juguang data, then persists to DB.
    *
    * @param projectId - The project to associate data with
@@ -74,6 +80,23 @@ export class DataIngestionService {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       errors.push(`Failed to fetch juguang data: ${message}`);
+    }
+
+    // Merge: preserve isUnderwater / underwaterPrice from existing records
+    if (pugongyingNotes.length > 0) {
+      try {
+        const existing = await this.persistenceService.findPugongyingNoteIds(projectId, pugongyingNotes.map((n) => n.noteId));
+        const existingMap = new Map(existing.map((n) => [n.noteId, n]));
+        for (const note of pugongyingNotes) {
+          const exist = existingMap.get(note.noteId);
+          if (exist) {
+            note.isUnderwater = exist.isUnderwater;
+            note.underwaterPrice = exist.underwaterPrice;
+          }
+        }
+      } catch {
+        // If lookup fails, proceed with API values (false / 0)
+      }
     }
 
     // Persist successfully fetched data

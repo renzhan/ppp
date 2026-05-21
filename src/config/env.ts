@@ -52,7 +52,9 @@ export function loadEnvConfig(): EnvConfig {
     QWEN_EMBEDDING_MODEL: process.env.QWEN_EMBEDDING_MODEL || '',
     PAICHACHA_API_KEY: process.env.PAICHACHA_API_KEY!,
     PAICHACHA_BASE_URL: process.env.PAICHACHA_BASE_URL!,
-    ENCRYPTION_KEY: process.env.ENCRYPTION_KEY!,
+    PUGONGYING_NOTE_BASE_URL: process.env.PUGONGYING_NOTE_BASE_URL || '',
+    PUGONGYING_COMMENT_BASE_URL: process.env.PUGONGYING_COMMENT_BASE_URL || '',
+    PUGONGYING_API_KEY: process.env.PUGONGYING_API_KEY || '',
   };
 }
 
