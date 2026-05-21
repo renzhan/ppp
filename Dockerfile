@@ -33,6 +33,9 @@ RUN cd web && npm ci
 # ============================================================
 FROM node:22-bookworm-slim AS builder
 
+RUN apt-get update && apt-get install -y --no-install-recommends openssl \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 COPY --from=deps /app/node_modules ./node_modules
@@ -48,6 +51,9 @@ RUN npm run build
 # ============================================================
 FROM node:22-bookworm-slim AS web-builder
 
+RUN apt-get update && apt-get install -y --no-install-recommends openssl \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 COPY --from=builder /app/node_modules ./node_modules
@@ -58,9 +64,14 @@ COPY web/ ./web/
 
 # Next.js transpilePackages uses ../src/ relative to web directory
 COPY src/ ./src/
+COPY prisma/ ./prisma/
 
 WORKDIR /app/web
 RUN npm ci
+
+# Provide a dummy DATABASE_URL so Prisma client can initialize during static generation.
+# No actual DB connection is made; routes that need it will fail gracefully at build time.
+ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
 RUN npm run build
 
 # ============================================================

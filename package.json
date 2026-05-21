@@ -13,6 +13,8 @@
     "prisma:seed": "npx tsx prisma/seed.ts"
   },
   "dependencies": {
+    "@earendil-works/pi-ai": "^0.75.4",
+    "@earendil-works/pi-coding-agent": "^0.75.4",
     "@napi-rs/canvas": "^1.0.0",
     "@prisma/client": "6.9.0",
     "@react-pdf/renderer": "^4.5.1",

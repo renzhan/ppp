@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { knowledgeService } from '@/lib/agent-management';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/agent-mgmt/knowledge
  * List all knowledge documents. Supports ?workspaceId query param for filtering.

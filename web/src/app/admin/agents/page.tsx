@@ -1,5 +1,6 @@
 'use client';
 
+import { Suspense } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { useCallback } from 'react';
 import { Settings, Bot, Sparkles, BookOpen } from 'lucide-react';
@@ -19,7 +20,7 @@ type TabKey = (typeof TABS)[number]['key'];
 
 const DEFAULT_TAB: TabKey = 'agents';
 
-export default function AgentManagementPage() {
+function AgentManagementContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -78,5 +79,13 @@ export default function AgentManagementPage() {
         {currentTab === 'knowledge' && <KnowledgeTab />}
       </div>
     </div>
+  );
+}
+
+export default function AgentManagementPage() {
+  return (
+    <Suspense fallback={<div className="mx-auto max-w-6xl p-6">加载中...</div>}>
+      <AgentManagementContent />
+    </Suspense>
   );
 }
