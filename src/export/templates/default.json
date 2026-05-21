@@ -1,0 +1,26 @@
+{
+  "id": "default",
+  "name": "默认模板",
+  "fonts": {
+    "heading": "SimHei",
+    "body": "SimHei"
+  },
+  "colors": {
+    "primary": "#1a1a2e",
+    "secondary": "#16213e",
+    "accent": "#e94560"
+  },
+  "spacing": {
+    "lineHeight": 1.6,
+    "paragraphSpacing": 12
+  },
+  "margins": {
+    "top": 72,
+    "bottom": 72,
+    "left": 72,
+    "right": 72
+  },
+  "headerFooter": {
+    "footer": "{{projectName}} - {{brand}} | 第{{page}}页"
+  }
+}

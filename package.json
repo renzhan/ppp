@@ -1,0 +1,39 @@
+{
+  "name": "marketing-review-system",
+  "version": "1.0.0",
+  "description": "小红书营销项目复盘报告自动生成系统",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "tsc --noEmit",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:seed": "npx tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@napi-rs/canvas": "^1.0.0",
+    "@prisma/client": "6.9.0",
+    "@react-pdf/renderer": "^4.5.1",
+    "docx": "^9.6.1",
+    "dotenv": "16.4.7",
+    "openai": "4.78.1",
+    "pdf-to-img": "^6.1.0",
+    "react": "^18.3.1",
+    "xlsx": "0.18.5",
+    "yaml": "2.9.0"
+  },
+  "overrides": {
+    "pdfjs-dist": "5.7.284"
+  },
+  "devDependencies": {
+    "@types/node": "22.10.5",
+    "@types/react": "^18.3.0",
+    "fast-check": "3.23.2",
+    "jsdom": "^29.1.1",
+    "prisma": "6.9.0",
+    "typescript": "5.7.3",
+    "vitest": "2.1.8"
+  }
+}

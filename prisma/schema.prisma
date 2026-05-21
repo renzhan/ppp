@@ -1,0 +1,492 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider      = "prisma-client"
+  output        = "../generated/prisma"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// 用户表
+model User {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  username          String    @unique @db.VarChar(50)
+  passwordHash      String    @map("password_hash") @db.VarChar(200)
+  displayName       String?   @map("display_name") @db.VarChar(100)
+  role              String    @default("user") @db.VarChar(20) // "admin" | "user"
+  mustChangePassword Boolean  @default(true) @map("must_change_password")
+  isActive          Boolean   @default(true) @map("is_active")
+  lastLoginAt       DateTime? @map("last_login_at") @db.Timestamptz()
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt         DateTime  @default(now()) @map("updated_at") @db.Timestamptz()
+
+  @@map("users")
+}
+
+// 项目表
+model Project {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  category          String   @db.VarChar(100)
+  brand             String   @db.VarChar(200)
+  spuName           String?  @map("spu_name") @db.VarChar(200)
+  projectName       String   @map("project_name") @db.VarChar(200)
+  projectType       String   @default("日常种草") @map("project_type") @db.VarChar(50)
+  startDate         DateTime @map("start_date") @db.Date
+  endDate           DateTime @map("end_date") @db.Date
+  launchPhases      Json?    @map("launch_phases")
+  engagementConfig  Json     @default("{\"includeShare\": true, \"includeFollow\": true}") @map("engagement_config")
+  cooperationPolicy Json     @default("{\"defaultDiscount\": 1, \"specialRules\": []}") @map("cooperation_policy")
+  createdAt         DateTime? @default(now()) @map("created_at") @db.Timestamptz()
+  status            String    @default("draft") @db.VarChar(20)
+  updatedAt         DateTime? @default(now()) @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  notes              Note[]
+  juguangData        JuguangData[]
+  businessAnnotations BusinessAnnotation[]
+  lingxiData         LingxiData[]
+  manualInputs       ManualInput[]
+  kpiTargets         KpiTarget[]
+  calculatedMetrics  CalculatedMetric[]
+  aiGeneratedContent AiGeneratedContent[]
+  competitorData     CompetitorData[]
+  reportVersions     ReportVersion[]
+  moduleDecisions    ModuleDecision[]
+  metricRatings      MetricRatingRecord[]
+  reviewEdits        ReviewEdit[]
+
+  @@map("projects")
+}
+
+// 笔记表（蒲公英数据）
+model Note {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  projectId         String   @map("project_id") @db.Uuid
+  noteId            String   @map("note_id") @db.VarChar(100)
+  brandUserName     String?  @map("brand_user_name") @db.VarChar(200)
+  spuName           String?  @map("spu_name") @db.VarChar(200)
+  kolNickName       String?  @map("kol_nick_name") @db.VarChar(200)
+  kolId             String?  @map("kol_id") @db.VarChar(100)
+  kolFanNum         Int?     @map("kol_fan_num")
+  noteType          String?  @map("note_type") @db.VarChar(20)
+  noteLink          String?  @map("note_link")
+  impNum            Int      @default(0) @map("imp_num")
+  readNum           Int      @default(0) @map("read_num")
+  engageNum         Int      @default(0) @map("engage_num")
+  likeNum           Int      @default(0) @map("like_num")
+  favNum            Int      @default(0) @map("fav_num")
+  cmtNum            Int      @default(0) @map("cmt_num")
+  shareNum          Int      @default(0) @map("share_num")
+  followNum         Int      @default(0) @map("follow_num")
+  kolPrice          Decimal  @default(0) @map("kol_price") @db.Decimal(12, 2)
+  serviceFee        Decimal  @default(0) @map("service_fee") @db.Decimal(12, 2)
+  totalPlatformPrice Decimal @default(0) @map("total_platform_price") @db.Decimal(12, 2)
+  heatImpNum        Int      @default(0) @map("heat_imp_num")
+  heatReadNum       Int      @default(0) @map("heat_read_num")
+  isUnderwater      Boolean  @default(false) @map("is_underwater")
+  underwaterPrice   Decimal  @default(0) @map("underwater_price") @db.Decimal(12, 2)
+  components        Json?
+  createdAt         DateTime? @default(now()) @map("created_at") @db.Timestamptz()
+
+  // Relations
+  project Project @relation(fields: [projectId], references: [id])
+
+  @@unique([projectId, noteId])
+  @@index([projectId])
+  @@map("notes")
+}
+
+// 聚光数据表
+model JuguangData {
+  id                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  projectId             String   @map("project_id") @db.Uuid
+  noteId                String?  @map("note_id") @db.VarChar(100)
+  fee                   Decimal  @default(0) @map("fee") @db.Decimal(12, 2)
+  impression            Int      @default(0)
+  click                 Int      @default(0)
+  interaction           Int      @default(0)
+  iUserNum              Int      @default(0) @map("i_user_num")
+  tiUserNum             Int      @default(0) @map("ti_user_num")
+  iUserPrice            Decimal  @default(0) @map("i_user_price") @db.Decimal(12, 4)
+  tiUserPrice           Decimal  @default(0) @map("ti_user_price") @db.Decimal(12, 4)
+  searchCmtClick        Int      @default(0) @map("search_cmt_click")
+  searchCmtAfterRead    Int      @default(0) @map("search_cmt_after_read")
+  searchCmtAfterReadAvg Decimal  @default(0) @map("search_cmt_after_read_avg") @db.Decimal(10, 2)
+  searchCmtClickCvr     Decimal  @default(0) @map("search_cmt_click_cvr") @db.Decimal(8, 4)
+  createdAt             DateTime? @default(now()) @map("created_at") @db.Timestamptz()
+
+  // Relations
+  project Project @relation(fields: [projectId], references: [id])
+
+  @@index([projectId])
+  @@map("juguang_data")
+}
+
+// 业务标注表
+model BusinessAnnotation {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  projectId        String   @map("project_id") @db.Uuid
+  noteId           String   @map("note_id") @db.VarChar(100)
+  contentDirection String?  @map("content_direction") @db.VarChar(100)
+  accountType      String?  @map("account_type") @db.VarChar(100)
+  kolType          String?  @map("kol_type") @db.VarChar(100)
+  launchPhase      String?  @map("launch_phase") @db.VarChar(100)
+  isUnderwater     Boolean  @default(false) @map("is_underwater")
+  createdAt        DateTime? @default(now()) @map("created_at") @db.Timestamptz()
+
+  // Relations
+  project Project @relation(fields: [projectId], references: [id])
+
+  @@unique([projectId, noteId])
+  @@index([projectId])
+  @@map("business_annotations")
+}
+
+// 灵犀数据表
+model LingxiData {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  projectId   String   @map("project_id") @db.Uuid
+  dataType    String   @map("data_type") @db.VarChar(50)
+  dataContent Json     @map("data_content")
+  periodStart DateTime? @map("period_start") @db.Date
+  periodEnd   DateTime? @map("period_end") @db.Date
+  createdAt   DateTime? @default(now()) @map("created_at") @db.Timestamptz()
+
+  // Relations
+  project Project @relation(fields: [projectId], references: [id])
+
+  @@index([projectId])
+  @@map("lingxi_data")
+}
+
+// 人工录入数据表
+model ManualInput {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  projectId   String   @map("project_id") @db.Uuid
+  inputType   String   @map("input_type") @db.VarChar(50)
+  dataContent Json     @map("data_content")
+  createdAt   DateTime? @default(now()) @map("created_at") @db.Timestamptz()
+
+  // Relations
+  project Project @relation(fields: [projectId], references: [id])
+
+  @@index([projectId])
+  @@map("manual_inputs")
+}
+
+// KPI目标表
+model KpiTarget {
+  id          String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  projectId   String  @map("project_id") @db.Uuid
+  metricName  String  @map("metric_name") @db.VarChar(50)
+  targetValue Decimal @map("target_value") @db.Decimal(15, 4)
+  isCostMetric Boolean @default(false) @map("is_cost_metric")
+
+  // Relations
+  project Project @relation(fields: [projectId], references: [id])
+
+  @@unique([projectId, metricName])
+  @@index([projectId])
+  @@map("kpi_targets")
+}
+
+// 计算结果缓存表
+model CalculatedMetric {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  projectId    String   @map("project_id") @db.Uuid
+  metricType   String   @map("metric_type") @db.VarChar(100)
+  metricValue  Json     @map("metric_value")
+  calculatedAt DateTime? @default(now()) @map("calculated_at") @db.Timestamptz()
+
+  // Relations
+  project Project @relation(fields: [projectId], references: [id])
+
+  @@index([projectId])
+  @@map("calculated_metrics")
+}
+
+// AI生成内容表
+model AiGeneratedContent {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  projectId        String   @map("project_id") @db.Uuid
+  contentType      String   @map("content_type") @db.VarChar(50)
+  generatedContent String?  @map("generated_content")
+  editedContent    String?  @map("edited_content")
+  isEdited         Boolean  @default(false) @map("is_edited")
+  createdAt        DateTime? @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt        DateTime? @default(now()) @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  project Project @relation(fields: [projectId], references: [id])
+
+  @@map("ai_generated_content")
+}
+
+// 竞品数据表
+model CompetitorData {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  projectId      String   @map("project_id") @db.Uuid
+  competitorName String   @map("competitor_name") @db.VarChar(200)
+  metrics        Json
+  createdAt      DateTime? @default(now()) @map("created_at") @db.Timestamptz()
+
+  // Relations
+  project Project @relation(fields: [projectId], references: [id])
+
+  @@map("competitor_data")
+}
+
+// 报告版本表
+model ReportVersion {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  projectId       String   @map("project_id") @db.Uuid
+  versionNumber   Int      @map("version_number")
+  generatedAt     DateTime @default(now()) @map("generated_at") @db.Timestamptz()
+  config          Json     @default("{}") // 生成配置（模块开关、语气等）
+  content         Json     @default("{}") // 完整报告内容快照
+  status          String   @default("draft") @db.VarChar(20) // draft | reviewing | finalized
+  createdBy       String?  @map("created_by") @db.VarChar(100)
+
+  // Relations
+  project         Project  @relation(fields: [projectId], references: [id])
+  moduleDecisions ModuleDecision[]
+  reviewEdits     ReviewEdit[]
+
+  @@unique([projectId, versionNumber])
+  @@index([projectId])
+  @@map("report_versions")
+}
+
+// 模块决策表
+model ModuleDecision {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  projectId       String   @map("project_id") @db.Uuid
+  versionId       String   @map("version_id") @db.Uuid
+  moduleId        String   @map("module_id") @db.VarChar(10) // M1-M8
+  moduleName      String   @map("module_name") @db.VarChar(100)
+  status          String   @db.VarChar(20) // show | hide | degraded
+  reason          String?  @db.Text
+  degradedFields  Json?    @map("degraded_fields") // 降级时缺失的字段列表
+  isOverridden    Boolean  @default(false) @map("is_overridden") // 用户是否手动覆盖
+  overriddenAt    DateTime? @map("overridden_at") @db.Timestamptz()
+
+  // Relations
+  project         Project       @relation(fields: [projectId], references: [id])
+  version         ReportVersion @relation(fields: [versionId], references: [id])
+
+  @@unique([versionId, moduleId])
+  @@index([projectId])
+  @@index([versionId])
+  @@map("module_decisions")
+}
+
+// 指标评级表
+model MetricRatingRecord {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  projectId        String   @map("project_id") @db.Uuid
+  metricName       String   @map("metric_name") @db.VarChar(50)
+  isCostMetric     Boolean  @default(false) @map("is_cost_metric")
+  vsKpiRatio       Decimal? @map("vs_kpi_ratio") @db.Decimal(10, 4)
+  vsKpiRating      String?  @map("vs_kpi_rating") @db.VarChar(5) // S/A/B/C/D or null
+  vsBenchmarkRatio Decimal? @map("vs_benchmark_ratio") @db.Decimal(10, 4)
+  vsBenchmarkRating String? @map("vs_benchmark_rating") @db.VarChar(5)
+  vsPreRatio       Decimal? @map("vs_pre_ratio") @db.Decimal(10, 4)
+  vsPreRating      String?  @map("vs_pre_rating") @db.VarChar(5)
+  finalRating      String   @map("final_rating") @db.VarChar(5) // 综合评级
+  calculatedAt     DateTime @default(now()) @map("calculated_at") @db.Timestamptz()
+
+  // Relations
+  project          Project  @relation(fields: [projectId], references: [id])
+
+  @@unique([projectId, metricName])
+  @@index([projectId])
+  @@map("metric_ratings")
+}
+
+// 审校编辑记录表
+model ReviewEdit {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  projectId       String   @map("project_id") @db.Uuid
+  versionId       String   @map("version_id") @db.Uuid
+  moduleId        String   @map("module_id") @db.VarChar(10)
+  editType        String   @map("edit_type") @db.VarChar(50) // tone_change | manual_edit | regenerate | column_hide | transform
+  previousContent Json?    @map("previous_content")
+  newContent      Json?    @map("new_content")
+  editedAt        DateTime @default(now()) @map("edited_at") @db.Timestamptz()
+  editedBy        String?  @map("edited_by") @db.VarChar(100)
+
+  // Relations
+  project         Project       @relation(fields: [projectId], references: [id])
+  version         ReportVersion @relation(fields: [versionId], references: [id])
+
+  @@index([versionId])
+  @@index([projectId])
+  @@map("review_edits")
+}
+
+// ===== Agent 管理系统数据模型 =====
+
+// 工作区
+model Workspace {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String   @unique @db.VarChar(100)
+  description String?  @db.VarChar(500)
+  icon        String?  @db.VarChar(50)
+  sortOrder   Int      @default(0) @map("sort_order")
+  isEnabled   Boolean  @default(true) @map("is_enabled")
+  isPreset    Boolean  @default(false) @map("is_preset")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  agents             Agent[]
+  skills             Skill[]
+  knowledgeDocuments KnowledgeDocument[]
+
+  @@map("workspaces")
+}
+
+// 模型配置
+model ModelConfig {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name         String   @db.VarChar(100)
+  apiKey       String   @map("api_key") @db.Text
+  baseUrl      String   @map("base_url") @db.VarChar(500)
+  modelName    String   @map("model_name") @db.VarChar(200)
+  timeoutMs    Int      @default(30000) @map("timeout_ms")
+  maxRetries   Int      @default(2) @map("max_retries")
+  isDefault    Boolean  @default(false) @map("is_default")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  agents Agent[]
+
+  @@map("model_configs")
+}
+
+// Agent
+model Agent {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name          String   @db.VarChar(100)
+  description   String?  @db.VarChar(500)
+  type          String   @db.VarChar(20)
+  workspaceId   String?  @map("workspace_id") @db.Uuid
+  modelConfigId String?  @map("model_config_id") @db.Uuid
+  systemPrompt  String?  @map("system_prompt") @db.Text
+  isEnabled     Boolean  @default(true) @map("is_enabled")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  workspace   Workspace?   @relation(fields: [workspaceId], references: [id])
+  modelConfig ModelConfig? @relation(fields: [modelConfigId], references: [id])
+  agentSkills AgentSkill[]
+  dispatchLogsAsSource DispatchLog[] @relation("SourceAgent")
+  dispatchLogsAsTarget DispatchLog[] @relation("TargetAgent")
+
+  @@map("agents")
+}
+
+// Skill
+model Skill {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String   @db.VarChar(100)
+  description String?  @db.VarChar(500)
+  content     String   @db.Text
+  scope       String   @db.VarChar(20)
+  workspaceId String?  @map("workspace_id") @db.Uuid
+  version     Int      @default(1)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  workspace    Workspace?    @relation(fields: [workspaceId], references: [id])
+  agentSkills  AgentSkill[]
+  versions     SkillVersion[]
+
+  @@map("skills")
+}
+
+// Skill 版本历史
+model SkillVersion {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  skillId   String   @map("skill_id") @db.Uuid
+  version   Int
+  content   String   @db.Text
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  skill Skill @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@unique([skillId, version])
+  @@map("skill_versions")
+}
+
+// Agent-Skill 多对多关联
+model AgentSkill {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  agentId   String   @map("agent_id") @db.Uuid
+  skillId   String   @map("skill_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  skill Skill @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@unique([agentId, skillId])
+  @@map("agent_skills")
+}
+
+// 知识库文档
+model KnowledgeDocument {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  fileName     String   @map("file_name") @db.VarChar(500)
+  fileSize     Int      @map("file_size")
+  mimeType     String   @map("mime_type") @db.VarChar(100)
+  storagePath  String   @map("storage_path") @db.VarChar(1000)
+  workspaceId  String?  @map("workspace_id") @db.Uuid
+  uploadedBy   String?  @map("uploaded_by") @db.VarChar(100)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  workspace Workspace? @relation(fields: [workspaceId], references: [id])
+
+  @@index([workspaceId])
+  @@map("knowledge_documents")
+}
+
+// 原生工具定义
+model NativeTool {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String   @unique @db.VarChar(100)
+  description String   @db.VarChar(500)
+  inputSchema Json     @map("input_schema")
+  outputFormat String? @map("output_format") @db.VarChar(100)
+  isBuiltin   Boolean  @default(true) @map("is_builtin")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  @@map("native_tools")
+}
+
+// 调度日志
+model DispatchLog {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sourceAgentId String?  @map("source_agent_id") @db.Uuid
+  targetAgentId String   @map("target_agent_id") @db.Uuid
+  taskSummary   String   @map("task_summary") @db.VarChar(1000)
+  status        String   @db.VarChar(20)
+  response      String?  @db.Text
+  errorMessage  String?  @map("error_message") @db.Text
+  durationMs    Int?     @map("duration_ms")
+  metadata      Json?
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  completedAt   DateTime? @map("completed_at") @db.Timestamptz()
+
+  sourceAgent Agent? @relation("SourceAgent", fields: [sourceAgentId], references: [id])
+  targetAgent Agent  @relation("TargetAgent", fields: [targetAgentId], references: [id])
+
+  @@index([targetAgentId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("dispatch_logs")
+}

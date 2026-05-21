@@ -1,0 +1,344 @@
+{
+  "project": {
+    "projectName": "冠益乳巴马128小红书种草项目复盘",
+    "brand": "冠益乳",
+    "category": "乳制品-酸奶",
+    "spu": "巴马128益生菌酸奶",
+    "projectType": "新品上市",
+    "period": "2025.03.01 - 2025.04.30",
+    "phases": {
+      "预热期": "2025.03.01 - 2025.03.15",
+      "爆发期": "2025.03.16 - 2025.04.10",
+      "持续期": "2025.04.11 - 2025.04.30"
+    }
+  },
+  "kpi": {
+    "总曝光": {
+      "kpi": "800w",
+      "actual": "857w+",
+      "completion": "107%"
+    },
+    "总阅读": {
+      "kpi": "150w",
+      "actual": "153w+",
+      "completion": "102%"
+    },
+    "总互动": {
+      "kpi": "10w",
+      "actual": "13w+",
+      "completion": "130%"
+    },
+    "CPE": {
+      "kpi": "3.5",
+      "actual": "2.27",
+      "completion": "154%"
+    },
+    "CPM": {
+      "kpi": "45",
+      "actual": "34.2",
+      "completion": "132%"
+    },
+    "CPC": {
+      "kpi": "0.35",
+      "actual": "0.2",
+      "completion": "175%"
+    },
+    "CTR": {
+      "kpi": "15%",
+      "actual": "17.8%",
+      "completion": "119%"
+    },
+    "爆文率": {
+      "kpi": "30%",
+      "actual": "59%",
+      "completion": "197%"
+    },
+    "CPTI": {
+      "kpi": "1.5",
+      "actual": "0.89",
+      "completion": "169%"
+    }
+  },
+  "benchmark": {
+    "CPM": {
+      "actual": 34.2,
+      "benchmark": "45-68",
+      "status": "优于大盘"
+    },
+    "CPC": {
+      "actual": 0.2,
+      "benchmark": "0.29-0.45",
+      "status": "优于大盘"
+    },
+    "CPE": {
+      "actual": 2.27,
+      "benchmark": "3.95-6.06",
+      "status": "优于大盘"
+    },
+    "CTR": {
+      "actual": "17.8%",
+      "benchmark": "7.33%-11.04%",
+      "status": "优于大盘"
+    }
+  },
+  "contentAnalysis": {
+    "内容方向": [
+      {
+        "direction": "产品直推",
+        "count": 35,
+        "impressions": "320w",
+        "reads": "58w",
+        "engagement": "4.8w",
+        "ti": "28w",
+        "cpti": "0.72",
+        "cpe": "4.21",
+        "viralCount": 12,
+        "viralRate": "34%"
+      },
+      {
+        "direction": "食欲氛围感",
+        "count": 22,
+        "impressions": "280w",
+        "reads": "52w",
+        "engagement": "4.2w",
+        "ti": "25w",
+        "cpti": "0.65",
+        "cpe": "3.85",
+        "viralCount": 15,
+        "viralRate": "68%"
+      },
+      {
+        "direction": "热点创意",
+        "count": 18,
+        "impressions": "180w",
+        "reads": "30w",
+        "engagement": "3.1w",
+        "ti": "18w",
+        "cpti": "0.89",
+        "cpe": "2.58",
+        "viralCount": 15,
+        "viralRate": "83%"
+      },
+      {
+        "direction": "测评种草",
+        "count": 12,
+        "impressions": "55w",
+        "reads": "9w",
+        "engagement": "0.7w",
+        "ti": "5w",
+        "cpti": "1.2",
+        "cpe": "8.57",
+        "viralCount": 3,
+        "viralRate": "25%"
+      },
+      {
+        "direction": "周边二创",
+        "count": 8,
+        "impressions": "22w",
+        "reads": "4w",
+        "engagement": "0.2w",
+        "ti": "2w",
+        "cpti": "2.1",
+        "cpe": "21.0",
+        "viralCount": 1,
+        "viralRate": "13%"
+      }
+    ],
+    "达人层级": [
+      {
+        "tier": "KOC(<1w粉)",
+        "count": 45,
+        "impressions": "180w",
+        "reads": "32w",
+        "engagement": "2.5w",
+        "ti": "15w",
+        "cpti": "0.45",
+        "cpe": "5.4",
+        "viralCount": 8,
+        "viralRate": "18%"
+      },
+      {
+        "tier": "尾部(1-5w粉)",
+        "count": 32,
+        "impressions": "380w",
+        "reads": "68w",
+        "engagement": "5.8w",
+        "ti": "35w",
+        "cpti": "0.72",
+        "cpe": "3.45",
+        "viralCount": 18,
+        "viralRate": "56%"
+      },
+      {
+        "tier": "腰部(5-50w粉)",
+        "count": 15,
+        "impressions": "220w",
+        "reads": "40w",
+        "engagement": "3.8w",
+        "ti": "22w",
+        "cpti": "1.05",
+        "cpe": "6.08",
+        "viralCount": 12,
+        "viralRate": "80%"
+      },
+      {
+        "tier": "头部(>50w粉)",
+        "count": 3,
+        "impressions": "77w",
+        "reads": "13w",
+        "engagement": "0.9w",
+        "ti": "6w",
+        "cpti": "2.8",
+        "cpe": "18.67",
+        "viralCount": 3,
+        "viralRate": "100%"
+      }
+    ],
+    "内容形式": [
+      {
+        "type": "视频",
+        "count": 38,
+        "impressions": "520w",
+        "reads": "95w",
+        "engagement": "8.2w",
+        "cpe": "2.93",
+        "viralCount": 28,
+        "viralRate": "74%"
+      },
+      {
+        "type": "图文",
+        "count": 57,
+        "impressions": "337w",
+        "reads": "58w",
+        "engagement": "4.8w",
+        "cpe": "5.0",
+        "viralCount": 18,
+        "viralRate": "32%"
+      }
+    ]
+  },
+  "trafficAnalysis": {
+    "总览": {
+      "totalSpend": "152,680",
+      "totalImpressions": "4,850,000",
+      "totalClicks": "562,000",
+      "totalEngagement": "89,500",
+      "ctr": "11.59%",
+      "cpc": "0.27",
+      "cpm": "31.48",
+      "cpe": "1.71",
+      "ti": "185,000",
+      "cpti": "0.83"
+    },
+    "广告类型": [
+      {
+        "type": "信息流",
+        "spend": "98,500",
+        "impressions": "3,200,000",
+        "clicks": "384,000",
+        "engagement": "52,000",
+        "cpm": "30.78",
+        "cpc": "0.26",
+        "cpe": "1.89",
+        "ctr": "12.0%",
+        "ti": "125,000",
+        "cpti": "0.79"
+      },
+      {
+        "type": "视频流",
+        "spend": "35,200",
+        "impressions": "980,000",
+        "clicks": "112,000",
+        "engagement": "28,500",
+        "cpm": "35.92",
+        "cpc": "0.31",
+        "cpe": "1.24",
+        "ctr": "11.43%",
+        "ti": "42,000",
+        "cpti": "0.84"
+      },
+      {
+        "type": "搜索",
+        "spend": "18,980",
+        "impressions": "670,000",
+        "clicks": "66,000",
+        "engagement": "9,000",
+        "cpm": "28.33",
+        "cpc": "0.29",
+        "cpe": "2.11",
+        "ctr": "9.85%",
+        "ti": "18,000",
+        "cpti": "1.05"
+      }
+    ],
+    "人群定向": [
+      {
+        "targeting": "平台推荐-精致中产",
+        "spend": "42,500",
+        "cpm": "28.5",
+        "cpc": "0.22",
+        "cpe": "1.45",
+        "ctr": "12.8%"
+      },
+      {
+        "targeting": "人群包-品牌资产人群",
+        "spend": "35,800",
+        "cpm": "32.1",
+        "cpc": "0.25",
+        "cpe": "1.12",
+        "ctr": "11.5%"
+      },
+      {
+        "targeting": "平台推荐-健康生活",
+        "spend": "28,600",
+        "cpm": "25.8",
+        "cpc": "0.20",
+        "cpe": "1.68",
+        "ctr": "13.2%"
+      },
+      {
+        "targeting": "行业兴趣-乳制品",
+        "spend": "22,400",
+        "cpm": "35.2",
+        "cpc": "0.30",
+        "cpe": "2.05",
+        "ctr": "10.8%"
+      },
+      {
+        "targeting": "人群包-竞品人群",
+        "spend": "15,200",
+        "cpm": "38.5",
+        "cpc": "0.32",
+        "cpe": "2.35",
+        "ctr": "9.5%"
+      }
+    ]
+  },
+  "highlights": [
+    "各项KPI均超额完成，总互动完成率130%，CPE完成率154%，爆文率完成率197%",
+    "CPM/CPC/CPE/CTR全面优于行业大盘，其中CPC优于大盘最低值175%",
+    "爆文率59%，远超KPI目标30%，千互爆文46篇，万互爆文3篇",
+    "品牌搜索指数投放期间上升至5000+，\"巴马128\"关键词从无到有",
+    "TI人群增长75w+，品牌人群资产有效扩充",
+    "热点创意方向爆文率83%，验证了\"热点+产品\"的高效种草模型"
+  ],
+  "optimization": {
+    "内容策略": [
+      "持续投放热点创意方向，爆文率83%验证了该方向的高效性，后续及时跟进平台趋势",
+      "食欲氛围感方向CPE表现优秀(3.85)，建议增加视频类内容占比",
+      "测评种草方向CPE偏高(8.57)，建议优化达人选择，聚焦垂类美食/健康博主",
+      "周边二创方向效果不佳，建议减少投入或优化创意形式"
+    ],
+    "达人选择": [
+      "尾部达人性价比最优(CPTI 0.72, 爆文率56%)，建议作为主力投放层级",
+      "腰部达人爆文率80%但CPTI偏高，建议精选优质账号集中投放",
+      "KOC层级爆文率仅18%，建议提高筛选标准或减少占比"
+    ],
+    "投流策略": [
+      "信息流+视频流组合投放效果最佳，建议保持7:3预算比例",
+      "精致中产和健康生活人群CTR最高，建议作为主力定向",
+      "搜索场域持续进行品牌词防守和品类词占位",
+      "视频流CPE最低(1.24)，建议对优质视频笔记加大视频流投放"
+    ]
+  }
+}
