@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
         username,
         passwordHash,
         displayName: displayName || null,
-        role: role === 'admin' ? 'admin' : 'user',
+        role: ['admin', '组长', 'AD', 'AM', '投手', '执行'].includes(role) ? role : '执行',
         mustChangePassword: true,
         isActive: true,
       },

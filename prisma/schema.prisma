@@ -14,84 +14,92 @@ datasource db {
 
 // 用户表
 model User {
-  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  username          String    @unique @db.VarChar(50)
-  passwordHash      String    @map("password_hash") @db.VarChar(200)
-  displayName       String?   @map("display_name") @db.VarChar(100)
-  role              String    @default("user") @db.VarChar(20) // "admin" | "user"
-  mustChangePassword Boolean  @default(true) @map("must_change_password")
-  isActive          Boolean   @default(true) @map("is_active")
-  lastLoginAt       DateTime? @map("last_login_at") @db.Timestamptz()
-  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz()
-  updatedAt         DateTime  @default(now()) @map("updated_at") @db.Timestamptz()
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  username           String    @unique @db.VarChar(50)
+  passwordHash       String    @map("password_hash") @db.VarChar(200)
+  displayName        String?   @map("display_name") @db.VarChar(100)
+  role               String    @default("user") @db.VarChar(20) // Valid values: "admin" | "组长" | "AD" | "AM" | "投手" | "执行"
+  mustChangePassword Boolean   @default(true) @map("must_change_password")
+  isActive           Boolean   @default(true) @map("is_active")
+  lastLoginAt        DateTime? @map("last_login_at") @db.Timestamptz()
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt          DateTime  @default(now()) @map("updated_at") @db.Timestamptz()
 
   @@map("users")
 }
 
 // 项目表
 model Project {
-  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  category          String   @db.VarChar(100)
-  brand             String   @db.VarChar(200)
-  spuName           String?  @map("spu_name") @db.VarChar(200)
-  projectName       String   @map("project_name") @db.VarChar(200)
-  projectType       String   @default("日常种草") @map("project_type") @db.VarChar(50)
-  startDate         DateTime @map("start_date") @db.Date
-  endDate           DateTime @map("end_date") @db.Date
-  launchPhases      Json?    @map("launch_phases")
-  engagementConfig  Json     @default("{\"includeShare\": true, \"includeFollow\": true}") @map("engagement_config")
-  cooperationPolicy Json     @default("{\"defaultDiscount\": 1, \"specialRules\": []}") @map("cooperation_policy")
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  category          String    @db.VarChar(100)
+  brand             String    @db.VarChar(200)
+  spuName           String?   @map("spu_name") @db.VarChar(200)
+  projectName       String    @map("project_name") @db.VarChar(200)
+  projectType       String    @default("日常种草") @map("project_type") @db.VarChar(50)
+  startDate         DateTime  @map("start_date") @db.Date
+  endDate           DateTime  @map("end_date") @db.Date
+  launchPhases      Json?     @map("launch_phases")
+  engagementConfig  Json      @default("{\"includeShare\": true, \"includeFollow\": true}") @map("engagement_config")
+  cooperationPolicy Json      @default("{\"defaultDiscount\": 1, \"specialRules\": []}") @map("cooperation_policy")
   createdAt         DateTime? @default(now()) @map("created_at") @db.Timestamptz()
   status            String    @default("draft") @db.VarChar(20)
   updatedAt         DateTime? @default(now()) @map("updated_at") @db.Timestamptz()
 
+  // 新增字段 (page-redesign-v2)
+  businessLine String?  @map("business_line") @db.VarChar(200)
+  createdBy    String?  @map("created_by") @db.Uuid
+  participants String[] @default([]) @map("participants")
+  isImported   Boolean  @default(false) @map("is_imported")
+  noteCount    Int      @default(0) @map("note_count")
+
   // Relations
-  notes              Note[]
-  juguangData        JuguangData[]
+  notes               Note[]
+  juguangData         JuguangData[]
   businessAnnotations BusinessAnnotation[]
-  lingxiData         LingxiData[]
-  manualInputs       ManualInput[]
-  kpiTargets         KpiTarget[]
-  calculatedMetrics  CalculatedMetric[]
-  aiGeneratedContent AiGeneratedContent[]
-  competitorData     CompetitorData[]
-  reportVersions     ReportVersion[]
-  moduleDecisions    ModuleDecision[]
-  metricRatings      MetricRatingRecord[]
-  reviewEdits        ReviewEdit[]
+  lingxiData          LingxiData[]
+  manualInputs        ManualInput[]
+  kpiTargets          KpiTarget[]
+  calculatedMetrics   CalculatedMetric[]
+  aiGeneratedContent  AiGeneratedContent[]
+  competitorData      CompetitorData[]
+  reportVersions      ReportVersion[]
+  moduleDecisions     ModuleDecision[]
+  metricRatings       MetricRatingRecord[]
+  reviewEdits         ReviewEdit[]
+  reviewConfigs      ReviewConfig[]
 
   @@map("projects")
 }
 
 // 笔记表（蒲公英数据）
 model Note {
-  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  projectId         String   @map("project_id") @db.Uuid
-  noteId            String   @map("note_id") @db.VarChar(100)
-  brandUserName     String?  @map("brand_user_name") @db.VarChar(200)
-  spuName           String?  @map("spu_name") @db.VarChar(200)
-  kolNickName       String?  @map("kol_nick_name") @db.VarChar(200)
-  kolId             String?  @map("kol_id") @db.VarChar(100)
-  kolFanNum         Int?     @map("kol_fan_num")
-  noteType          String?  @map("note_type") @db.VarChar(20)
-  noteLink          String?  @map("note_link")
-  impNum            Int      @default(0) @map("imp_num")
-  readNum           Int      @default(0) @map("read_num")
-  engageNum         Int      @default(0) @map("engage_num")
-  likeNum           Int      @default(0) @map("like_num")
-  favNum            Int      @default(0) @map("fav_num")
-  cmtNum            Int      @default(0) @map("cmt_num")
-  shareNum          Int      @default(0) @map("share_num")
-  followNum         Int      @default(0) @map("follow_num")
-  kolPrice          Decimal  @default(0) @map("kol_price") @db.Decimal(12, 2)
-  serviceFee        Decimal  @default(0) @map("service_fee") @db.Decimal(12, 2)
-  totalPlatformPrice Decimal @default(0) @map("total_platform_price") @db.Decimal(12, 2)
-  heatImpNum        Int      @default(0) @map("heat_imp_num")
-  heatReadNum       Int      @default(0) @map("heat_read_num")
-  isUnderwater      Boolean  @default(false) @map("is_underwater")
-  underwaterPrice   Decimal  @default(0) @map("underwater_price") @db.Decimal(12, 2)
-  components        Json?
-  createdAt         DateTime? @default(now()) @map("created_at") @db.Timestamptz()
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  projectId          String    @map("project_id") @db.Uuid
+  noteId             String    @map("note_id") @db.VarChar(100)
+  brandUserName      String?   @map("brand_user_name") @db.VarChar(200)
+  spuName            String?   @map("spu_name") @db.VarChar(200)
+  kolNickName        String?   @map("kol_nick_name") @db.VarChar(200)
+  kolId              String?   @map("kol_id") @db.VarChar(100)
+  kolFanNum          Int?      @map("kol_fan_num")
+  noteType           String?   @map("note_type") @db.VarChar(20)
+  noteLink           String?   @map("note_link")
+  impNum             Int       @default(0) @map("imp_num")
+  readNum            Int       @default(0) @map("read_num")
+  engageNum          Int       @default(0) @map("engage_num")
+  likeNum            Int       @default(0) @map("like_num")
+  favNum             Int       @default(0) @map("fav_num")
+  cmtNum             Int       @default(0) @map("cmt_num")
+  shareNum           Int       @default(0) @map("share_num")
+  followNum          Int       @default(0) @map("follow_num")
+  kolPrice           Decimal   @default(0) @map("kol_price") @db.Decimal(12, 2)
+  serviceFee         Decimal   @default(0) @map("service_fee") @db.Decimal(12, 2)
+  totalPlatformPrice Decimal   @default(0) @map("total_platform_price") @db.Decimal(12, 2)
+  heatImpNum         Int       @default(0) @map("heat_imp_num")
+  heatReadNum        Int       @default(0) @map("heat_read_num")
+  isUnderwater       Boolean   @default(false) @map("is_underwater")
+  underwaterPrice    Decimal   @default(0) @map("underwater_price") @db.Decimal(12, 2)
+  components         Json?
+  createdAt          DateTime? @default(now()) @map("created_at") @db.Timestamptz()
 
   // Relations
   project Project @relation(fields: [projectId], references: [id])
@@ -103,21 +111,21 @@ model Note {
 
 // 聚光数据表
 model JuguangData {
-  id                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  projectId             String   @map("project_id") @db.Uuid
-  noteId                String?  @map("note_id") @db.VarChar(100)
-  fee                   Decimal  @default(0) @map("fee") @db.Decimal(12, 2)
-  impression            Int      @default(0)
-  click                 Int      @default(0)
-  interaction           Int      @default(0)
-  iUserNum              Int      @default(0) @map("i_user_num")
-  tiUserNum             Int      @default(0) @map("ti_user_num")
-  iUserPrice            Decimal  @default(0) @map("i_user_price") @db.Decimal(12, 4)
-  tiUserPrice           Decimal  @default(0) @map("ti_user_price") @db.Decimal(12, 4)
-  searchCmtClick        Int      @default(0) @map("search_cmt_click")
-  searchCmtAfterRead    Int      @default(0) @map("search_cmt_after_read")
-  searchCmtAfterReadAvg Decimal  @default(0) @map("search_cmt_after_read_avg") @db.Decimal(10, 2)
-  searchCmtClickCvr     Decimal  @default(0) @map("search_cmt_click_cvr") @db.Decimal(8, 4)
+  id                    String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  projectId             String    @map("project_id") @db.Uuid
+  noteId                String?   @map("note_id") @db.VarChar(100)
+  fee                   Decimal   @default(0) @map("fee") @db.Decimal(12, 2)
+  impression            Int       @default(0)
+  click                 Int       @default(0)
+  interaction           Int       @default(0)
+  iUserNum              Int       @default(0) @map("i_user_num")
+  tiUserNum             Int       @default(0) @map("ti_user_num")
+  iUserPrice            Decimal   @default(0) @map("i_user_price") @db.Decimal(12, 4)
+  tiUserPrice           Decimal   @default(0) @map("ti_user_price") @db.Decimal(12, 4)
+  searchCmtClick        Int       @default(0) @map("search_cmt_click")
+  searchCmtAfterRead    Int       @default(0) @map("search_cmt_after_read")
+  searchCmtAfterReadAvg Decimal   @default(0) @map("search_cmt_after_read_avg") @db.Decimal(10, 2)
+  searchCmtClickCvr     Decimal   @default(0) @map("search_cmt_click_cvr") @db.Decimal(8, 4)
   createdAt             DateTime? @default(now()) @map("created_at") @db.Timestamptz()
 
   // Relations
@@ -129,14 +137,14 @@ model JuguangData {
 
 // 业务标注表
 model BusinessAnnotation {
-  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  projectId        String   @map("project_id") @db.Uuid
-  noteId           String   @map("note_id") @db.VarChar(100)
-  contentDirection String?  @map("content_direction") @db.VarChar(100)
-  accountType      String?  @map("account_type") @db.VarChar(100)
-  kolType          String?  @map("kol_type") @db.VarChar(100)
-  launchPhase      String?  @map("launch_phase") @db.VarChar(100)
-  isUnderwater     Boolean  @default(false) @map("is_underwater")
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  projectId        String    @map("project_id") @db.Uuid
+  noteId           String    @map("note_id") @db.VarChar(100)
+  contentDirection String?   @map("content_direction") @db.VarChar(100)
+  accountType      String?   @map("account_type") @db.VarChar(100)
+  kolType          String?   @map("kol_type") @db.VarChar(100)
+  launchPhase      String?   @map("launch_phase") @db.VarChar(100)
+  isUnderwater     Boolean   @default(false) @map("is_underwater")
   createdAt        DateTime? @default(now()) @map("created_at") @db.Timestamptz()
 
   // Relations
@@ -149,10 +157,10 @@ model BusinessAnnotation {
 
 // 灵犀数据表
 model LingxiData {
-  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  projectId   String   @map("project_id") @db.Uuid
-  dataType    String   @map("data_type") @db.VarChar(50)
-  dataContent Json     @map("data_content")
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  projectId   String    @map("project_id") @db.Uuid
+  dataType    String    @map("data_type") @db.VarChar(50)
+  dataContent Json      @map("data_content")
   periodStart DateTime? @map("period_start") @db.Date
   periodEnd   DateTime? @map("period_end") @db.Date
   createdAt   DateTime? @default(now()) @map("created_at") @db.Timestamptz()
@@ -166,10 +174,10 @@ model LingxiData {
 
 // 人工录入数据表
 model ManualInput {
-  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  projectId   String   @map("project_id") @db.Uuid
-  inputType   String   @map("input_type") @db.VarChar(50)
-  dataContent Json     @map("data_content")
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  projectId   String    @map("project_id") @db.Uuid
+  inputType   String    @map("input_type") @db.VarChar(50)
+  dataContent Json      @map("data_content")
   createdAt   DateTime? @default(now()) @map("created_at") @db.Timestamptz()
 
   // Relations
@@ -181,10 +189,10 @@ model ManualInput {
 
 // KPI目标表
 model KpiTarget {
-  id          String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  projectId   String  @map("project_id") @db.Uuid
-  metricName  String  @map("metric_name") @db.VarChar(50)
-  targetValue Decimal @map("target_value") @db.Decimal(15, 4)
+  id           String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  projectId    String  @map("project_id") @db.Uuid
+  metricName   String  @map("metric_name") @db.VarChar(50)
+  targetValue  Decimal @map("target_value") @db.Decimal(15, 4)
   isCostMetric Boolean @default(false) @map("is_cost_metric")
 
   // Relations
@@ -197,10 +205,10 @@ model KpiTarget {
 
 // 计算结果缓存表
 model CalculatedMetric {
-  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  projectId    String   @map("project_id") @db.Uuid
-  metricType   String   @map("metric_type") @db.VarChar(100)
-  metricValue  Json     @map("metric_value")
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  projectId    String    @map("project_id") @db.Uuid
+  metricType   String    @map("metric_type") @db.VarChar(100)
+  metricValue  Json      @map("metric_value")
   calculatedAt DateTime? @default(now()) @map("calculated_at") @db.Timestamptz()
 
   // Relations
@@ -212,12 +220,12 @@ model CalculatedMetric {
 
 // AI生成内容表
 model AiGeneratedContent {
-  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  projectId        String   @map("project_id") @db.Uuid
-  contentType      String   @map("content_type") @db.VarChar(50)
-  generatedContent String?  @map("generated_content")
-  editedContent    String?  @map("edited_content")
-  isEdited         Boolean  @default(false) @map("is_edited")
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  projectId        String    @map("project_id") @db.Uuid
+  contentType      String    @map("content_type") @db.VarChar(50)
+  generatedContent String?   @map("generated_content")
+  editedContent    String?   @map("edited_content")
+  isEdited         Boolean   @default(false) @map("is_edited")
   createdAt        DateTime? @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt        DateTime? @default(now()) @map("updated_at") @db.Timestamptz()
 
@@ -229,9 +237,9 @@ model AiGeneratedContent {
 
 // 竞品数据表
 model CompetitorData {
-  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  projectId      String   @map("project_id") @db.Uuid
-  competitorName String   @map("competitor_name") @db.VarChar(200)
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  projectId      String    @map("project_id") @db.Uuid
+  competitorName String    @map("competitor_name") @db.VarChar(200)
   metrics        Json
   createdAt      DateTime? @default(now()) @map("created_at") @db.Timestamptz()
 
@@ -243,17 +251,17 @@ model CompetitorData {
 
 // 报告版本表
 model ReportVersion {
-  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  projectId       String   @map("project_id") @db.Uuid
-  versionNumber   Int      @map("version_number")
-  generatedAt     DateTime @default(now()) @map("generated_at") @db.Timestamptz()
-  config          Json     @default("{}") // 生成配置（模块开关、语气等）
-  content         Json     @default("{}") // 完整报告内容快照
-  status          String   @default("draft") @db.VarChar(20) // draft | reviewing | finalized
-  createdBy       String?  @map("created_by") @db.VarChar(100)
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  projectId     String   @map("project_id") @db.Uuid
+  versionNumber Int      @map("version_number")
+  generatedAt   DateTime @default(now()) @map("generated_at") @db.Timestamptz()
+  config        Json     @default("{}") // 生成配置（模块开关、语气等）
+  content       Json     @default("{}") // 完整报告内容快照
+  status        String   @default("draft") @db.VarChar(20) // draft | reviewing | finalized
+  createdBy     String?  @map("created_by") @db.VarChar(100)
 
   // Relations
-  project         Project  @relation(fields: [projectId], references: [id])
+  project         Project          @relation(fields: [projectId], references: [id])
   moduleDecisions ModuleDecision[]
   reviewEdits     ReviewEdit[]
 
@@ -264,20 +272,20 @@ model ReportVersion {
 
 // 模块决策表
 model ModuleDecision {
-  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  projectId       String   @map("project_id") @db.Uuid
-  versionId       String   @map("version_id") @db.Uuid
-  moduleId        String   @map("module_id") @db.VarChar(10) // M1-M8
-  moduleName      String   @map("module_name") @db.VarChar(100)
-  status          String   @db.VarChar(20) // show | hide | degraded
-  reason          String?  @db.Text
-  degradedFields  Json?    @map("degraded_fields") // 降级时缺失的字段列表
-  isOverridden    Boolean  @default(false) @map("is_overridden") // 用户是否手动覆盖
-  overriddenAt    DateTime? @map("overridden_at") @db.Timestamptz()
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  projectId      String    @map("project_id") @db.Uuid
+  versionId      String    @map("version_id") @db.Uuid
+  moduleId       String    @map("module_id") @db.VarChar(10) // M1-M8
+  moduleName     String    @map("module_name") @db.VarChar(100)
+  status         String    @db.VarChar(20) // show | hide | degraded
+  reason         String?   @db.Text
+  degradedFields Json?     @map("degraded_fields") // 降级时缺失的字段列表
+  isOverridden   Boolean   @default(false) @map("is_overridden") // 用户是否手动覆盖
+  overriddenAt   DateTime? @map("overridden_at") @db.Timestamptz()
 
   // Relations
-  project         Project       @relation(fields: [projectId], references: [id])
-  version         ReportVersion @relation(fields: [versionId], references: [id])
+  project Project       @relation(fields: [projectId], references: [id])
+  version ReportVersion @relation(fields: [versionId], references: [id])
 
   @@unique([versionId, moduleId])
   @@index([projectId])
@@ -287,21 +295,21 @@ model ModuleDecision {
 
 // 指标评级表
 model MetricRatingRecord {
-  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  projectId        String   @map("project_id") @db.Uuid
-  metricName       String   @map("metric_name") @db.VarChar(50)
-  isCostMetric     Boolean  @default(false) @map("is_cost_metric")
-  vsKpiRatio       Decimal? @map("vs_kpi_ratio") @db.Decimal(10, 4)
-  vsKpiRating      String?  @map("vs_kpi_rating") @db.VarChar(5) // S/A/B/C/D or null
-  vsBenchmarkRatio Decimal? @map("vs_benchmark_ratio") @db.Decimal(10, 4)
-  vsBenchmarkRating String? @map("vs_benchmark_rating") @db.VarChar(5)
-  vsPreRatio       Decimal? @map("vs_pre_ratio") @db.Decimal(10, 4)
-  vsPreRating      String?  @map("vs_pre_rating") @db.VarChar(5)
-  finalRating      String   @map("final_rating") @db.VarChar(5) // 综合评级
-  calculatedAt     DateTime @default(now()) @map("calculated_at") @db.Timestamptz()
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  projectId         String   @map("project_id") @db.Uuid
+  metricName        String   @map("metric_name") @db.VarChar(50)
+  isCostMetric      Boolean  @default(false) @map("is_cost_metric")
+  vsKpiRatio        Decimal? @map("vs_kpi_ratio") @db.Decimal(10, 4)
+  vsKpiRating       String?  @map("vs_kpi_rating") @db.VarChar(5) // S/A/B/C/D or null
+  vsBenchmarkRatio  Decimal? @map("vs_benchmark_ratio") @db.Decimal(10, 4)
+  vsBenchmarkRating String?  @map("vs_benchmark_rating") @db.VarChar(5)
+  vsPreRatio        Decimal? @map("vs_pre_ratio") @db.Decimal(10, 4)
+  vsPreRating       String?  @map("vs_pre_rating") @db.VarChar(5)
+  finalRating       String   @map("final_rating") @db.VarChar(5) // 综合评级
+  calculatedAt      DateTime @default(now()) @map("calculated_at") @db.Timestamptz()
 
   // Relations
-  project          Project  @relation(fields: [projectId], references: [id])
+  project Project @relation(fields: [projectId], references: [id])
 
   @@unique([projectId, metricName])
   @@index([projectId])
@@ -321,8 +329,8 @@ model ReviewEdit {
   editedBy        String?  @map("edited_by") @db.VarChar(100)
 
   // Relations
-  project         Project       @relation(fields: [projectId], references: [id])
-  version         ReportVersion @relation(fields: [versionId], references: [id])
+  project Project       @relation(fields: [projectId], references: [id])
+  version ReportVersion @relation(fields: [versionId], references: [id])
 
   @@index([versionId])
   @@index([projectId])
@@ -352,16 +360,16 @@ model Workspace {
 
 // 模型配置
 model ModelConfig {
-  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name         String   @db.VarChar(100)
-  apiKey       String   @map("api_key") @db.Text
-  baseUrl      String   @map("base_url") @db.VarChar(500)
-  modelName    String   @map("model_name") @db.VarChar(200)
-  timeoutMs    Int      @default(30000) @map("timeout_ms")
-  maxRetries   Int      @default(2) @map("max_retries")
-  isDefault    Boolean  @default(false) @map("is_default")
-  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz()
-  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name       String   @db.VarChar(100)
+  apiKey     String   @map("api_key") @db.Text
+  baseUrl    String   @map("base_url") @db.VarChar(500)
+  modelName  String   @map("model_name") @db.VarChar(200)
+  timeoutMs  Int      @default(30000) @map("timeout_ms")
+  maxRetries Int      @default(2) @map("max_retries")
+  isDefault  Boolean  @default(false) @map("is_default")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
 
   agents Agent[]
 
@@ -381,9 +389,9 @@ model Agent {
   createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt     DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
 
-  workspace   Workspace?   @relation(fields: [workspaceId], references: [id])
-  modelConfig ModelConfig? @relation(fields: [modelConfigId], references: [id])
-  agentSkills AgentSkill[]
+  workspace            Workspace?    @relation(fields: [workspaceId], references: [id])
+  modelConfig          ModelConfig?  @relation(fields: [modelConfigId], references: [id])
+  agentSkills          AgentSkill[]
   dispatchLogsAsSource DispatchLog[] @relation("SourceAgent")
   dispatchLogsAsTarget DispatchLog[] @relation("TargetAgent")
 
@@ -402,9 +410,9 @@ model Skill {
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
 
-  workspace    Workspace?    @relation(fields: [workspaceId], references: [id])
-  agentSkills  AgentSkill[]
-  versions     SkillVersion[]
+  workspace   Workspace?     @relation(fields: [workspaceId], references: [id])
+  agentSkills AgentSkill[]
+  versions    SkillVersion[]
 
   @@map("skills")
 }
@@ -439,15 +447,15 @@ model AgentSkill {
 
 // 知识库文档
 model KnowledgeDocument {
-  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  fileName     String   @map("file_name") @db.VarChar(500)
-  fileSize     Int      @map("file_size")
-  mimeType     String   @map("mime_type") @db.VarChar(100)
-  storagePath  String   @map("storage_path") @db.VarChar(1000)
-  workspaceId  String?  @map("workspace_id") @db.Uuid
-  uploadedBy   String?  @map("uploaded_by") @db.VarChar(100)
-  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz()
-  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  fileName    String   @map("file_name") @db.VarChar(500)
+  fileSize    Int      @map("file_size")
+  mimeType    String   @map("mime_type") @db.VarChar(100)
+  storagePath String   @map("storage_path") @db.VarChar(1000)
+  workspaceId String?  @map("workspace_id") @db.Uuid
+  uploadedBy  String?  @map("uploaded_by") @db.VarChar(100)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
 
   workspace Workspace? @relation(fields: [workspaceId], references: [id])
 
@@ -457,29 +465,29 @@ model KnowledgeDocument {
 
 // 原生工具定义
 model NativeTool {
-  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name        String   @unique @db.VarChar(100)
-  description String   @db.VarChar(500)
-  inputSchema Json     @map("input_schema")
-  outputFormat String? @map("output_format") @db.VarChar(100)
-  isBuiltin   Boolean  @default(true) @map("is_builtin")
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name         String   @unique @db.VarChar(100)
+  description  String   @db.VarChar(500)
+  inputSchema  Json     @map("input_schema")
+  outputFormat String?  @map("output_format") @db.VarChar(100)
+  isBuiltin    Boolean  @default(true) @map("is_builtin")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz()
 
   @@map("native_tools")
 }
 
 // 调度日志
 model DispatchLog {
-  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  sourceAgentId String?  @map("source_agent_id") @db.Uuid
-  targetAgentId String   @map("target_agent_id") @db.Uuid
-  taskSummary   String   @map("task_summary") @db.VarChar(1000)
-  status        String   @db.VarChar(20)
-  response      String?  @db.Text
-  errorMessage  String?  @map("error_message") @db.Text
-  durationMs    Int?     @map("duration_ms")
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sourceAgentId String?   @map("source_agent_id") @db.Uuid
+  targetAgentId String    @map("target_agent_id") @db.Uuid
+  taskSummary   String    @map("task_summary") @db.VarChar(1000)
+  status        String    @db.VarChar(20)
+  response      String?   @db.Text
+  errorMessage  String?   @map("error_message") @db.Text
+  durationMs    Int?      @map("duration_ms")
   metadata      Json?
-  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz()
   completedAt   DateTime? @map("completed_at") @db.Timestamptz()
 
   sourceAgent Agent? @relation("SourceAgent", fields: [sourceAgentId], references: [id])
@@ -489,4 +497,78 @@ model DispatchLog {
   @@index([status])
   @@index([createdAt])
   @@map("dispatch_logs")
+}
+
+// ===== 页面改版V2 数据模型 =====
+
+// 项目树节点表（级联选择器数据源）
+model ProjectTreeNode {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  category      String   @db.VarChar(200)
+  brand         String   @db.VarChar(200)
+  businessLine  String   @map("business_line") @db.VarChar(200)
+  importBatchId String?  @map("import_batch_id") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  @@unique([category, brand, businessLine])
+  @@index([category])
+  @@index([category, brand])
+  @@map("project_tree_nodes")
+}
+
+// 复盘配置表
+model ReviewConfig {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  projectId        String   @map("project_id") @db.Uuid
+  createdBy        String   @map("created_by") @db.Uuid
+  status           String   @default("draft") @db.VarChar(20) // draft | generating | completed
+  benchmark        Json     @default("{}")
+  influencerTiers  Json     @default("[]") @map("influencer_tiers")
+  kpiTargets       Json     @default("{}") @map("kpi_targets")
+  engagementMetric String   @default("exclude_follow") @map("engagement_metric") @db.VarChar(30)
+  viralMetric      String   @default("like_comment_share") @map("viral_metric") @db.VarChar(30)
+  modules          Json     @default("{}")
+  launchPhases     Json     @default("[]") @map("launch_phases")
+  planFileUrl      String?  @map("plan_file_url")
+  planFileName     String?  @map("plan_file_name") @db.VarChar(500)
+  reportContent    Json?    @map("report_content")
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt        DateTime @default(now()) @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  project Project @relation(fields: [projectId], references: [id])
+
+  @@index([projectId])
+  @@index([createdBy])
+  @@map("review_configs")
+}
+
+// 舆情数据表
+model SentimentData {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  projectId   String    @map("project_id") @db.Uuid
+  dataType    String    @map("data_type") @db.VarChar(50) // sentiment_distribution | trend | keywords | negative_comments
+  dataContent Json      @map("data_content")
+  periodStart DateTime? @map("period_start") @db.Date
+  periodEnd   DateTime? @map("period_end") @db.Date
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+
+  @@index([projectId])
+  @@index([projectId, dataType])
+  @@map("sentiment_data")
+}
+
+// 导出记录表
+model ExportRecord {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  projectId  String   @map("project_id") @db.Uuid
+  exportType String   @map("export_type") @db.VarChar(50) // sentiment | report
+  fileName   String   @map("file_name") @db.VarChar(500)
+  fileUrl    String?  @map("file_url")
+  exportedBy String   @map("exported_by") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  @@index([projectId])
+  @@index([exportedBy])
+  @@map("export_records")
 }

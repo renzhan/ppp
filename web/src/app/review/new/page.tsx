@@ -95,6 +95,9 @@ export default function NewReviewPage() {
   // ─── Form State ──────────────────────────────────────────────────────────
   const [selectedProjectId, setSelectedProjectId] = useState(preselectedProjectId);
   const [projectSearch, setProjectSearch] = useState('');
+  const [filterCategory, setFilterCategory] = useState('');
+  const [filterBrand, setFilterBrand] = useState('');
+  const [filterBusinessLine, setFilterBusinessLine] = useState('');
   const [benchmark, setBenchmark] = useState<BenchmarkData>({
     ctr: '', cpm: '', cpc: '', cpe: '', engagementRate: '',
   });
@@ -130,18 +133,45 @@ export default function NewReviewPage() {
     },
   });
 
-  // Filter projects by search keyword
+  // Derive category/brand/businessLine options from existing projects
+  const categoryOptions = useMemo(() => {
+    if (!projects) return [];
+    const set = new Set(projects.map((p) => p.category).filter(Boolean));
+    return Array.from(set).sort();
+  }, [projects]);
+
+  const brandOptions = useMemo(() => {
+    if (!projects) return [];
+    let filtered = projects;
+    if (filterCategory) filtered = filtered.filter((p) => p.category === filterCategory);
+    const set = new Set(filtered.map((p) => p.brand).filter(Boolean));
+    return Array.from(set).sort();
+  }, [projects, filterCategory]);
+
+  const businessLineOptions = useMemo(() => {
+    if (!projects) return [];
+    let filtered = projects;
+    if (filterCategory) filtered = filtered.filter((p) => p.category === filterCategory);
+    if (filterBrand) filtered = filtered.filter((p) => p.brand === filterBrand);
+    const set = new Set(filtered.map((p) => p.businessLine).filter((v): v is string => !!v));
+    return Array.from(set).sort();
+  }, [projects, filterCategory, filterBrand]);
+
+  // Filter projects by cascade selection + search keyword
   const filteredProjects = useMemo(() => {
     if (!projects) return [];
-    if (!projectSearch.trim()) return projects;
-    const keyword = projectSearch.trim().toLowerCase();
-    return projects.filter((p) =>
-      p.projectName.toLowerCase().includes(keyword) ||
-      p.category?.toLowerCase().includes(keyword) ||
-      p.brand?.toLowerCase().includes(keyword) ||
-      p.businessLine?.toLowerCase().includes(keyword)
-    );
-  }, [projects, projectSearch]);
+    let filtered = projects;
+    if (filterCategory) filtered = filtered.filter((p) => p.category === filterCategory);
+    if (filterBrand) filtered = filtered.filter((p) => p.brand === filterBrand);
+    if (filterBusinessLine) filtered = filtered.filter((p) => p.businessLine === filterBusinessLine);
+    if (projectSearch.trim()) {
+      const keyword = projectSearch.trim().toLowerCase();
+      filtered = filtered.filter((p) =>
+        p.projectName.toLowerCase().includes(keyword)
+      );
+    }
+    return filtered;
+  }, [projects, filterCategory, filterBrand, filterBusinessLine, projectSearch]);
 
   // Selected project info (for read-only display)
   const selectedProject = useMemo(() => {
@@ -183,6 +213,13 @@ export default function NewReviewPage() {
   const handleProjectChange = (projectId: string) => {
     setSelectedProjectId(projectId);
     setProjectSearch('');
+    // Auto-fill cascade filters based on selected project
+    const project = projects?.find((p) => p.id === projectId);
+    if (project) {
+      setFilterCategory(project.category || '');
+      setFilterBrand(project.brand || '');
+      setFilterBusinessLine(project.businessLine || '');
+    }
   };
 
   const handleAddTier = () => {
@@ -286,6 +323,45 @@ export default function NewReviewPage() {
 
       {/* Section: 项目信息 */}
       <FormSection title="项目信息">
+        {/* Cascade filters from existing projects */}
+        <div className="mb-4 grid grid-cols-3 gap-3">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-slate-600">品类</label>
+            <select
+              value={filterCategory}
+              onChange={(e) => { setFilterCategory(e.target.value); setFilterBrand(''); setFilterBusinessLine(''); setSelectedProjectId(''); }}
+              className="block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            >
+              <option value="">全部品类</option>
+              {categoryOptions.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-slate-600">品牌</label>
+            <select
+              value={filterBrand}
+              onChange={(e) => { setFilterBrand(e.target.value); setFilterBusinessLine(''); setSelectedProjectId(''); }}
+              disabled={!filterCategory}
+              className="block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-slate-50"
+            >
+              <option value="">全部品牌</option>
+              {brandOptions.map((b) => <option key={b} value={b}>{b}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-slate-600">业务线</label>
+            <select
+              value={filterBusinessLine}
+              onChange={(e) => { setFilterBusinessLine(e.target.value); setSelectedProjectId(''); }}
+              disabled={!filterBrand}
+              className="block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-slate-50"
+            >
+              <option value="">全部业务线</option>
+              {businessLineOptions.map((bl) => <option key={bl} value={bl}>{bl}</option>)}
+            </select>
+          </div>
+        </div>
+
         <div>
           <label className="mb-1 block text-xs font-medium text-slate-600">选择项目</label>
           <div className="relative">

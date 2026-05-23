@@ -3,14 +3,26 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutList, PlusCircle, PanelLeftClose, PanelLeft, Users, Bot, LogOut } from 'lucide-react';
+import {
+  FolderKanban,
+  BarChart3,
+  Lightbulb,
+  MessageCircle,
+  Users,
+  Settings,
+  PanelLeftClose,
+  PanelLeft,
+  LogOut,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navItems = [
-  { href: '/', label: '项目列表', icon: LayoutList },
-  { href: '/projects/new', label: '新建项目', icon: PlusCircle },
-  { href: '/admin/agents', label: 'Agent 管理', icon: Bot, adminOnly: true },
-  { href: '/admin/users', label: '用户管理', icon: Users, adminOnly: true },
+  { href: '/', label: '项目管理', icon: FolderKanban },
+  { href: '/review', label: '复盘系统', icon: BarChart3 },
+  { href: '/planning', label: '策划系统', icon: Lightbulb },
+  { href: '/sentiment', label: '舆情系统', icon: MessageCircle },
+  { href: '/admin/users', label: '账户管理', icon: Users, adminOnly: true },
+  { href: '/admin/settings', label: '系统设置', icon: Settings, adminOnly: true },
 ];
 
 export function Sidebar() {
@@ -35,17 +47,17 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        'flex h-screen flex-col border-r bg-white transition-all duration-200',
+        'flex h-screen flex-col bg-slate-900 transition-all duration-200',
         collapsed ? 'w-16' : 'w-56'
       )}
     >
-      <div className="flex h-14 items-center justify-between border-b px-4">
+      <div className="flex h-14 items-center justify-between border-b border-slate-700 px-4">
         {!collapsed && (
-          <span className="text-sm font-semibold text-gray-800">营销复盘系统</span>
+          <span className="text-sm font-semibold text-white">派盘盘</span>
         )}
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+          className="rounded p-1 text-slate-400 hover:bg-white/5 hover:text-white"
           aria-label={collapsed ? '展开侧边栏' : '收起侧边栏'}
         >
           {collapsed ? <PanelLeft size={18} /> : <PanelLeftClose size={18} />}
@@ -66,8 +78,8 @@ export function Sidebar() {
                 className={cn(
                   'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
                   isActive
-                    ? 'bg-primary/10 text-primary'
-                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                    ? 'bg-white/10 text-white'
+                    : 'text-slate-300 hover:bg-white/5 hover:text-white'
                 )}
                 title={collapsed ? item.label : undefined}
               >
@@ -79,10 +91,10 @@ export function Sidebar() {
       </nav>
 
       {/* Logout button */}
-      <div className="border-t px-2 py-3">
+      <div className="border-t border-slate-700 px-2 py-3">
         <button
           onClick={handleLogout}
-          className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900"
+          className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-white/5 hover:text-white"
           title={collapsed ? '退出登录' : undefined}
         >
           <LogOut size={18} className="shrink-0" />

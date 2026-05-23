@@ -164,7 +164,7 @@ export default function AdminUsersPage() {
                         : 'bg-blue-100 text-blue-700'
                     }`}
                   >
-                    {user.role === 'admin' ? '管理员' : '普通用户'}
+                    {user.role === 'admin' ? '管理员' : user.role}
                   </span>
                 </td>
                 <td className="px-4 py-3">
@@ -328,7 +328,7 @@ function AddUserModal({
   const [form, setForm] = useState({
     username: '',
     displayName: '',
-    role: 'user',
+    role: '执行',
     password: '',
   });
   const [error, setError] = useState('');
@@ -399,7 +399,11 @@ function AddUserModal({
             onChange={(e) => setForm({ ...form, role: e.target.value })}
             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
           >
-            <option value="user">普通用户</option>
+            <option value="组长">组长</option>
+            <option value="AD">AD</option>
+            <option value="AM">AM</option>
+            <option value="投手">投手</option>
+            <option value="执行">执行</option>
             <option value="admin">管理员</option>
           </select>
         </div>
@@ -507,7 +511,11 @@ function EditUserModal({
             onChange={(e) => setForm({ ...form, role: e.target.value })}
             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
           >
-            <option value="user">普通用户</option>
+            <option value="组长">组长</option>
+            <option value="AD">AD</option>
+            <option value="AM">AM</option>
+            <option value="投手">投手</option>
+            <option value="执行">执行</option>
             <option value="admin">管理员</option>
           </select>
         </div>
@@ -624,8 +632,8 @@ function ImportModal({
   onSuccess: (msg: string) => void;
 }) {
   const [file, setFile] = useState<File | null>(null);
-  const [defaultPassword, setDefaultPassword] = useState('password123');
   const [error, setError] = useState('');
+  const [importErrors, setImportErrors] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -635,14 +643,14 @@ function ImportModal({
       return;
     }
     setError('');
+    setImportErrors([]);
     setLoading(true);
 
     try {
       const formData = new FormData();
       formData.append('file', file);
-      formData.append('defaultPassword', defaultPassword);
 
-      const res = await fetch('/api/admin/users/import', {
+      const res = await fetch('/api/admin/import/users', {
         method: 'POST',
         body: formData,
       });
@@ -653,11 +661,21 @@ function ImportModal({
         return;
       }
 
-      let msg = `导入完成：成功 ${data.successCount} 个`;
-      if (data.failedCount > 0) {
-        msg += `，失败 ${data.failedCount} 个`;
+      // Show import errors if any
+      if (data.errors && data.errors.length > 0) {
+        setImportErrors(data.errors);
       }
-      onSuccess(msg);
+
+      let msg = `导入完成：成功 ${data.imported} 个用户`;
+      if (data.errors && data.errors.length > 0) {
+        msg += `，${data.errors.length} 条错误`;
+      }
+      if (!data.errors || data.errors.length === 0) {
+        onSuccess(msg);
+      } else {
+        // Keep modal open to show errors, but show success count
+        setError('');
+      }
     } catch {
       setError('网络错误');
     } finally {
@@ -672,13 +690,25 @@ function ImportModal({
           {error}
         </div>
       )}
+      {importErrors.length > 0 && (
+        <div className="mb-3 max-h-40 overflow-y-auto rounded-lg bg-orange-50 px-3 py-2 text-xs text-orange-700">
+          <p className="mb-1 font-medium">导入错误：</p>
+          <ul className="list-inside list-disc space-y-0.5">
+            {importErrors.map((err, idx) => (
+              <li key={idx}>{err}</li>
+            ))}
+          </ul>
+        </div>
+      )}
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-700">
-          <p>Excel文件需包含列：username（用户名）、displayName/姓名（显示名称）、role/角色（角色，可选）</p>
+          <p>Excel文件(.xlsx)需包含列：用户名、显示名、角色</p>
+          <p className="mt-1">有效角色值：组长、AD、AM、投手、执行</p>
+          <p className="mt-1">系统将为每个用户自动生成初始密码，首次登录需修改密码。</p>
           <a
-            href="/api/admin/users/template"
+            href="/api/admin/import/users/template"
             download
-            className="mt-1 inline-flex items-center gap-1 text-blue-600 underline hover:text-blue-800"
+            className="mt-2 inline-flex items-center gap-1 text-blue-600 underline hover:text-blue-800"
           >
             下载导入模板
           </a>
@@ -689,22 +719,13 @@ function ImportModal({
           </label>
           <input
             type="file"
-            accept=".xlsx,.xls"
-            onChange={(e) => setFile(e.target.files?.[0] || null)}
+            accept=".xlsx"
+            onChange={(e) => {
+              setFile(e.target.files?.[0] || null);
+              setError('');
+              setImportErrors([]);
+            }}
             className="w-full text-sm text-gray-500 file:mr-4 file:rounded-lg file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-blue-700 hover:file:bg-blue-100"
-          />
-        </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">
-            统一初始密码
-          </label>
-          <input
-            type="text"
-            value={defaultPassword}
-            onChange={(e) => setDefaultPassword(e.target.value)}
-            placeholder="至少6位"
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-            minLength={6}
           />
         </div>
         <div className="flex justify-end gap-3 pt-2">

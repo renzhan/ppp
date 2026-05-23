@@ -1,0 +1,57 @@
+import { NextResponse } from 'next/server';
+import * as XLSX from 'xlsx';
+
+/**
+ * GET /api/admin/import/users/template
+ * 
+ * Downloads an Excel template for batch user import.
+ * Includes a hidden sheet with role values used for dropdown validation.
+ */
+export async function GET() {
+  const wb = XLSX.utils.book_new();
+
+  // Main sheet with sample data
+  const data = [
+    ['用户名', '显示名', '角色'],
+    ['zhangsan', '张三', '执行'],
+    ['lisi', '李四', 'AM'],
+    ['wangwu', '王五', '组长'],
+  ];
+  
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  
+  // Set column widths
+  ws['!cols'] = [
+    { wch: 20 },
+    { wch: 20 },
+    { wch: 15 },
+  ];
+
+  XLSX.utils.book_append_sheet(wb, ws, '用户导入模板');
+
+  // Create a hidden "角色选项" sheet with valid role values for reference
+  const validRoles = ['admin', '组长', 'AD', 'AM', '投手', '执行'];
+  const rolesData = [['有效角色值（请勿修改此表）'], ...validRoles.map(r => [r])];
+  const rolesWs = XLSX.utils.aoa_to_sheet(rolesData);
+  rolesWs['!cols'] = [{ wch: 25 }];
+  XLSX.utils.book_append_sheet(wb, rolesWs, '角色选项');
+
+  // Set data validation on the role column (C2:C200)
+  // Note: SheetJS community edition has limited dataValidation support,
+  // so we also add the roles as a reference sheet
+  if (!ws['!dataValidation']) ws['!dataValidation'] = [];
+  (ws['!dataValidation'] as unknown[]).push({
+    sqref: 'C2:C200',
+    type: 'list',
+    formula1: `"${validRoles.join(',')}"`,
+  });
+
+  const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+  
+  return new NextResponse(buffer, {
+    headers: {
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': 'attachment; filename="user-import-template.xlsx"',
+    },
+  });
+}

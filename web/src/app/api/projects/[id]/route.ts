@@ -142,6 +142,12 @@ export async function PUT(
     if (body.cooperationPolicy !== undefined) {
       updateData.cooperationPolicy = body.cooperationPolicy as Prisma.InputJsonValue;
     }
+    if (body.businessLine !== undefined) {
+      updateData.businessLine = body.businessLine || null;
+    }
+    if (body.participants !== undefined) {
+      updateData.participants = Array.isArray(body.participants) ? body.participants : [];
+    }
 
     const updated = await prisma.project.update({
       where: { id: params.id },

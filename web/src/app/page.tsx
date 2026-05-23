@@ -1,25 +1,16 @@
 'use client';
 
-import { useMemo, useRef, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useRouter } from 'next/navigation';
+import { useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
-import { CalendarDays, FileText, MoreHorizontal, Plus, RotateCcw, Search, Tag, Trash2 } from 'lucide-react';
-import { PageHeader } from '@/components/layout/page-header';
+import { Plus, Search, RotateCcw, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Loading } from '@/components/ui/loading';
-import {
-  PROJECT_STATUS_BADGES,
-  PROJECT_STATUS_LABELS,
-  PROJECT_TYPES,
-  formatDateRange,
-  type ProjectStatus,
-} from '@/lib/project-meta';
+import { formatDate } from '@/lib/project-meta';
 
-interface ReportVersionSummary {
+interface TreeNode {
   id: string;
-  versionNumber: number;
-  status: string;
-  generatedAt: string;
+  label: string;
+  children?: TreeNode[];
 }
 
 interface Project {
@@ -27,72 +18,80 @@ interface Project {
   projectName: string;
   brand: string;
   category: string;
-  projectType: string;
+  businessLine: string | null;
   startDate: string;
   endDate: string;
   createdAt: string;
-  status: ProjectStatus;
-  reportVersions: ReportVersionSummary[];
+  createdBy: string | null;
+  createdByDisplayName: string | null;
+  noteCount: number;
+  participants: string[];
 }
 
 interface ProjectsResponse {
   items: Project[];
   totalItems: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
 }
-
-interface FiltersResponse {
-  brands: string[];
-  categories: string[];
-}
-
-const STATUS_OPTIONS: Array<{ value: string; label: string }> = [
-  { value: '', label: '全部状态' },
-  { value: 'draft', label: '待复盘' },
-  { value: 'generating', label: '生成中' },
-  { value: 'reviewing', label: '待审校' },
-  { value: 'finalized', label: '终版' },
-];
 
 export default function ProjectListPage() {
   const [search, setSearch] = useState('');
   const [filters, setFilters] = useState({
-    brand: '',
     category: '',
-    projectType: '',
-    status: '',
+    brand: '',
+    businessLine: '',
+    dateFrom: '',
+    dateTo: '',
   });
+  const [page, setPage] = useState(1);
+  const pageSize = 20;
 
-  const { data: filterOptions } = useQuery<FiltersResponse>({
-    queryKey: ['project-filters'],
+  // Fetch tree structure for cascade selectors
+  const { data: treeData } = useQuery<TreeNode[]>({
+    queryKey: ['tree-structure'],
     queryFn: async () => {
-      const response = await fetch('/api/projects/filters');
-      if (!response.ok) {
-        throw new Error('获取筛选项失败');
-      }
+      const response = await fetch('/api/tree-structure');
+      if (!response.ok) throw new Error('获取树结构失败');
       return response.json();
     },
     staleTime: 60_000,
   });
 
+  // Derive brand and business line options from tree
+  const brandOptions = useMemo(() => {
+    if (!treeData || !filters.category) return [];
+    const categoryNode = treeData.find((n) => n.id === filters.category);
+    return categoryNode?.children ?? [];
+  }, [treeData, filters.category]);
+
+  const businessLineOptions = useMemo(() => {
+    if (!treeData || !filters.category || !filters.brand) return [];
+    const categoryNode = treeData.find((n) => n.id === filters.category);
+    const brandNode = categoryNode?.children?.find((n) => n.id === filters.brand);
+    return brandNode?.children ?? [];
+  }, [treeData, filters.category, filters.brand]);
+
+  // Build query string
   const queryString = useMemo(() => {
     const params = new URLSearchParams();
-    params.set('page', '1');
-    params.set('pageSize', '60');
+    params.set('page', String(page));
+    params.set('pageSize', String(pageSize));
     if (search) params.set('search', search);
-    if (filters.brand) params.set('brand', filters.brand);
     if (filters.category) params.set('category', filters.category);
-    if (filters.projectType) params.set('projectType', filters.projectType);
-    if (filters.status) params.set('status', filters.status);
+    if (filters.brand) params.set('brand', filters.brand);
+    if (filters.businessLine) params.set('businessLine', filters.businessLine);
+    if (filters.dateFrom) params.set('dateFrom', filters.dateFrom);
+    if (filters.dateTo) params.set('dateTo', filters.dateTo);
     return params.toString();
-  }, [filters, search]);
+  }, [filters, search, page]);
 
   const { data, isLoading, isError, error } = useQuery<ProjectsResponse>({
     queryKey: ['projects', queryString],
     queryFn: async () => {
       const response = await fetch(`/api/projects?${queryString}`);
-      if (!response.ok) {
-        throw new Error('获取项目列表失败');
-      }
+      if (!response.ok) throw new Error('获取项目列表失败');
       return response.json();
     },
   });
@@ -100,75 +99,138 @@ export default function ProjectListPage() {
   const resetFilters = () => {
     setSearch('');
     setFilters({
-      brand: '',
       category: '',
-      projectType: '',
-      status: '',
+      brand: '',
+      businessLine: '',
+      dateFrom: '',
+      dateTo: '',
     });
+    setPage(1);
   };
+
+  const handleCategoryChange = (value: string) => {
+    setFilters((prev) => ({ ...prev, category: value, brand: '', businessLine: '' }));
+    setPage(1);
+  };
+
+  const handleBrandChange = (value: string) => {
+    setFilters((prev) => ({ ...prev, brand: value, businessLine: '' }));
+    setPage(1);
+  };
+
+  const handleBusinessLineChange = (value: string) => {
+    setFilters((prev) => ({ ...prev, businessLine: value }));
+    setPage(1);
+  };
+
+  const totalPages = data?.totalPages ?? 1;
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="项目管理"
-        description="全部项目默认可见，可按品牌、品类、项目名称、项目时间和项目类型筛选。"
-        actions={
-          <Link
-            href="/projects/new"
-            className="inline-flex h-11 items-center gap-2 rounded-lg bg-blue-600 px-5 text-sm font-medium text-white transition hover:bg-blue-700"
-          >
-            <Plus size={16} />
-            新建项目
-          </Link>
-        }
-      />
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-gray-900">项目管理</h1>
+          <p className="mt-1 text-sm text-slate-500">管理所有项目，支持按品类、品牌、业务线、项目名称和立项日期筛选。</p>
+        </div>
+        <Link
+          href="/projects/new"
+          className="inline-flex h-10 items-center gap-2 rounded-lg bg-blue-600 px-5 text-sm font-medium text-white transition hover:bg-blue-700"
+        >
+          <Plus size={16} />
+          新建项目
+        </Link>
+      </div>
 
+      {/* Filter Bar */}
       <div className="rounded-lg border bg-white p-4">
-        <div className="grid gap-3 lg:grid-cols-[minmax(0,1.3fr)_repeat(4,minmax(0,0.9fr))_auto]">
-          <div className="relative">
-            <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+        <div className="flex flex-wrap items-end gap-3">
+          {/* Category */}
+          <div className="min-w-[140px]">
+            <label className="mb-1 block text-xs font-medium text-slate-600">品类</label>
+            <select
+              value={filters.category}
+              onChange={(e) => handleCategoryChange(e.target.value)}
+              className="h-9 w-full rounded-md border border-slate-200 px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            >
+              <option value="">全部品类</option>
+              {(treeData ?? []).map((node) => (
+                <option key={node.id} value={node.id}>{node.label}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Brand */}
+          <div className="min-w-[140px]">
+            <label className="mb-1 block text-xs font-medium text-slate-600">品牌</label>
+            <select
+              value={filters.brand}
+              onChange={(e) => handleBrandChange(e.target.value)}
+              disabled={!filters.category}
+              className="h-9 w-full rounded-md border border-slate-200 px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-50"
+            >
+              <option value="">全部品牌</option>
+              {brandOptions.map((node) => (
+                <option key={node.id} value={node.id}>{node.label}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Business Line */}
+          <div className="min-w-[140px]">
+            <label className="mb-1 block text-xs font-medium text-slate-600">产品线</label>
+            <select
+              value={filters.businessLine}
+              onChange={(e) => handleBusinessLineChange(e.target.value)}
+              disabled={!filters.brand}
+              className="h-9 w-full rounded-md border border-slate-200 px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-50"
+            >
+              <option value="">全部产品线</option>
+              {businessLineOptions.map((node) => (
+                <option key={node.id} value={node.id}>{node.label}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Project Name Search */}
+          <div className="min-w-[180px]">
+            <label className="mb-1 block text-xs font-medium text-slate-600">项目名称</label>
+            <div className="relative">
+              <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                value={search}
+                onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+                placeholder="搜索项目名称"
+                className="h-9 w-full rounded-md border border-slate-200 pl-9 pr-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              />
+            </div>
+          </div>
+
+          {/* Date Range */}
+          <div className="min-w-[140px]">
+            <label className="mb-1 block text-xs font-medium text-slate-600">立项开始日期</label>
             <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="搜索项目名称或品牌"
-              className="h-11 w-full rounded-lg border border-slate-200 py-2 pl-10 pr-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              type="date"
+              value={filters.dateFrom}
+              onChange={(e) => { setFilters((prev) => ({ ...prev, dateFrom: e.target.value })); setPage(1); }}
+              className="h-9 w-full rounded-md border border-slate-200 px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            />
+          </div>
+          <div className="min-w-[140px]">
+            <label className="mb-1 block text-xs font-medium text-slate-600">立项结束日期</label>
+            <input
+              type="date"
+              value={filters.dateTo}
+              onChange={(e) => { setFilters((prev) => ({ ...prev, dateTo: e.target.value })); setPage(1); }}
+              className="h-9 w-full rounded-md border border-slate-200 px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
             />
           </div>
 
-          <FilterSelect
-            value={filters.category}
-            onChange={(value) => setFilters((prev) => ({ ...prev, category: value }))}
-            options={[
-              { value: '', label: '全部品类' },
-              ...(filterOptions?.categories || []).map((item) => ({ value: item, label: item })),
-            ]}
-          />
-          <FilterSelect
-            value={filters.brand}
-            onChange={(value) => setFilters((prev) => ({ ...prev, brand: value }))}
-            options={[
-              { value: '', label: '全部品牌' },
-              ...(filterOptions?.brands || []).map((item) => ({ value: item, label: item })),
-            ]}
-          />
-          <FilterSelect
-            value={filters.projectType}
-            onChange={(value) => setFilters((prev) => ({ ...prev, projectType: value }))}
-            options={[
-              { value: '', label: '全部项目类型' },
-              ...PROJECT_TYPES.map((item) => ({ value: item, label: item })),
-            ]}
-          />
-          <FilterSelect
-            value={filters.status}
-            onChange={(value) => setFilters((prev) => ({ ...prev, status: value }))}
-            options={STATUS_OPTIONS}
-          />
-
+          {/* Reset */}
           <button
             type="button"
             onClick={resetFilters}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+            className="inline-flex h-9 items-center gap-1.5 rounded-md border border-slate-200 px-3 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
           >
             <RotateCcw size={14} />
             重置
@@ -176,6 +238,7 @@ export default function ProjectListPage() {
         </div>
       </div>
 
+      {/* Table */}
       {isLoading ? (
         <Loading size="lg" text="正在加载项目列表..." className="py-20" />
       ) : isError ? (
@@ -183,14 +246,111 @@ export default function ProjectListPage() {
           {(error as Error).message || '获取项目列表失败'}
         </div>
       ) : data?.items.length ? (
-        <div className="grid gap-5 xl:grid-cols-3 md:grid-cols-2">
-          {data.items.map((project) => {
-            const latestVersion = project.reportVersions[0];
-            const statusLabel = PROJECT_STATUS_LABELS[project.status] || project.status;
-            const primaryAction = getPrimaryAction(project);
+        <div className="overflow-hidden rounded-lg border bg-white">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b bg-slate-50 text-left">
+                  <th className="whitespace-nowrap px-4 py-3 font-medium text-slate-600">品类</th>
+                  <th className="whitespace-nowrap px-4 py-3 font-medium text-slate-600">品牌</th>
+                  <th className="whitespace-nowrap px-4 py-3 font-medium text-slate-600">业务线</th>
+                  <th className="whitespace-nowrap px-4 py-3 font-medium text-slate-600">项目名称</th>
+                  <th className="whitespace-nowrap px-4 py-3 font-medium text-slate-600">创建者</th>
+                  <th className="whitespace-nowrap px-4 py-3 font-medium text-slate-600">笔记数量</th>
+                  <th className="whitespace-nowrap px-4 py-3 font-medium text-slate-600">立项时间</th>
+                  <th className="whitespace-nowrap px-4 py-3 font-medium text-slate-600">参与者</th>
+                  <th className="whitespace-nowrap px-4 py-3 font-medium text-slate-600">操作</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {data.items.map((project) => (
+                  <tr key={project.id} className="transition hover:bg-slate-50">
+                    <td className="whitespace-nowrap px-4 py-3 text-slate-700">{project.category || '-'}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-slate-700">{project.brand || '-'}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-slate-700">{project.businessLine || '-'}</td>
+                    <td className="max-w-[200px] truncate px-4 py-3 font-medium text-slate-900">{project.projectName}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-slate-700">{project.createdByDisplayName || '-'}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-slate-700">{project.noteCount ?? 0}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-slate-700">{formatDate(project.startDate)}</td>
+                    <td className="max-w-[150px] truncate px-4 py-3 text-slate-700">
+                      {project.participants?.length > 0 ? `${project.participants.length}人` : '-'}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <Link
+                          href={`/projects/${project.id}/edit`}
+                          className="inline-flex items-center rounded px-2 py-1 text-xs font-medium text-blue-600 transition hover:bg-blue-50"
+                        >
+                          编辑
+                        </Link>
+                        <Link
+                          href={`/review/new?projectId=${project.id}`}
+                          className="inline-flex items-center rounded px-2 py-1 text-xs font-medium text-emerald-600 transition hover:bg-emerald-50"
+                        >
+                          复盘
+                        </Link>
+                        <Link
+                          href="/planning"
+                          className="inline-flex items-center rounded px-2 py-1 text-xs font-medium text-amber-600 transition hover:bg-amber-50"
+                        >
+                          策划
+                        </Link>
+                        <Link
+                          href={`/sentiment?projectId=${project.id}`}
+                          className="inline-flex items-center rounded px-2 py-1 text-xs font-medium text-violet-600 transition hover:bg-violet-50"
+                        >
+                          舆情监控
+                        </Link>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
-            return <ProjectCard key={project.id} project={project} latestVersion={latestVersion} statusLabel={statusLabel} primaryAction={primaryAction} />;
-          })}
+          {/* Pagination */}
+          <div className="flex items-center justify-between border-t px-4 py-3">
+            <p className="text-sm text-slate-500">
+              共 {data.totalItems} 条记录，第 {data.page}/{totalPages} 页
+            </p>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              {generatePageNumbers(page, totalPages).map((p, idx) =>
+                p === '...' ? (
+                  <span key={`ellipsis-${idx}`} className="px-1 text-slate-400">...</span>
+                ) : (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setPage(p as number)}
+                    className={`inline-flex h-8 w-8 items-center justify-center rounded-md text-sm font-medium transition ${
+                      page === p
+                        ? 'bg-blue-600 text-white'
+                        : 'border border-slate-200 text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    {p}
+                  </button>
+                )
+              )}
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
         </div>
       ) : (
         <div className="rounded-lg border bg-white px-6 py-16 text-center text-sm text-slate-500">
@@ -201,214 +361,32 @@ export default function ProjectListPage() {
   );
 }
 
-function FilterSelect({
-  value,
-  onChange,
-  options,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  options: Array<{ value: string; label: string }>;
-}) {
-  return (
-    <select
-      value={value}
-      onChange={(event) => onChange(event.target.value)}
-      className="h-11 rounded-lg border border-slate-200 px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-    >
-      {options.map((option) => (
-        <option key={`${option.value}-${option.label}`} value={option.value}>
-          {option.label}
-        </option>
-      ))}
-    </select>
-  );
-}
-
-function MetaRow({
-  icon: Icon,
-  text,
-}: {
-  icon: typeof CalendarDays;
-  text: string;
-}) {
-  return (
-    <div className="flex items-center gap-2">
-      <Icon size={16} className="text-slate-400" />
-      <span>{text}</span>
-    </div>
-  );
-}
-
-function ProjectCard({
-  project,
-  latestVersion,
-  statusLabel,
-  primaryAction,
-}: {
-  project: Project;
-  latestVersion: ReportVersionSummary | undefined;
-  statusLabel: string;
-  primaryAction: { label: string; href: string };
-}) {
-  const router = useRouter();
-  const queryClient = useQueryClient();
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  const deleteMutation = useMutation({
-    mutationFn: async () => {
-      const res = await fetch(`/api/projects/${project.id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error('删除失败');
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['projects'] });
-    },
-  });
-
-  return (
-    <>
-      <article
-        className="relative cursor-pointer overflow-hidden rounded-lg border bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
-        onClick={() => router.push(`/projects/${project.id}`)}
-      >
-        <div className={`h-1 ${getProjectTypeBar(project.projectType)}`} />
-        <div className="space-y-5 p-6">
-          <div className="space-y-3">
-            <div className="flex items-start justify-between gap-3">
-              <div className="space-y-1">
-                <span className="inline-flex rounded-md bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">
-                  {project.projectType}
-                </span>
-                <div className="pt-1">
-                  <p className="text-2xl font-semibold text-slate-900">{project.brand}</p>
-                  <p className="mt-1 text-base text-slate-600">{project.projectName}</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-2">
-                <span
-                  className={`mt-1 inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${PROJECT_STATUS_BADGES[project.status]}`}
-                >
-                  {statusLabel}
-                </span>
-                <div className="relative" ref={menuRef}>
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); setMenuOpen(!menuOpen); }}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
-                  >
-                    <MoreHorizontal size={18} />
-                  </button>
-                  {menuOpen && (
-                    <>
-                      <div className="fixed inset-0 z-10" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); }} />
-                      <div className="absolute right-0 top-full z-20 mt-1 w-36 overflow-hidden rounded-lg border bg-white py-1 shadow-lg">
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); setMenuOpen(false); router.push(`/projects/${project.id}`); }}
-                          className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-slate-700 transition hover:bg-slate-50"
-                        >
-                          <FileText size={14} />
-                          详情
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); setMenuOpen(false); setConfirmDelete(true); }}
-                          className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-rose-600 transition hover:bg-rose-50"
-                        >
-                          <Trash2 size={14} />
-                          删除
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-3 text-sm text-slate-600" onClick={(e) => e.stopPropagation()}>
-            <MetaRow icon={CalendarDays} text={formatDateRange(project.startDate, project.endDate)} />
-            <MetaRow icon={FileText} text={`状态：${statusLabel}`} />
-            <MetaRow
-              icon={Tag}
-              text={`最新版本：${latestVersion ? `V${latestVersion.versionNumber}.0` : '无'}`}
-            />
-          </div>
-
-          <div onClick={(e) => e.stopPropagation()}>
-            <Link
-              href={primaryAction.href}
-              className="inline-flex h-10 items-center justify-center rounded-lg bg-blue-600 px-4 text-sm font-medium text-white transition hover:bg-blue-700"
-            >
-              {primaryAction.label}
-            </Link>
-          </div>
-        </div>
-      </article>
-
-      {confirmDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setConfirmDelete(false)}>
-          <div className="w-96 rounded-lg bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-semibold text-slate-900">确认删除</h3>
-            <p className="mt-2 text-sm text-slate-600">
-              确定要删除项目「{project.projectName}」吗？此操作不可恢复，所有关联数据（笔记、标注、版本等）将被一并删除。
-            </p>
-            <div className="mt-6 flex items-center justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setConfirmDelete(false)}
-                className="inline-flex h-10 items-center rounded-lg border border-slate-200 px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-              >
-                取消
-              </button>
-              <button
-                type="button"
-                onClick={() => deleteMutation.mutate()}
-                disabled={deleteMutation.isPending}
-                className="inline-flex h-10 items-center rounded-lg bg-rose-600 px-4 text-sm font-medium text-white transition hover:bg-rose-700 disabled:opacity-60"
-              >
-                {deleteMutation.isPending ? '删除中...' : '确认删除'}
-              </button>
-            </div>
-            {deleteMutation.isError && (
-              <p className="mt-3 text-xs text-rose-500">{(deleteMutation.error as Error).message}</p>
-            )}
-          </div>
-        </div>
-      )}
-    </>
-  );
-}
-
-function getPrimaryAction(project: Project) {
-  switch (project.status) {
-    case 'draft':
-    case 'uploading':
-      return { label: '上传数据', href: `/projects/${project.id}/upload` };
-    case 'generating':
-      return { label: '查看进度', href: `/projects/${project.id}/generate` };
-    case 'reviewing':
-      return { label: '进入审校', href: `/projects/${project.id}/versions` };
-    case 'finalized':
-      return { label: '下载报告', href: `/projects/${project.id}/versions` };
-    default:
-      return { label: '查看详情', href: `/projects/${project.id}` };
+/**
+ * Generate page number array with ellipsis for pagination display.
+ * Shows at most 7 page buttons with ellipsis for gaps.
+ */
+function generatePageNumbers(current: number, total: number): (number | '...')[] {
+  if (total <= 7) {
+    return Array.from({ length: total }, (_, i) => i + 1);
   }
-}
 
-function getProjectTypeBar(projectType: string) {
-  switch (projectType) {
-    case '新品上市':
-      return 'bg-lime-500';
-    case '日常种草':
-      return 'bg-sky-500';
-    case '节点营销':
-      return 'bg-amber-500';
-    case '竞品防御':
-      return 'bg-violet-500';
-    default:
-      return 'bg-slate-300';
+  const pages: (number | '...')[] = [];
+
+  if (current <= 4) {
+    for (let i = 1; i <= 5; i++) pages.push(i);
+    pages.push('...');
+    pages.push(total);
+  } else if (current >= total - 3) {
+    pages.push(1);
+    pages.push('...');
+    for (let i = total - 4; i <= total; i++) pages.push(i);
+  } else {
+    pages.push(1);
+    pages.push('...');
+    for (let i = current - 1; i <= current + 1; i++) pages.push(i);
+    pages.push('...');
+    pages.push(total);
   }
+
+  return pages;
 }
