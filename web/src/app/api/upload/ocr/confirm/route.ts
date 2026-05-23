@@ -7,7 +7,7 @@ import { transitionStatus } from '@/project/status-machine';
  */
 interface ConfirmOCRRequest {
   projectId: string;
-  dataType: 'aips' | 'brand_ranking' | 'soc_sov' | 'spu_ranking';
+  dataType: 'brand' | 'spu' | 'keyword' | 'screenshot';
   data: Record<string, unknown>;
 }
 
@@ -49,7 +49,7 @@ export async function POST(request: Request) {
     }
 
     // Validate dataType
-    const validDataTypes = ['aips', 'brand_ranking', 'soc_sov', 'spu_ranking'];
+    const validDataTypes = ['brand', 'spu', 'keyword', 'screenshot'];
     if (!validDataTypes.includes(dataType)) {
       return NextResponse.json(
         { error: `无效的 dataType，支持: ${validDataTypes.join(', ')}` },

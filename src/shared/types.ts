@@ -192,58 +192,57 @@ export interface BusinessAnnotation {
   isUnderwater: boolean;         // 水下合作标记
 }
 
-// ---- 灵犀数据（底表上传） ----
+// ---- 灵犀数据 ----
 
 /**
- * AIPS人群资产数据
+ * 灵犀-品牌数据
  */
-export interface AIPSData {
-  awareness: number;
-  interest: number;
-  purchase: number;
-  share: number;
-  penetrationRate: number;
-  flowRates: Record<string, number>; // 各层级间转化率
+export interface BrandData {
+  aips: number;                    // 品牌-AIPS人群总数
+  ti: number;                      // 品牌-TI人群数
+  penetrationRate?: number;        // 人群渗透率（%），后续扩展
+  monthlySearchVolume?: number;    // 月搜索指数，后续扩展
+  period: string;                  // 周期
 }
 
 /**
- * 品牌排名数据
+ * 灵犀-SPU数据
  */
-export interface BrandRankingData {
-  brandName: string;
-  rank: number;
-  category: string;
-  period: string;
+export interface SpuData {
+  spuName: string;                 // SPU名称
+  aips: number;                    // SPU-AIPS人群资产规模
+  ti?: number;                     // SPU-TI人群数，后续扩展
+  period: string;                  // 周期
 }
 
 /**
- * SOC/SOV数据
+ * 灵犀-关键词数据
  */
-export interface SOCSOVData {
-  soc: number;                   // 内容份额占比
-  sov: number;                   // 声量份额占比
-  category: string;
-  period: string;
+export interface KeywordData {
+  keyword: string;                 // 搜索关键词
+  searchVolume: number;            // 月搜索指数
+  upstreamRank?: number;           // 上游搜索排名，后续扩展
+  downstreamRank?: number;         // 下游搜索排名，后续扩展
+  period: string;                  // 周期
 }
 
 /**
- * SPU排名数据
+ * 灵犀-截图数据
  */
-export interface SPURankingData {
-  spuName: string;
-  rank: number;
-  category: string;
-  period: string;
+export interface ScreenshotData {
+  type: string;                    // soc_sov / audience / mind
+  period: string;                  // 周期
+  filePath: string;                // 截图文件路径
 }
 
 /**
- * 灵犀平台数据（底表上传）
+ * 灵犀平台数据（按 dataType 分片存储）
  */
 export interface LingxiData {
-  aips?: AIPSData;               // 人群资产数据
-  brandRanking?: BrandRankingData;
-  socSov?: SOCSOVData;
-  spuRanking?: SPURankingData;
+  brand?: BrandData;               // 品牌级，一行
+  spu?: SpuData[];                 // SPU级，多行
+  keyword?: KeywordData[];         // 关键词级，多行
+  screenshot?: ScreenshotData[];   // 截图
 }
 
 // ---- Calculation Input/Output Interfaces ----
@@ -595,4 +594,7 @@ export interface EnvConfig {
   /** 聚光 API */
   JUGUANG_BASE_URL: string;
   JUGUANG_API_KEY: string;
+  /** 灵犀 API */
+  LINGXI_BASE_URL: string;
+  LINGXI_API_KEY: string;
 }

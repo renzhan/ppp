@@ -11,7 +11,7 @@ import { PaichachaClient } from './paichacha-client.js';
 import { PrismaDataPersistenceService } from './persistence-service.js';
 import { SpreadsheetUploadService } from './spreadsheet-upload.js';
 import { envConfig } from '../config/env.js';
-import type { PugongyingNote, JuguangNote } from '../shared/types.js';
+import type { PugongyingNote, JuguangNote, LingxiData } from '../shared/types.js';
 
 // ---- Types ----
 
@@ -48,12 +48,17 @@ export class DataIngestionService {
       baseUrl: envConfig.JUGUANG_BASE_URL,
       apiKey: envConfig.JUGUANG_API_KEY,
     };
+    const lingxiConfig = {
+      baseUrl: envConfig.LINGXI_BASE_URL,
+      apiKey: envConfig.LINGXI_API_KEY,
+    };
     this.paichachaClient = paichachaClient ?? new PaichachaClient(
       envConfig.PAICHACHA_BASE_URL,
       envConfig.PAICHACHA_API_KEY,
       undefined,
       pgyConfig,
       juguangConfig,
+      lingxiConfig,
     );
     this.persistenceService = persistenceService ?? new PrismaDataPersistenceService();
   }
@@ -89,6 +94,18 @@ export class DataIngestionService {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       errors.push(`Failed to fetch juguang data: ${message}`);
+    }
+
+    // Fetch lingxi data（参数后续由前端传入，当前写死联调用）
+    let lingxiData: LingxiData | undefined;
+    try {
+      lingxiData = await this.paichachaClient.fetchLingxiData(
+        '爷爷不泡茶',    // brand_name
+        '酸奶',          // keyword
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      errors.push(`Failed to fetch lingxi data: ${message}`);
     }
 
     // Merge: preserve isUnderwater / underwaterPrice from existing records
@@ -127,6 +144,15 @@ export class DataIngestionService {
       }
     }
 
+    if (lingxiData) {
+      try {
+        await this.persistenceService.saveLingxiData(projectId, lingxiData);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        errors.push(`Failed to persist lingxi data: ${message}`);
+      }
+    }
+
     return { pugongyingNotes, juguangNotes, errors };
   }
 }
@@ -146,5 +172,7 @@ export { processLingxiScreenshot, detectImageMimeType, LOW_CONFIDENCE_THRESHOLD 
 export type { OCRResult, OCRField, OCRProcessingResult, SupportedImageMimeType } from './ocr-service.js';
 export { recognizeLingxiScreenshot, parsePlanDocumentVision } from './vision-document-parser.js';
 export type { PageImage, PlanParseResult, VisionParseOptions } from './vision-document-parser.js';
+export { LingxiClient } from './lingxi-client.js';
+export type { LingxiClientConfig } from './lingxi-client.js';
 export { convertDocumentToImages, convertToPdfViaLibreOffice, renderPdfToImages } from './document-converter.js';
 export type { SupportedFormat, ConversionOptions, ConversionResult } from './document-converter.js';

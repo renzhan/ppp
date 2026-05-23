@@ -5,11 +5,13 @@
  * Implements retry logic with exponential backoff and response validation.
  */
 
-import type { PugongyingNote, JuguangNote } from '../shared/types.js';
+import type { PugongyingNote, JuguangNote, LingxiData } from '../shared/types.js';
 import { PugongyingClient } from './pugongying-client.js';
 import type { PugongyingClientConfig } from './pugongying-client.js';
 import { JuguangClient } from './juguang-client.js';
 import type { JuguangClientConfig } from './juguang-client.js';
+import { LingxiClient } from './lingxi-client.js';
+import type { LingxiClientConfig } from './lingxi-client.js';
 
 /**
  * Interface for the Paichacha API client
@@ -18,6 +20,8 @@ export interface IPaichachaClient {
   fetchPugongyingData(noteIds: string[]): Promise<PugongyingNote[]>;
   /** 获取聚光笔记层级离线报表（advertiserId + 日期范围，替代旧的 noteIds 模式） */
   fetchJuguangData(advertiserId: number, startDate: string, endDate: string): Promise<JuguangNote[]>;
+  /** 获取灵犀数据（brandName + keyword，Phase 1 写死） */
+  fetchLingxiData(brandName: string, keyword: string): Promise<LingxiData>;
 }
 
 /**
@@ -39,6 +43,7 @@ export class PaichachaClient implements IPaichachaClient {
   private readonly retryConfig: RetryConfig;
   private readonly pugongyingClient?: PugongyingClient;
   private readonly juguangClient?: JuguangClient;
+  private readonly lingxiClient?: LingxiClient;
 
   constructor(
     baseUrl: string,
@@ -46,8 +51,9 @@ export class PaichachaClient implements IPaichachaClient {
     retryConfig?: Partial<RetryConfig>,
     pugongyingConfig?: PugongyingClientConfig,
     juguangConfig?: JuguangClientConfig,
+    lingxiConfig?: LingxiClientConfig,
   ) {
-    this.baseUrl = baseUrl.replace(/\/+$/, ''); // Remove trailing slashes
+    this.baseUrl = baseUrl.replace(/\/+$/, '');
     this.apiKey = apiKey;
     this.retryConfig = { ...DEFAULT_RETRY_CONFIG, ...retryConfig };
     if (pugongyingConfig) {
@@ -55,6 +61,9 @@ export class PaichachaClient implements IPaichachaClient {
     }
     if (juguangConfig) {
       this.juguangClient = new JuguangClient(juguangConfig);
+    }
+    if (lingxiConfig) {
+      this.lingxiClient = new LingxiClient(lingxiConfig);
     }
   }
 
@@ -74,5 +83,12 @@ export class PaichachaClient implements IPaichachaClient {
   ): Promise<JuguangNote[]> {
     if (!this.juguangClient) throw new Error('Juguang client not configured');
     return this.juguangClient.fetchJuguangData(advertiserId, startDate, endDate);
+  }
+
+  // ── Lingxi ──
+
+  async fetchLingxiData(brandName: string, keyword: string): Promise<LingxiData> {
+    if (!this.lingxiClient) throw new Error('Lingxi client not configured');
+    return this.lingxiClient.fetchLingxiData(brandName, keyword);
   }
 }

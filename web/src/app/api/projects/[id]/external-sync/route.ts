@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { Prisma } from '../../../../../../../generated/prisma';
 import { prisma } from '@/lib/prisma';
 import { transitionStatus } from '@/project/status-machine';
 
@@ -10,14 +9,7 @@ export async function POST(
   try {
     const project = await prisma.project.findUnique({
       where: { id: params.id },
-      select: {
-        id: true,
-        brand: true,
-        category: true,
-        projectType: true,
-        startDate: true,
-        endDate: true,
-      },
+      select: { id: true, brand: true, category: true, projectType: true, startDate: true, endDate: true },
     });
 
     if (!project) {
@@ -26,25 +18,17 @@ export async function POST(
 
     const payload = {
       provider: '灵犀千瓜',
-      source: 'mock',
-      summary: {
-        brand: project.brand,
-        category: project.category,
-        projectType: project.projectType,
-      },
-      metrics: {
-        brandSearchIndex: 82,
-        topicExposure: 1250000,
-        categoryShareOfVoice: 18.6,
-        interactionTrend: 'up',
-      },
+      source: 'external-sync',
+      brand: project.brand,
+      category: project.category,
+      projectType: project.projectType,
     };
 
     await prisma.lingxiData.create({
       data: {
         projectId: project.id,
-        dataType: 'paichacha_sync',
-        dataContent: payload as Prisma.InputJsonValue,
+        dataType: 'brand',
+        dataContent: payload as object,
         periodStart: project.startDate,
         periodEnd: project.endDate,
       },
@@ -52,11 +36,7 @@ export async function POST(
 
     await transitionStatus(project.id, 'first_upload');
 
-    return NextResponse.json({
-      success: true,
-      provider: '灵犀千瓜',
-      recordCount: 1,
-    });
+    return NextResponse.json({ success: true, provider: '灵犀千瓜', recordCount: 1 });
   } catch (error) {
     console.error('POST /api/projects/[id]/external-sync error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

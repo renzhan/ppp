@@ -57,6 +57,8 @@ export function loadEnvConfig(): EnvConfig {
     PUGONGYING_API_KEY: process.env.PUGONGYING_API_KEY || '',
     JUGUANG_BASE_URL: process.env.JUGUANG_BASE_URL || '',
     JUGUANG_API_KEY: process.env.JUGUANG_API_KEY || '',
+    LINGXI_BASE_URL: process.env.LINGXI_BASE_URL || '',
+    LINGXI_API_KEY: process.env.LINGXI_API_KEY || '',
   };
 }
 

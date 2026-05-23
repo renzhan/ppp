@@ -9,7 +9,7 @@
 import { SpreadsheetParserImpl } from './spreadsheet-parser.js';
 import { PrismaDataPersistenceService } from './persistence-service.js';
 import type { ParseError } from './spreadsheet-parser.js';
-import type { LingxiData, BusinessAnnotation } from '../shared/types.js';
+import type { BusinessAnnotation } from '../shared/types.js';
 
 // ---- Types ----
 
@@ -41,56 +41,6 @@ export class SpreadsheetUploadService {
   ) {
     this.parser = parser ?? new SpreadsheetParserImpl();
     this.persistenceService = persistenceService ?? new PrismaDataPersistenceService();
-  }
-
-  /**
-   * Upload and persist Lingxi platform data from a spreadsheet.
-   * Parses the file, then persists valid data to the database.
-   *
-   * @param projectId - The project to associate data with
-   * @param file - The spreadsheet file buffer
-   * @param format - File format ('xlsx' or 'csv')
-   * @returns Parse results including data, errors, warnings, and persistence status
-   */
-  async uploadLingxiData(
-    projectId: string,
-    file: Buffer,
-    format: 'xlsx' | 'csv',
-  ): Promise<SpreadsheetUploadResult<LingxiData>> {
-    const parseResult = this.parser.parseLingxiSheet(file, format);
-
-    // Only persist if there are no critical errors and we have some data
-    const hasData = !!(
-      parseResult.data.aips ||
-      parseResult.data.brandRanking ||
-      parseResult.data.socSov ||
-      parseResult.data.spuRanking
-    );
-    const hasCriticalErrors = parseResult.errors.length > 0;
-
-    let persisted = false;
-
-    if (hasData && !hasCriticalErrors) {
-      try {
-        await this.persistenceService.saveLingxiData(projectId, parseResult.data);
-        persisted = true;
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        parseResult.errors.push({
-          row: 0,
-          column: 'A',
-          message: `Failed to persist lingxi data: ${message}`,
-          severity: 'error',
-        });
-      }
-    }
-
-    return {
-      data: parseResult.data,
-      errors: parseResult.errors,
-      warnings: parseResult.warnings,
-      persisted,
-    };
   }
 
   /**

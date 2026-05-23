@@ -212,17 +212,23 @@ export class PrismaDataPersistenceService implements DataPersistenceService {
   async saveLingxiData(projectId: string, data: LingxiData): Promise<void> {
     const records: { dataType: string; dataContent: unknown }[] = [];
 
-    if (data.aips) {
-      records.push({ dataType: 'aips', dataContent: data.aips });
+    if (data.brand) {
+      records.push({ dataType: 'brand', dataContent: data.brand });
     }
-    if (data.brandRanking) {
-      records.push({ dataType: 'brand_ranking', dataContent: data.brandRanking });
+    if (data.spu) {
+      for (const spu of data.spu) {
+        records.push({ dataType: 'spu', dataContent: spu });
+      }
     }
-    if (data.socSov) {
-      records.push({ dataType: 'soc_sov', dataContent: data.socSov });
+    if (data.keyword) {
+      for (const kw of data.keyword) {
+        records.push({ dataType: 'keyword', dataContent: kw });
+      }
     }
-    if (data.spuRanking) {
-      records.push({ dataType: 'spu_ranking', dataContent: data.spuRanking });
+    if (data.screenshot) {
+      for (const ss of data.screenshot) {
+        records.push({ dataType: 'screenshot', dataContent: ss });
+      }
     }
 
     if (records.length === 0) return;

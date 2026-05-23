@@ -1,3 +1,15 @@
+/**
+ * POST /api/upload/external
+ * Upload external platform data (通用外部数据上传).
+ *
+ * Accepts multipart form data with:
+ *   - file: xlsx/csv file
+ *   - projectId: UUID of the project
+ *
+ * Internally delegates to SpreadsheetParserImpl for annotation parsing.
+ * Lingxi-specific sheet parsing has been removed (moved to API-based ingestion).
+ */
+
 import { NextResponse } from 'next/server';
 import { SpreadsheetParserImpl } from '@/ingestion/spreadsheet-parser';
 import { PrismaDataPersistenceService } from '@/ingestion/persistence-service';
@@ -13,14 +25,6 @@ function getFileFormat(filename: string): SupportedFormat | null {
   return null;
 }
 
-/**
- * POST /api/upload/external
- * Upload external platform data (灵犀平台数据: AIPS, 品牌排名, SOC/SOV, SPU排名).
- *
- * Accepts multipart form data with:
- *   - file: xlsx/csv file
- *   - projectId: UUID of the project
- */
 export async function POST(request: Request) {
   try {
     const formData = await request.formData();
@@ -59,24 +63,14 @@ export async function POST(request: Request) {
 
     // Parse lingxi data using SpreadsheetParser
     const parser = new SpreadsheetParserImpl();
-    const parseResult = parser.parseLingxiSheet(buffer, format);
+    const parseResult = parser.parseAnnotationSheet(buffer, format);
 
-    // Check for critical errors with no data
-    const hasData = !!(
-      parseResult.data.aips ||
-      parseResult.data.brandRanking ||
-      parseResult.data.socSov ||
-      parseResult.data.spuRanking
-    );
-
-    if (parseResult.errors.length > 0 && !hasData) {
+    if (parseResult.errors.length > 0 && parseResult.data.length === 0) {
       return NextResponse.json(
         {
           error: 'Failed to parse external platform spreadsheet',
           details: parseResult.errors.map((e) => ({
-            row: e.row,
-            column: e.column,
-            reason: e.message,
+            row: e.row, column: e.column, reason: e.message,
           })),
         },
         { status: 422 }
@@ -85,40 +79,22 @@ export async function POST(request: Request) {
 
     // Persist valid data
     let persisted = false;
-    let successCount = 0;
-
-    if (hasData) {
+    if (parseResult.data.length > 0) {
       try {
         const persistenceService = new PrismaDataPersistenceService();
-        await persistenceService.saveLingxiData(projectId, parseResult.data);
+        await persistenceService.saveAnnotations(projectId, parseResult.data);
         persisted = true;
-        // Trigger status transition: draft → uploading (silently ignored if already past draft)
-        await transitionStatus(projectId, 'first_upload');
-
-        // Count successful data sections
-        if (parseResult.data.aips) successCount++;
-        if (parseResult.data.brandRanking) successCount++;
-        if (parseResult.data.socSov) successCount++;
-        if (parseResult.data.spuRanking) successCount++;
+        await transitionStatus(projectId, 'first_upload').catch(() => {});
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        return NextResponse.json(
-          { error: `Failed to persist data: ${message}` },
-          { status: 500 }
-        );
+        return NextResponse.json({ error: `数据保存失败: ${message}` }, { status: 500 });
       }
     }
 
     return NextResponse.json({
-      success: successCount,
+      success: parseResult.data.length,
       failed: parseResult.errors.length,
       persisted,
-      sections: {
-        aips: !!parseResult.data.aips,
-        brandRanking: !!parseResult.data.brandRanking,
-        socSov: !!parseResult.data.socSov,
-        spuRanking: !!parseResult.data.spuRanking,
-      },
       errors: parseResult.errors.map((e) => ({
         row: e.row,
         column: e.column,
