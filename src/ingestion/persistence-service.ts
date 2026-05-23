@@ -194,6 +194,9 @@ export class PrismaDataPersistenceService implements DataPersistenceService {
           searchCmtAfterRead: record.searchCmtAfterRead,
           searchCmtAfterReadAvg: record.searchCmtAfterReadAvg,
           searchCmtClickCvr: record.searchCmtClickCvr,
+          acp: record.acp,
+          cpm: record.cpm,
+          cpi: record.cpi,
         })),
       });
     });

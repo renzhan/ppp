@@ -131,21 +131,24 @@ model Note {
 
 // 聚光数据表
 model JuguangData {
-  id                    String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  projectId             String    @map("project_id") @db.Uuid
-  noteId                String?   @map("note_id") @db.VarChar(100)
-  fee                   Decimal   @default(0) @map("fee") @db.Decimal(12, 2)
-  impression            Int       @default(0)
-  click                 Int       @default(0)
-  interaction           Int       @default(0)
-  iUserNum              Int       @default(0) @map("i_user_num")
-  tiUserNum             Int       @default(0) @map("ti_user_num")
-  iUserPrice            Decimal   @default(0) @map("i_user_price") @db.Decimal(12, 4)
-  tiUserPrice           Decimal   @default(0) @map("ti_user_price") @db.Decimal(12, 4)
-  searchCmtClick        Int       @default(0) @map("search_cmt_click")
-  searchCmtAfterRead    Int       @default(0) @map("search_cmt_after_read")
-  searchCmtAfterReadAvg Decimal   @default(0) @map("search_cmt_after_read_avg") @db.Decimal(10, 2)
-  searchCmtClickCvr     Decimal   @default(0) @map("search_cmt_click_cvr") @db.Decimal(8, 4)
+  id                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  projectId             String   @map("project_id") @db.Uuid
+  noteId                String?  @map("note_id") @db.VarChar(100)
+  fee                   Decimal  @default(0) @map("fee") @db.Decimal(12, 2)
+  impression            Int      @default(0)
+  click                 Int      @default(0)
+  interaction           Int      @default(0)
+  iUserNum              Int      @default(0) @map("i_user_num")
+  tiUserNum             Int      @default(0) @map("ti_user_num")
+  iUserPrice            Decimal  @default(0) @map("i_user_price") @db.Decimal(12, 4)
+  tiUserPrice           Decimal  @default(0) @map("ti_user_price") @db.Decimal(12, 4)
+  searchCmtClick        Int      @default(0) @map("search_cmt_click")
+  searchCmtAfterRead    Int      @default(0) @map("search_cmt_after_read")
+  searchCmtAfterReadAvg Decimal  @default(0) @map("search_cmt_after_read_avg") @db.Decimal(10, 2)
+  searchCmtClickCvr     Decimal  @default(0) @map("search_cmt_click_cvr") @db.Decimal(8, 4)
+  acp                   Decimal  @default(0) @db.Decimal(12, 2)
+  cpm                   Decimal  @default(0) @db.Decimal(12, 2)
+  cpi                   Decimal  @default(0) @db.Decimal(12, 2)
   createdAt             DateTime? @default(now()) @map("created_at") @db.Timestamptz()
 
   // Relations

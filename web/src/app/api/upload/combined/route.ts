@@ -37,6 +37,9 @@ interface JuguangRow {
   searchCmtAfterRead: number;
   searchCmtAfterReadAvg: number;
   searchCmtClickCvr: number;
+  acp: number;
+  cpm: number;
+  cpi: number;
 }
 
 function findColumnIndex(headers: unknown[], names: string[]): number {
@@ -142,6 +145,9 @@ function parseJuguangSheet(rows: unknown[][]): { data: JuguangRow[]; errors: Par
   const searchCmtAfterReadCol = findColumnIndex(headers, ['search_cmt_after_read', '搜索后阅读', '搜索阅读', '搜后阅读量']);
   const searchCmtAfterReadAvgCol = findColumnIndex(headers, ['search_cmt_after_read_avg', '搜索后平均阅读', '搜索平均阅读', '平均搜索后阅读笔记篇数']);
   const searchCmtClickCvrCol = findColumnIndex(headers, ['search_cmt_click_cvr', '搜索点击转化率', '搜索转化率', '搜索组件点击转化率']);
+  const acpCol = findColumnIndex(headers, ['acp', '平均点击成本']);
+  const cpmCol = findColumnIndex(headers, ['cpm', '平均千次曝光成本']);
+  const cpiCol = findColumnIndex(headers, ['cpi', '平均互动成本']);
 
   if (feeCol === -1) return { data, errors: [{ sheet: '', row: 1, column: 'A', reason: '缺少必填列: fee/消耗' }] };
 
@@ -169,6 +175,9 @@ function parseJuguangSheet(rows: unknown[][]): { data: JuguangRow[]; errors: Par
       searchCmtAfterRead: searchCmtAfterReadCol !== -1 ? parseNumber(row[searchCmtAfterReadCol]) : 0,
       searchCmtAfterReadAvg: searchCmtAfterReadAvgCol !== -1 ? parseNumber(row[searchCmtAfterReadAvgCol]) : 0,
       searchCmtClickCvr: searchCmtClickCvrCol !== -1 ? parseNumber(row[searchCmtClickCvrCol]) : 0,
+      acp: acpCol !== -1 ? parseNumber(row[acpCol]) : 0,
+      cpm: cpmCol !== -1 ? parseNumber(row[cpmCol]) : 0,
+      cpi: cpiCol !== -1 ? parseNumber(row[cpiCol]) : 0,
     });
   }
   return { data, errors };

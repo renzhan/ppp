@@ -148,19 +148,22 @@ export interface PugongyingNote {
  * 聚光数据（金额已转换为元）
  */
 export interface JuguangNote {
-  noteId?: string;
-  fee: number;                   // 消耗（元）
-  impression: number;
-  click: number;
-  interaction: number;
-  iUserNum: number;
-  tiUserNum: number;
-  iUserPrice: number;
-  tiUserPrice: number;
-  searchCmtClick: number;
-  searchCmtAfterRead: number;
-  searchCmtAfterReadAvg: number;
-  searchCmtClickCvr: number;
+  noteId?: string;                // 笔记id
+  fee: number;                    // 消费（元）— 推广消费金额
+  impression: number;             // 展现量 — 推广展现量
+  click: number;                  // 点击量 — 推广点击量，视频流中「观看视频5s」记做一次点击
+  interaction: number;            // 互动量 — 点赞、收藏、关注、评论、分享5个互动行为指标之和
+  iUserNum: number;               // 新增种草人群 — 用户点击推广后转化为相应SPU的I或TI人群的总人数
+  tiUserNum: number;              // 新增深度种草人群 — 用户点击推广后转化为相应SPU的TI人群的总人数
+  iUserPrice: number;             // 新增种草人群成本（元）— 推广消费/新增种草人群
+  tiUserPrice: number;            // 新增深度种草人群成本（元）— 推广消费/新增深度种草人群
+  searchCmtClick: number;         // 搜索组件点击量 — 点击推广搜索组件的次数
+  searchCmtAfterRead: number;     // 搜后阅读量 — 点击组件后的搜索场景阅读量
+  searchCmtAfterReadAvg: number;  // 平均搜后阅读笔记篇数 — 搜后阅读量/搜索组件点击量
+  searchCmtClickCvr: number;      // 搜索组件点击转化率 — 搜索组件点击量/点击量
+  acp: number;                    // 平均点击成本（元）— 推广消费/推广点击量
+  cpm: number;                    // 平均千次展现费用（元）— 推广消费/推广展现量*1000
+  cpi: number;                    // 平均互动成本（元）— 消费/互动量
 }
 
 /**

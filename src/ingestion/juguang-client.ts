@@ -36,6 +36,9 @@ interface RawJuguangNote {
   search_cmt_after_read?: string;
   search_cmt_after_read_avg?: string;
   search_cmt_click_cvr?: string;
+  acp?: string;
+  cpm?: string;
+  cpi?: string;
 }
 
 interface JuguangPageResponse {
@@ -140,6 +143,9 @@ function mapToJuguangNote(raw: RawJuguangNote): JuguangNote {
     searchCmtAfterRead: parseNum(raw.search_cmt_after_read),
     searchCmtAfterReadAvg: parseNum(raw.search_cmt_after_read_avg),
     searchCmtClickCvr: parseNum(raw.search_cmt_click_cvr),
+    acp: parseNum(raw.acp),
+    cpm: parseNum(raw.cpm),
+    cpi: parseNum(raw.cpi),
   };
 }
 
