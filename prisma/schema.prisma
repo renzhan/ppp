@@ -83,6 +83,7 @@ model Note {
   kolFanNum         Int?     @map("kol_fan_num")
   noteType          String?  @map("note_type") @db.VarChar(20)
   noteLink          String?  @map("note_link")
+  noteTitle         String?  @map("note_title")
   impNum            Int      @default(0) @map("imp_num")
   readNum           Int      @default(0) @map("read_num")
   engageNum         Int      @default(0) @map("engage_num")

@@ -97,51 +97,51 @@ export interface ComponentData {
  * 蒲公英笔记数据（金额已转换为元）
  */
 export interface PugongyingNote {
-  noteId: string;
-  brandUserName: string;
-  spuName: string;
-  kolNickName: string;
-  kolId: string;
-  kolFanNum: number;
-  noteType: 'image' | 'video';
-  noteLink: string;
-  impNum: number;
-  readNum: number;
-  engageNum: number;
-  likeNum: number;
-  favNum: number;
-  cmtNum: number;
-  shareNum: number;
-  followNum: number;
-  kolPrice: number;              // 元
-  serviceFee: number;            // 元（API total_platform_price → 服务费）
-  totalPlatformPrice: number;    // 元（kolPrice + serviceFee，计算得出）
-  heatImpNum: number;
-  heatReadNum: number;
-  isUnderwater: boolean;
-  underwaterPrice: number;       // 元
-  components?: ComponentData[];
-  // 0521 新字段
-  notePublishTime?: Date | null;
-  cooperateType?: string | null;
-  duration?: number | null;
-  originImpNum: number;
-  originReadNum: number;
-  promotionImpNum: number;
-  promotionReadNum: number;
-  readUv: number;
-  engageRate?: number | null;
-  readCost: number;
-  engageCost: number;
-  avgViewTime?: number | null;
-  videoPlay5sRate?: number | null;
-  picRead3sRate?: number | null;
-  finishRate?: number | null;
-  cp: number;
-  cpRate?: number | null;
-  cpcp: number;
-  orderId?: string | null;
-  effect?: string | null;
+  noteId: string;                 // 笔记id，不会为空
+  brandUserName: string;          // 报备品牌名称
+  spuName: string;                // SPU名称
+  kolNickName: string;            // 博主昵称
+  kolId: string;                  // 博主userId
+  kolFanNum: number;              // 博主粉丝量
+  noteType: 'image' | 'video';    // 笔记类型 — 1图文/2视频
+  noteLink: string;               // 笔记链接，不会为空
+  noteTitle?: string | null;      // 笔记标题，视频笔记可能为空
+  impNum: number;                 // 曝光量
+  readNum: number;                // 阅读量
+  engageNum: number;              // 互动量
+  likeNum: number;                // 点赞量
+  favNum: number;                 // 收藏量
+  cmtNum: number;                 // 评论量
+  shareNum: number;               // 分享量
+  followNum: number;              // 关注量（API不提供，默认0）
+  kolPrice: number;               // 博主报价（元）— API原单位分
+  serviceFee: number;             // 服务费金额（元）— API字段名为total_platform_price
+  totalPlatformPrice: number;     // 平台总价（元）— kolPrice + serviceFee
+  heatImpNum: number;             // 加热曝光量
+  heatReadNum: number;            // 加热阅读量
+  isUnderwater: boolean;          // 是否水下合作 — 来自业务标注
+  underwaterPrice: number;        // 水下报价（元）— 来自业务标注
+  components?: ComponentData[];   // 组件数据（评论区/正文/底栏/互动）
+  notePublishTime?: Date | null;  // 笔记发布日期
+  cooperateType?: string | null;  // 笔记来源 — 0定制/1共创/2招募/3新芽/30用户授权
+  duration?: number | null;       // 视频笔记总时长（秒）
+  originImpNum: number;           // 自然流量曝光量
+  originReadNum: number;          // 自然流量阅读量
+  promotionImpNum: number;        // 推广曝光量
+  promotionReadNum: number;       // 推广阅读量
+  readUv: number;                 // 阅读UV
+  engageRate?: number | null;     // 互动率（%）
+  readCost: number;               // 阅读单价（元）— API原单位分
+  engageCost: number;             // 互动单价（元）— API原单位分
+  avgViewTime?: number | null;    // 平均浏览时长（秒）
+  videoPlay5sRate?: number | null;// 5s播放率（%）— 仅视频笔记
+  picRead3sRate?: number | null;  // 3s阅读率（%）— 仅图文笔记
+  finishRate?: number | null;     // 视频完播率（%）
+  cp: number;                     // 消费意向
+  cpRate?: number | null;         // 消费意向转化率（%）
+  cpcp: number;                   // 消费意向单价（元）— API原单位分
+  orderId?: string | null;        // 订单id
+  effect?: string | null;         // 是否为优效模式 — true为优效
 }
 
 /**

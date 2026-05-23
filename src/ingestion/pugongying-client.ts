@@ -30,6 +30,7 @@ export interface RawPugongyingNote {
   kol_fan_num?: number;
   note_type?: string;
   note_link?: string;
+  note_title?: string;
   note_publish_time?: string;
   cooperate_type?: string;
   duration?: number;
@@ -275,6 +276,7 @@ function mapToNote(raw: RawPugongyingNote): PugongyingNote {
     kolFanNum: raw.kol_fan_num ?? 0,
     noteType: raw.note_type === '视频' ? 'video' : 'image',
     noteLink: raw.note_link ?? '',
+    noteTitle: raw.note_title ?? null,
     impNum: raw.imp_num ?? 0,
     readNum: raw.read_num ?? 0,
     engageNum: raw.engage_num ?? 0,
