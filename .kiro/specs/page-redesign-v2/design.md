@@ -168,11 +168,12 @@ interface NoteBaseUploaderProps {
 ```typescript
 // web/src/components/review/review-form.tsx
 interface ReviewFormState {
-  // 项目信息
+  // 项目信息（从已有项目列表中选择，选择后自动回填品类/品牌/业务线，只读展示）
   projectId: string;
-  category: string;
-  brand: string;
-  businessLine: string;
+  // 以下字段由选择项目后自动填充，不可手动编辑
+  category: string;       // 只读回填
+  brand: string;          // 只读回填
+  businessLine: string;   // 只读回填
 
   // 大盘数据
   benchmark: {
@@ -283,6 +284,21 @@ model Project {
   reviewConfigs   ReviewConfig[]
 }
 ```
+
+#### 1.5. User 表扩展（角色体系）
+
+现有 User 表的 `role` 字段从 `"admin" | "user"` 扩展为 `"admin" | "组长" | "AD" | "AM" | "投手" | "执行"`。
+
+```prisma
+model User {
+  // role 字段值域扩展：admin | 组长 | AD | AM | 投手 | 执行
+  // 其他字段不变
+}
+```
+
+**数据权限过滤逻辑**：
+- admin 角色：查询不加过滤条件，可见所有项目
+- 其他角色：查询条件 `WHERE createdBy = userId OR userId = ANY(participants)`
 
 #### 2. 新增 ProjectTreeNode 表（级联选择器数据源）
 
@@ -442,6 +458,25 @@ POST   /api/sentiment/[projectId]/export       - 导出舆情报告
 GET    /api/sentiment/export-records           - 导出记录列表
 ```
 
+#### 用户批量导入
+
+```
+POST /api/admin/import/users
+  - Body: multipart/form-data (xlsx file)
+  - Excel字段：用户名、显示名、角色（组长/AD/AM/投手/执行）
+  - 逻辑：解析xlsx → 为每个用户生成初始密码 → 批量创建User记录（mustChangePassword=true）
+  - Response: { imported: number, errors: string[] }
+```
+
+#### 数据权限中间件
+
+```
+所有项目相关API（/api/projects, /api/reviews, /api/sentiment）在查询时：
+- 从JWT token中获取 userId 和 role
+- if role === 'admin': 不加过滤
+- else: 添加 WHERE (createdBy = userId OR userId = ANY(participants))
+```
+
 ### 关键数据流
 
 #### 1. 项目底表导入流程
@@ -489,11 +524,17 @@ sequenceDiagram
 sequenceDiagram
     participant User as 用户
     participant Form as 新建复盘表单
+    participant ProjAPI as /api/projects
     participant API as /api/reviews
     participant Check as 笔记检查
     participant Gen as 报告生成
 
-    User->>Form: 填写复盘配置
+    User->>Form: 打开新建复盘页面
+    Form->>ProjAPI: GET /api/projects (获取用户有权限的项目列表)
+    ProjAPI-->>Form: 项目列表 [{id, name, category, brand, businessLine, noteCount}]
+    User->>Form: 从项目列表中选择一个项目
+    Form->>Form: 自动回填品类、品牌、业务线（只读展示）
+    User->>Form: 填写复盘配置（大盘数据、KPI、模块等）
     User->>Form: 点击"开始复盘"
     Form->>API: POST /api/reviews (配置数据)
     API->>Check: 检查project.noteCount > 0

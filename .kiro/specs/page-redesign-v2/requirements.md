@@ -20,8 +20,9 @@
 - **Note_Base_Table**: 笔记底表，包含博主信息、笔记数据、投流数据等40+字段的Excel文件
 - **Cascade_Selector**: 级联选择器，品类→品牌→业务线的三级联动选择组件
 - **Tree_Structure**: 树结构数据，由项目底表去重后生成的品类-品牌-业务线层级数据
-- **Admin_User**: 管理员用户，拥有系统设置和账户管理权限的角色
-- **Regular_User**: 普通用户，拥有项目管理和复盘操作权限的角色
+- **Admin_User**: 管理员用户，拥有系统设置、账户管理和全部数据查看权限的角色
+- **Regular_User**: 普通用户（含组长、AD、AM、投手、执行5种角色），只能查看自己创建或参与的项目
+- **User_Role**: 用户角色类型，包含 admin、组长、AD、AM、投手、执行 共6种
 - **Influencer_Tier**: 达人层级，按粉丝量划分的达人分类（默认：头部/腰部/尾部）
 - **Launch_Phase**: 投流周期，按时间划分的投放阶段（默认：预热期/爆发期/持续期）
 - **Report_Module**: 报告模块，复盘报告中可开关的独立内容单元（共9项）
@@ -61,9 +62,22 @@
 
 1. THE Navigation_Sidebar SHALL 展示以下导航项：项目管理、复盘系统、策划系统、舆情系统
 2. THE Navigation_Sidebar SHALL 对Admin_User额外展示：账户管理、系统设置
-3. IF 当前用户角色为Regular_User, THEN THE Navigation_Sidebar SHALL 隐藏"账户管理"和"系统设置"导航项
+3. IF 当前用户角色为Regular_User（组长/AD/AM/投手/执行）, THEN THE Navigation_Sidebar SHALL 隐藏"账户管理"和"系统设置"导航项
 4. WHEN 用户点击导航项时, THE Navigation_Sidebar SHALL 高亮当前选中项并导航到对应页面
 5. THE Navigation_Sidebar SHALL 采用深蓝色背景的固定侧边栏设计，在所有页面保持一致
+
+### Requirement 3.5: 用户角色体系与数据权限
+
+**User Story:** As a 平台管理员, I want 系统支持多种业务角色并限制数据可见范围, so that 每个用户只能看到与自己相关的项目数据。
+
+#### Acceptance Criteria
+
+1. THE System SHALL 支持以下6种用户角色：admin、组长、AD、AM、投手、执行
+2. WHEN Admin_User查看项目列表时, THE System SHALL 展示所有项目（无数据权限限制）
+3. WHEN Regular_User（组长/AD/AM/投手/执行）查看项目列表时, THE System SHALL 仅展示该用户创建的项目或该用户作为参与者的项目
+4. THE System SHALL 对复盘系统、舆情系统等模块同样应用数据权限过滤规则
+5. WHEN Admin_User通过Excel批量导入用户时, THE System SHALL 为每个用户分配角色（组长/AD/AM/投手/执行之一）
+6. THE System SHALL 在账户管理页面支持Admin_User上传用户Excel批量创建账户，Excel包含用户名、显示名、角色字段
 
 ### Requirement 4: 项目列表页展示与筛选
 
@@ -77,6 +91,8 @@
 4. THE Project_List_Page SHALL 提供立项日期范围筛选器，支持选择开始日期和结束日期
 5. WHEN 用户设置筛选条件时, THE Project_List_Page SHALL 实时过滤列表数据并展示匹配结果
 6. THE Project_List_Page SHALL 提供"新建项目"按钮入口
+7. WHEN Regular_User访问项目列表时, THE Project_List_Page SHALL 仅展示该用户创建或参与的项目
+8. WHEN Admin_User访问项目列表时, THE Project_List_Page SHALL 展示所有项目
 
 ### Requirement 5: 系统设置-项目底表导入
 
@@ -144,15 +160,15 @@
 
 ### Requirement 10: 新建复盘-项目信息与背景数据
 
-**User Story:** As a 项目运营人员, I want 在新建复盘时选择关联项目并录入大盘背景数据, so that 复盘报告能够基于正确的项目上下文和行业基准进行分析。
+**User Story:** As a 项目运营人员, I want 在新建复盘时从已创建的项目中选择关联项目并录入大盘背景数据, so that 复盘报告能够基于正确的项目上下文和行业基准进行分析。
 
 #### Acceptance Criteria
 
-1. THE Review_Form SHALL 提供项目信息区域，包含品类、品牌、品牌业务线的Cascade_Selector和项目名称选择器（从已有项目中选择）
+1. THE Review_Form SHALL 提供项目选择器，数据来源为当前用户有权限访问的已创建项目列表（而非直接选择品类/品牌/业务线），支持按项目名称搜索筛选
 2. THE Review_Form SHALL 提供复盘背景（大盘数据）录入区域，包含以下指标：CTR、CPM、CPC、CPE、互动率
 3. THE Review_Form SHALL 提供达人层级配置区域，默认包含3项（头部/腰部/尾部），每项包含名称和粉丝范围
 4. THE Review_Form SHALL 支持达人层级的增加和删除操作
-5. WHEN 用户选择项目名称时, THE Review_Form SHALL 自动关联该项目的品类、品牌、业务线信息
+5. WHEN 用户选择项目时, THE Review_Form SHALL 自动回填展示该项目的品类、品牌、业务线信息（只读，不可修改）
 
 ### Requirement 11: 新建复盘-KPI目标配置
 
