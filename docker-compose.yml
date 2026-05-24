@@ -1,17 +1,112 @@
-version: "3.9"
+# Unified Docker Compose orchestration for the merged platform
+# Services: Nginx (reverse proxy), Frontend (Next.js 16), PPP Backend (Node.js),
+#           Presenton Backend (FastAPI), PostgreSQL database
+#
+# Usage: docker-compose up -d
+# All services communicate over internal Docker network.
+# Only port 80 (Nginx) is exposed to the host.
 
 services:
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile
+  nginx:
+    image: nginx:alpine
     ports:
-      - "3000:3000"
-    env_file:
-      - .env
-    environment:
-      - NODE_ENV=production
-      - NEXT_TELEMETRY_DISABLED=1
+      - "80:80"
     volumes:
-      - ./prisma:/app/prisma:ro
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      frontend:
+        condition: service_started
+      ppp-backend:
+        condition: service_started
+      presenton-backend:
+        condition: service_started
     restart: unless-stopped
+    networks:
+      - app-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    environment:
+      - PPP_BACKEND_URL=http://ppp-backend:4000
+      - PRESENTON_BASE_URL=http://presenton-backend:8000
+      - PRESENTON_BACKEND_URL=http://presenton-backend:8000
+      - JWT_SECRET=${JWT_SECRET}
+    expose:
+      - "3000"
+    depends_on:
+      ppp-backend:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  ppp-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-postgresql://ppp_user:ppp_password@db:5432/ppp}
+      - PRESENTON_API_URL=http://presenton-backend:8000
+      - PRESENTON_API_KEY=${PRESENTON_API_KEY}
+      - JWT_SECRET=${JWT_SECRET}
+      - LLM_PROVIDER=${LLM_PROVIDER:-openai}
+      - LLM_API_KEY=${LLM_API_KEY}
+      - LLM_MODEL=${LLM_MODEL:-gpt-4o}
+      - LLM_BASE_URL=${LLM_BASE_URL:-https://api.openai.com/v1}
+    expose:
+      - "4000"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  presenton-backend:
+    build:
+      context: ./presenton
+      dockerfile: Dockerfile
+    environment:
+      - APP_DATA_DIRECTORY=/app_data
+      - PRESENTON_API_KEY=${PRESENTON_API_KEY}
+      - JWT_SECRET=${JWT_SECRET}
+      - LLM=${LLM:-openai}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - FASTAPI_HOST=0.0.0.0
+      - FASTAPI_PORT=8000
+    volumes:
+      - presenton_data:/app_data
+    expose:
+      - "8000"
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-ppp}
+      - POSTGRES_USER=${POSTGRES_USER:-ppp_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-ppp_password}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    expose:
+      - "5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ppp_user} -d ${POSTGRES_DB:-ppp}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - app-network
+
+volumes:
+  presenton_data:
+  pg_data:
+
+networks:
+  app-network:
+    driver: bridge

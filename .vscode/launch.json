@@ -1,66 +1,192 @@
 {
   "version": "0.2.0",
   "configurations": [
+    // ─── Frontend (Next.js 16) ───────────────────────────────────────────
     {
-      "name": "Next.js: dev",
+      "name": "Frontend: dev",
       "type": "node",
       "request": "launch",
-      "cwd": "${workspaceFolder}/web",
+      "cwd": "${workspaceFolder}/frontend",
+      "envFile": "${workspaceFolder}/frontend/.env.local",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["next", "dev"],
+      "runtimeArgs": ["next", "dev", "--port", "3000"],
       "console": "integratedTerminal",
       "serverReadyAction": {
         "pattern": "- Local:.+(https?://.+)",
         "uriFormat": "%s",
         "action": "openExternally"
-      },
-      "env": {
-        "NODE_OPTIONS": "--inspect"
       }
     },
     {
-      "name": "Next.js: debug server-side",
+      "name": "Frontend: debug server-side",
       "type": "node",
       "request": "launch",
-      "cwd": "${workspaceFolder}/web",
+      "cwd": "${workspaceFolder}/frontend",
+      "envFile": "${workspaceFolder}/frontend/.env.local",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["next", "dev"],
+      "runtimeArgs": ["next", "dev", "--port", "3000"],
       "console": "integratedTerminal",
       "env": {
         "NODE_OPTIONS": "--inspect-brk"
       }
     },
     {
-      "name": "Vitest: run all",
+      "name": "Frontend: build",
       "type": "node",
       "request": "launch",
-      "cwd": "${workspaceFolder}",
+      "cwd": "${workspaceFolder}/frontend",
+      "envFile": "${workspaceFolder}/frontend/.env.local",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["next", "build"],
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Frontend: test",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/frontend",
+      "envFile": "${workspaceFolder}/frontend/.env.local",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["vitest", "--run"],
+      "console": "integratedTerminal"
+    },
+
+    // ─── PPP Backend (Node.js/TypeScript) ────────────────────────────────
+    {
+      "name": "Backend: dev",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/backend",
+      "envFile": "${workspaceFolder}/backend/.env",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["tsx", "watch", "src/index.ts"],
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Backend: debug",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/backend",
+      "envFile": "${workspaceFolder}/backend/.env",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["tsx", "src/index.ts"],
+      "console": "integratedTerminal",
+      "env": {
+        "NODE_OPTIONS": "--inspect-brk"
+      }
+    },
+    {
+      "name": "Backend: build",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/backend",
+      "envFile": "${workspaceFolder}/backend/.env",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["tsc"],
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Backend: test",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/backend",
       "runtimeExecutable": "npx",
       "runtimeArgs": ["vitest", "run"],
-      "console": "integratedTerminal"
+      "console": "integratedTerminal",
+      "env": {
+        "JWT_SECRET": "test-jwt-secret-at-least-32-characters-long"
+      }
     },
     {
-      "name": "Vitest: debug current file",
+      "name": "Backend: test current file",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/backend",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["vitest", "run", "${relativeFile}", "--reporter=verbose"],
+      "console": "integratedTerminal",
+      "env": {
+        "JWT_SECRET": "test-jwt-secret-at-least-32-characters-long"
+      }
+    },
+    {
+      "name": "Backend: prisma migrate",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/backend",
+      "envFile": "${workspaceFolder}/backend/.env",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["prisma", "migrate", "dev"],
+      "console": "integratedTerminal"
+    },
+
+    // ─── Presenton Backend (Python/FastAPI) ──────────────────────────────
+    {
+      "name": "Presenton: dev",
+      "type": "debugpy",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/presenton",
+      "envFile": "${workspaceFolder}/presenton/.env",
+      "program": "server.py",
+      "args": ["--port", "8000", "--host", "0.0.0.0", "--reload", "true"],
+      "console": "integratedTerminal",
+      "env": {
+        "APP_DATA_DIRECTORY": "${workspaceFolder}/presenton/app_data"
+      }
+    },
+    {
+      "name": "Presenton: debug",
+      "type": "debugpy",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/presenton",
+      "envFile": "${workspaceFolder}/presenton/.env",
+      "program": "server.py",
+      "args": ["--port", "8000", "--host", "127.0.0.1"],
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "env": {
+        "APP_DATA_DIRECTORY": "${workspaceFolder}/presenton/app_data"
+      }
+    },
+    {
+      "name": "Presenton: test (pytest)",
+      "type": "debugpy",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/presenton",
+      "envFile": "${workspaceFolder}/presenton/.env",
+      "module": "pytest",
+      "args": ["tests/", "-v"],
+      "console": "integratedTerminal",
+      "env": {
+        "PRESENTON_API_KEY": "test-presenton-api-key"
+      }
+    },
+
+    // ─── Docker Compose (全部服务) ───────────────────────────────────────
+    {
+      "name": "Docker: up all services",
       "type": "node",
       "request": "launch",
       "cwd": "${workspaceFolder}",
-      "runtimeExecutable": "npx",
-      "runtimeArgs": [
-        "vitest",
-        "run",
-        "${relativeFile}",
-        "--reporter=verbose"
-      ],
+      "runtimeExecutable": "docker",
+      "runtimeArgs": ["compose", "up", "--build"],
       "console": "integratedTerminal"
     },
     {
-      "name": "TypeScript: check",
+      "name": "Docker: down",
       "type": "node",
       "request": "launch",
       "cwd": "${workspaceFolder}",
-      "runtimeExecutable": "npx",
-      "runtimeArgs": ["tsc", "--noEmit"],
+      "runtimeExecutable": "docker",
+      "runtimeArgs": ["compose", "down"],
       "console": "integratedTerminal"
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Full Stack: dev (all 3 services)",
+      "configurations": ["Frontend: dev", "Backend: dev", "Presenton: dev"],
+      "stopAll": true
     }
   ]
 }
