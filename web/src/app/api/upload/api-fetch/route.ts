@@ -33,7 +33,7 @@ function createIngestionService(): DataIngestionService {
     throw new Error('聚光 API 配置缺失: JUGUANG_BASE_URL 和 JUGUANG_API_KEY 为必填项');
   }
 
-  const pgyConfig = { noteBaseUrl: pgyNoteBaseUrl, apiKey: pgyApiKey };
+  const pgyConfig = { noteBaseUrl: pgyNoteBaseUrl, commentBaseUrl: process.env.PUGONGYING_COMMENT_BASE_URL || '', apiKey: pgyApiKey };
   const juguangConfig = { baseUrl: juguangBaseUrl, apiKey: juguangApiKey };
 
   const client = new PaichachaClient(baseUrl, apiKey, undefined, pgyConfig, juguangConfig);

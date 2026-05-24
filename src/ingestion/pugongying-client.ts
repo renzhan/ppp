@@ -5,12 +5,13 @@
  * 映射为系统标准类型 PugongyingNote[]。
  */
 
-import type { PugongyingNote } from '../shared/types.js';
+import type { PugongyingNote, CommentData } from '../shared/types.js';
 
 // ── Config ──
 
 export interface PugongyingClientConfig {
   noteBaseUrl: string;
+  commentBaseUrl: string;
   apiKey: string;
 }
 
@@ -208,6 +209,83 @@ export class PugongyingClient {
     });
   }
 
+  // ── Comments ──
+
+  async fetchComments(noteIds: string[]): Promise<CommentData[]> {
+    const allComments: CommentData[] = [];
+    const CONCURRENCY = 5;
+    const pending = [...noteIds];
+    const workers = Array.from({ length: CONCURRENCY }, async () => {
+      while (pending.length > 0) {
+        const noteId = pending.shift()!;
+        try {
+          const raw = await withRetry(async () => {
+            const url = `${this.config.commentBaseUrl}/api/comments/full_tree/?note_id=${encodeURIComponent(noteId)}`;
+            const res = await fetch(url, { headers: { 'X-API-Key': this.config.apiKey } });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const json = await res.json() as { code: number; msg?: string; data?: FullTreeResponse };
+            if (json.code !== 0) throw new Error(`评论 API 错误: code=${json.code} msg=${json.msg}`);
+            return json.data!;
+          });
+          // 拍平：一级 + 二级
+          for (const c of raw.comments ?? []) {
+            allComments.push({
+              noteId,
+              commentId: c.comment_id,
+              parentCommentId: null,
+              nickname: c.nickname,
+              content: c.content,
+              likes: Number(c.likes ?? 0),
+              commentTime: c.updateTime,
+            });
+            for (const r of c.replies ?? []) {
+              allComments.push({
+                noteId,
+                commentId: r.comment_id,
+                parentCommentId: c.comment_id,
+                nickname: r.nickname,
+                content: r.content,
+                likes: Number(r.likes ?? 0),
+                commentTime: r.updateTime,
+              });
+            }
+          }
+        } catch {
+          // skip failed notes
+        }
+      }
+    });
+    await Promise.all(workers);
+    return allComments;
+  }
+
+}
+
+// ── Comment raw type ──
+
+interface FullTreeResponse {
+  note_id: string;
+  total_first: number;
+  total_second: number;
+  total: number;
+  comments?: FullTreeComment[];
+}
+
+interface FullTreeComment {
+  comment_id: string;
+  nickname?: string;
+  content?: string;
+  likes?: string;
+  updateTime?: string;
+  replies?: FullTreeReply[];
+}
+
+interface FullTreeReply {
+  comment_id: string;
+  nickname?: string;
+  content?: string;
+  likes?: string;
+  updateTime?: string;
 }
 
 // ── Validation ──

@@ -192,6 +192,21 @@ export interface BusinessAnnotation {
   isUnderwater: boolean;         // 水下合作标记
 }
 
+// ---- 评论数据 ----
+
+/**
+ * 评论数据（蒲公英 full_tree API，用于舆情分析）
+ */
+export interface CommentData {
+  noteId: string;                  // 所属笔记ID
+  commentId: string;               // 评论唯一ID
+  parentCommentId?: string | null; // 父评论ID，一级为null
+  nickname?: string | null;        // 用户昵称
+  content?: string | null;         // 评论内容
+  likes: number;                   // 点赞数
+  commentTime?: string | null;     // 评论时间
+}
+
 // ---- 灵犀数据 ----
 
 /**

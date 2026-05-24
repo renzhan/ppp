@@ -11,7 +11,7 @@ import { PaichachaClient } from './paichacha-client.js';
 import { PrismaDataPersistenceService } from './persistence-service.js';
 import { SpreadsheetUploadService } from './spreadsheet-upload.js';
 import { envConfig } from '../config/env.js';
-import type { PugongyingNote, JuguangNote, LingxiData } from '../shared/types.js';
+import type { PugongyingNote, JuguangNote, LingxiData, CommentData } from '../shared/types.js';
 
 // ---- Types ----
 
@@ -42,6 +42,7 @@ export class DataIngestionService {
   ) {
     const pgyConfig = {
       noteBaseUrl: envConfig.PUGONGYING_NOTE_BASE_URL,
+      commentBaseUrl: envConfig.PUGONGYING_COMMENT_BASE_URL,
       apiKey: envConfig.PUGONGYING_API_KEY,
     };
     const juguangConfig = {
@@ -154,6 +155,33 @@ export class DataIngestionService {
     }
 
     return { pugongyingNotes, juguangNotes, errors };
+  }
+
+  /**
+   * 评论数据采集（全量替换，用于舆情分析）
+   * Phase 1 — 与 ingestFromAPI 平级，按需独立调用
+   */
+  async ingestComments(projectId: string, noteIds: string[]): Promise<{ count: number; errors: string[] }> {
+    const errors: string[] = [];
+    let commentData: CommentData[] = [];
+
+    try {
+      commentData = await this.paichachaClient.fetchCommentData(noteIds);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      errors.push(`Failed to fetch comment data: ${message}`);
+    }
+
+    if (commentData.length > 0) {
+      try {
+        await this.persistenceService.saveComments(projectId, commentData);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        errors.push(`Failed to persist comment data: ${message}`);
+      }
+    }
+
+    return { count: commentData.length, errors };
   }
 }
 

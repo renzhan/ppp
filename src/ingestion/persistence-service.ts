@@ -8,6 +8,7 @@ import { prisma } from '../shared/db.js';
 import type {
   PugongyingNote,
   JuguangNote,
+  CommentData,
   LingxiData,
   BusinessAnnotation,
   ManualInputData,
@@ -32,6 +33,8 @@ export interface DataPersistenceService {
 
   /** Insert manual input records (benchmark, KPI targets, brand search index, topic exposure) */
   saveManualInput(projectId: string, input: ManualInputData): Promise<void>;
+  /** 全量替换评论数据（先删后插，按 noteId 维度） */
+  saveComments(projectId: string, data: CommentData[]): Promise<void>;
 }
 
 /**
@@ -293,6 +296,27 @@ export class PrismaDataPersistenceService implements DataPersistenceService {
           inputType: input.inputType,
           dataContent: input.dataContent as object,
         },
+      });
+    });
+  }
+
+  /** 全量替换评论数据（先删后插，按 noteId 维度） */
+  async saveComments(projectId: string, data: CommentData[]): Promise<void> {
+    if (data.length === 0) return;
+    const noteIds = [...new Set(data.map((d) => d.noteId))];
+    await prisma.$transaction(async (tx) => {
+      await tx.comment.deleteMany({ where: { projectId, noteId: { in: noteIds } } });
+      await tx.comment.createMany({
+        data: data.map((d) => ({
+          projectId,
+          noteId: d.noteId,
+          commentId: d.commentId,
+          parentCommentId: d.parentCommentId ?? null,
+          nickname: d.nickname ?? null,
+          content: d.content ?? null,
+          likes: d.likes,
+          commentTime: d.commentTime ?? null,
+        })),
       });
     });
   }

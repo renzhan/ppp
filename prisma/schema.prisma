@@ -53,8 +53,9 @@ model Project {
   noteCount    Int      @default(0) @map("note_count")
 
   // Relations
-  notes               Note[]
-  juguangData         JuguangData[]
+  comments           Comment[]
+  notes              Note[]
+  juguangData        JuguangData[]
   businessAnnotations BusinessAnnotation[]
   lingxiData          LingxiData[]
   manualInputs        ManualInput[]
@@ -157,6 +158,25 @@ model JuguangData {
 
   @@index([projectId])
   @@map("juguang_data")
+}
+
+// 评论表（蒲公英 full_tree 采集，用于舆情分析）
+model Comment {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  projectId       String   @map("project_id") @db.Uuid
+  noteId          String   @map("note_id") @db.VarChar(100)
+  commentId       String   @map("comment_id") @db.VarChar(100)
+  parentCommentId String?  @map("parent_comment_id") @db.VarChar(100)
+  nickname        String?  @db.VarChar(255)
+  content         String?  @db.Text
+  likes           Int      @default(0)
+  commentTime     String?  @map("comment_time") @db.VarChar(50)
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  project Project @relation(fields: [projectId], references: [id])
+  @@index([projectId])
+  @@index([noteId])
+  @@map("comments")
 }
 
 // 业务标注表

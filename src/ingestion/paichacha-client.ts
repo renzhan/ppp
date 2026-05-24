@@ -5,7 +5,7 @@
  * Implements retry logic with exponential backoff and response validation.
  */
 
-import type { PugongyingNote, JuguangNote, LingxiData } from '../shared/types.js';
+import type { PugongyingNote, JuguangNote, LingxiData, CommentData } from '../shared/types.js';
 import { PugongyingClient } from './pugongying-client.js';
 import type { PugongyingClientConfig } from './pugongying-client.js';
 import { JuguangClient } from './juguang-client.js';
@@ -22,6 +22,8 @@ export interface IPaichachaClient {
   fetchJuguangData(advertiserId: number, startDate: string, endDate: string): Promise<JuguangNote[]>;
   /** 获取灵犀数据（brandName + keyword，Phase 1 写死） */
   fetchLingxiData(brandName: string, keyword: string): Promise<LingxiData>;
+  /** 获取评论数据（全量评论，用于舆情分析） */
+  fetchCommentData(noteIds: string[]): Promise<CommentData[]>;
 }
 
 /**
@@ -90,5 +92,12 @@ export class PaichachaClient implements IPaichachaClient {
   async fetchLingxiData(brandName: string, keyword: string): Promise<LingxiData> {
     if (!this.lingxiClient) throw new Error('Lingxi client not configured');
     return this.lingxiClient.fetchLingxiData(brandName, keyword);
+  }
+
+  // ── Comments ──
+
+  async fetchCommentData(noteIds: string[]): Promise<CommentData[]> {
+    if (!this.pugongyingClient) throw new Error('Pugongying client not configured');
+    return this.pugongyingClient.fetchComments(noteIds);
   }
 }
