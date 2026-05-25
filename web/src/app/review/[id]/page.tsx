@@ -1,6 +1,5 @@
 'use client';
 
-import { use } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { ArrowLeft, Download, BookOpen } from 'lucide-react';
@@ -82,8 +81,8 @@ const KPI_LABELS: Record<string, string> = {
 
 // ─── Page Component ──────────────────────────────────────────────────────────
 
-export default function ReviewDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
+export default function ReviewDetailPage({ params }: { params: { id: string } }) {
+  const { id } = params;
 
   const { data: review, isLoading, isError, error } = useQuery<ReviewDetail>({
     queryKey: ['review', id],

@@ -1,20 +1,21 @@
 'use client';
 
-import { use, useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { type Editor } from '@tiptap/react';
 import {
   ArrowLeft,
-  Save,
-  Download,
-  FileText,
-  MessageCircle,
-  Send,
   Table2,
   X,
   ChevronRight,
+  MessageCircle,
+  Send,
 } from 'lucide-react';
 import { Loading } from '@/components/ui/loading';
+import { TipTapEditor } from '@/components/proofread/tiptap-editor';
+import { EditorToolbar } from '@/components/proofread/editor-toolbar';
 import { cn } from '@/lib/utils';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -113,16 +114,18 @@ function parseReportSections(content: unknown): ReportSection[] {
 
 // ─── Page Component ──────────────────────────────────────────────────────────
 
-export default function ProofreadPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
+export default function ProofreadPage({ params }: { params: { id: string } }) {
+  const { id } = params;
 
   // State
   const [activeChapterIdx, setActiveChapterIdx] = useState(0);
   const [editorContent, setEditorContent] = useState('');
   const [sections, setSections] = useState<ReportSection[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [showSourceData, setShowSourceData] = useState(false);
+  const [editorInstance, setEditorInstance] = useState<Editor | null>(null);
 
   // AI Chat state
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -172,13 +175,6 @@ export default function ProofreadPage({ params }: { params: Promise<{ id: string
     }
   }, [reportData]);
 
-  // Update editor content when chapter changes
-  useEffect(() => {
-    if (sections[activeChapterIdx]) {
-      setEditorContent(sections[activeChapterIdx].content);
-    }
-  }, [activeChapterIdx, sections]);
-
   // Save mutation
   const saveMutation = useMutation({
     mutationFn: async (content: unknown) => {
@@ -192,12 +188,12 @@ export default function ProofreadPage({ params }: { params: Promise<{ id: string
     },
   });
 
-  // Save handler
+  // Save handler - serializes TipTap content as HTML
   const handleSave = useCallback(async () => {
     setIsSaving(true);
     setSaveMessage(null);
 
-    // Update current section content
+    // Update current section content with HTML from editor
     const updatedSections = [...sections];
     if (updatedSections[activeChapterIdx]) {
       updatedSections[activeChapterIdx] = {
@@ -218,9 +214,11 @@ export default function ProofreadPage({ params }: { params: Promise<{ id: string
     }
   }, [sections, activeChapterIdx, editorContent, saveMutation]);
 
-  // Chapter navigation
+  // Chapter navigation - saves current content before switching
   const handleChapterClick = useCallback((idx: number) => {
-    // Save current content before switching
+    if (idx === activeChapterIdx) return;
+
+    // Save current chapter content (HTML from TipTap) before switching
     setSections((prev) => {
       const updated = [...prev];
       if (updated[activeChapterIdx]) {
@@ -230,6 +228,98 @@ export default function ProofreadPage({ params }: { params: Promise<{ id: string
     });
     setActiveChapterIdx(idx);
   }, [activeChapterIdx, editorContent]);
+
+  // Load new chapter content when active chapter changes
+  useEffect(() => {
+    if (sections[activeChapterIdx]) {
+      setEditorContent(sections[activeChapterIdx].content);
+    }
+  }, [activeChapterIdx, sections]);
+
+  // Editor content change handler (receives HTML from TipTap)
+  const handleEditorChange = useCallback((html: string) => {
+    setEditorContent(html);
+  }, []);
+
+  // Editor ready callback - captures editor instance for toolbar
+  const handleEditorReady = useCallback((editor: Editor | null) => {
+    setEditorInstance(editor as Editor | null);
+  }, []);
+
+  // Router for navigation
+  const router = useRouter();
+
+  // Generate PPT handler - calls prepare API and navigates to PPT editor
+  const handleGeneratePPT = useCallback(async () => {
+    if (!review) return;
+    setIsGenerating(true);
+    try {
+      // Save current chapter content before generating
+      const updatedSections = [...sections];
+      if (updatedSections[activeChapterIdx]) {
+        updatedSections[activeChapterIdx] = {
+          ...updatedSections[activeChapterIdx],
+          content: editorContent,
+        };
+      }
+
+      // Build the content for PPT generation
+      // Combine all sections into markdown-like content
+      const fullContent = updatedSections
+        .map((s) => `## ${s.title}\n\n${s.content}`)
+        .join('\n\n');
+
+      // Build modules from report data (if available as structured data)
+      const modules: Record<string, { status: 'show' | 'hide'; paragraphs?: Array<{ content: string }>; tables?: Array<{ title?: string; headers: string[]; rows: string[][] }> }> = {};
+      for (const section of updatedSections) {
+        modules[section.title] = {
+          status: 'show',
+          paragraphs: [{ content: section.content }],
+        };
+      }
+
+      // Call prepare API
+      const prepareRes = await fetch('/api/ppt/presentation/prepare', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectName: review.project.projectName,
+          brand: review.project.brand,
+          category: review.project.category,
+          content: fullContent,
+          modules,
+          n_slides: 15,
+          language: '中文',
+          tone: 'professional',
+        }),
+      });
+
+      if (!prepareRes.ok) {
+        const errData = await prepareRes.json().catch(() => ({ error: '准备 PPT 失败' }));
+        throw new Error(errData.error || '准备 PPT 失败');
+      }
+
+      const { id: presentationId } = await prepareRes.json();
+
+      // Navigate to PPT editor page immediately
+      router.push(`/review/${id}/ppt-editor/${presentationId}`);
+    } catch (err) {
+      console.error('Generate PPT failed:', err);
+      setSaveMessage(err instanceof Error ? err.message : '生成 PPT 失败');
+      setTimeout(() => setSaveMessage(null), 5000);
+      setIsGenerating(false);
+    }
+  }, [review, sections, activeChapterIdx, editorContent, id, router]);
+
+  // Export PDF handler
+  const handleExportPDF = useCallback(() => {
+    window.open(`/api/reviews/${id}/export?format=pdf`, '_blank');
+  }, [id]);
+
+  // Export Word handler
+  const handleExportWord = useCallback(() => {
+    window.open(`/api/reviews/${id}/export?format=word`, '_blank');
+  }, [id]);
 
   // AI Chat handler
   const handleSendMessage = useCallback(() => {
@@ -244,7 +334,7 @@ export default function ProofreadPage({ params }: { params: Promise<{ id: string
     setChatMessages((prev) => [...prev, userMessage]);
     setChatInput('');
 
-    // Simulate AI response (in production, this would call an AI API)
+    // Placeholder AI response (will be replaced by real AI integration in Task 7)
     setTimeout(() => {
       const assistantMessage: ChatMessage = {
         id: `assistant-${Date.now()}`,
@@ -304,30 +394,6 @@ export default function ProofreadPage({ params }: { params: Promise<{ id: string
             <Table2 size={14} />
             查看源数据对照
           </button>
-          <button
-            onClick={handleSave}
-            disabled={isSaving}
-            className="inline-flex h-8 items-center gap-1.5 rounded-md bg-blue-600 px-3 text-xs font-medium text-white transition hover:bg-blue-700 disabled:opacity-50"
-          >
-            <Save size={14} />
-            {isSaving ? '保存中...' : '保存'}
-          </button>
-          <a
-            href={`/api/reviews/${id}/export?format=pdf`}
-            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 px-3 text-xs font-medium text-slate-600 transition hover:bg-slate-50"
-            download
-          >
-            <Download size={14} />
-            PDF
-          </a>
-          <a
-            href={`/api/reviews/${id}/export?format=word`}
-            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 px-3 text-xs font-medium text-slate-600 transition hover:bg-slate-50"
-            download
-          >
-            <FileText size={14} />
-            Word
-          </a>
           {saveMessage && (
             <span className={cn(
               'text-xs',
@@ -386,7 +452,7 @@ export default function ProofreadPage({ params }: { params: Promise<{ id: string
             />
           )}
 
-          {/* Editor area */}
+          {/* Editor area with toolbar */}
           <div className="flex-1 overflow-y-auto p-6">
             {sections.length === 0 ? (
               <div className="flex h-full items-center justify-center text-sm text-slate-400">
@@ -397,19 +463,31 @@ export default function ProofreadPage({ params }: { params: Promise<{ id: string
                 <h2 className="mb-4 text-lg font-semibold text-slate-800">
                   {sections[activeChapterIdx]?.title || ''}
                 </h2>
-                <textarea
-                  value={editorContent}
-                  onChange={(e) => setEditorContent(e.target.value)}
-                  className="min-h-[500px] w-full resize-y rounded-lg border border-slate-200 bg-white p-4 text-sm leading-relaxed text-slate-700 shadow-sm focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                {/* Editor Toolbar */}
+                <EditorToolbar
+                  editor={editorInstance}
+                  onGeneratePPT={handleGeneratePPT}
+                  onSave={handleSave}
+                  onExportPDF={handleExportPDF}
+                  onExportWord={handleExportWord}
+                  isSaving={isSaving}
+                  isGenerating={isGenerating}
+                />
+                {/* TipTap Rich Text Editor */}
+                <TipTapEditor
+                  content={editorContent}
+                  onChange={handleEditorChange}
+                  onEditorReady={handleEditorReady}
                   placeholder="在此编辑报告内容..."
-                  aria-label="报告内容编辑区"
+                  editable={true}
+                  className="rounded-t-none border-t-0"
                 />
               </div>
             )}
           </div>
         </div>
 
-        {/* Right panel: AI Assistant */}
+        {/* Right panel: AI Assistant (placeholder - full implementation in Task 7) */}
         <aside className="flex w-72 flex-shrink-0 flex-col border-l bg-white">
           <div className="flex items-center gap-2 border-b px-4 py-3">
             <MessageCircle size={16} className="text-blue-600" />

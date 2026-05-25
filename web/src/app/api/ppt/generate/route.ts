@@ -1,18 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { presentonClient } from '@/lib/presenton-client';
+import { getSession } from '@/lib/auth';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
 /**
  * POST /api/ppt/generate
  * 
- * 将复盘报告内容发送给 Presenton (localhost:5000) 生成 PPT。
+ * 将复盘报告内容发送给 Presenton（内部服务 localhost:8000）生成 PPT。
  * 
  * 流程：
- * 1. 接收前端传来的 modules 数据
- * 2. 读取 复盘报告模版分析.md 作为生成指引
- * 3. 组装完整的 content（包含数据表格、KPI等）
- * 4. 调用 Presenton API 生成 PPT
+ * 1. JWT 验证（通过 getSession）
+ * 2. 接收前端传来的 modules 数据
+ * 3. 读取 复盘报告模版分析.md 作为生成指引
+ * 4. 组装完整的 content（包含数据表格、KPI等）
+ * 5. 调用 Presenton API 生成 PPT（不带 auth headers，内部服务无需认证）
  * 
  * 注意：Presenton 生成是同步阻塞的，通常需要 2-5 分钟。
  */
@@ -67,6 +69,12 @@ const MOCK_DATA = {
 };
 
 export async function POST(request: NextRequest) {
+  // 1. JWT 验证
+  const session = await getSession(request);
+  if (!session) {
+    return new Response('Unauthorized', { status: 401 });
+  }
+
   try {
     const body = await request.json();
     const {

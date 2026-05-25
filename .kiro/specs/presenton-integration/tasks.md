@@ -1,0 +1,254 @@
+# Implementation Plan: Presenton 深度集成
+
+## Overview
+
+将 Presenton AI 演示文稿生成器深度集成到 PPP 平台。实现路径：复制 FastAPI 代码并移除认证 → 升级 API Proxy → 安装 TipTap 并创建编辑器组件 → 升级审校台 → AI 助手面板 → PPT 编辑器页面 → Docker/Supervisor 配置 → 测试。
+
+## Tasks
+
+- [x] 1. 复制 Presenton FastAPI 代码并移除认证
+  - [x] 1.1 复制 Presenton FastAPI 源码到 `presenton-api/` 目录
+    - 从 `D:\code\presenton/servers/fastapi/` 复制完整 FastAPI 项目到 `presenton-api/`
+    - 保留 `main.py`, `models/`, `routes/`, `services/`, `requirements.txt` 等核心文件
+    - 移除前端相关文件（如有）
+    - _Requirements: 1.1_
+  - [x] 1.2 移除 Presenton 认证中间件
+    - 在 `presenton-api/main.py` 中移除 `AuthMiddleware` 和 `APIKeyMiddleware`
+    - 移除所有路由中的 `Depends(get_current_user)` 依赖
+    - 配置 CORS 仅允许 `http://localhost:3000` 来源
+    - 配置 Uvicorn 绑定 `127.0.0.1:8000`（仅本地访问）
+    - _Requirements: 1.5, 2.1, 2.2, 2.5_
+  - [x] 1.3 验证 Presenton API 端点可用
+    - 确认 `/api/v1/ppt/presentation/generate` 端点存在
+    - 确认 `/api/v1/ppt/presentation/{id}` 端点存在
+    - 确认 `/api/v1/ppt/chat` 端点存在
+    - 确认 `/api/v1/ppt/presentation/export/pptx` 端点存在
+    - 确认 `/api/v1/health` 健康检查端点存在（如不存在则添加）
+    - _Requirements: 1.3, 1.4_
+
+- [x] 2. 升级 API Proxy 路由层
+  - [x] 2.1 升级 `web/src/lib/presenton-client.ts`
+    - 将 `PRESENTON_BASE_URL` 默认值从 `localhost:5000` 改为 `localhost:8000`
+    - 移除 Basic Auth 相关代码（`PRESENTON_USERNAME`, `PRESENTON_PASSWORD`, `authHeader`）
+    - 新增 `chatStream(payload: ChatRequest): Promise<ReadableStream>` 方法
+    - 更新 `healthCheck()` 使用 `/api/v1/health` 端点
+    - _Requirements: 7.1, 7.2, 10.2_
+  - [x] 2.2 创建 Chat API 代理路由 `web/src/app/api/ppt/chat/route.ts`
+    - 实现 JWT 验证（调用 `verifyAuth`）
+    - 转发请求到 `http://localhost:8000/api/v1/ppt/chat`（不带 auth headers）
+    - 支持 streaming 响应透传（`text/event-stream`）
+    - 超时设置 60 秒
+    - _Requirements: 2.3, 2.4, 7.1, 7.2, 7.5, 10.2_
+  - [x] 2.3 创建演示文稿 CRUD 代理路由 `web/src/app/api/ppt/[presentationId]/route.ts`
+    - GET: 获取演示文稿详情
+    - PUT: 更新演示文稿
+    - JWT 验证 + 转发到 Presenton API
+    - _Requirements: 7.1, 7.2, 7.3_
+  - [x] 2.4 创建导出代理路由 `web/src/app/api/ppt/[presentationId]/export/route.ts`
+    - POST: 导出 PPTX 文件
+    - 超时设置 120 秒
+    - _Requirements: 7.1, 7.4_
+  - [x] 2.5 创建健康检查路由 `web/src/app/api/ppt/health/route.ts`
+    - GET: 检查 Presenton 服务状态
+    - _Requirements: 1.3_
+  - [x] 2.6 创建 prepare 代理路由 `web/src/app/api/ppt/presentation/prepare/route.ts`
+    - POST: 创建演示文稿记录，返回 presentationId
+    - JWT 验证 + 转发到 Presenton API `/api/v1/ppt/presentation/prepare`
+    - _Requirements: 5.2, 7.1_
+  - [x] 2.7 创建 stream 代理路由 `web/src/app/api/ppt/presentation/stream/[id]/route.ts`
+    - GET: SSE 流式代理，透传 Presenton 的 `/api/v1/ppt/presentation/stream/{id}` 响应
+    - 设置 `Content-Type: text/event-stream`，不缓冲响应
+    - 超时设置 300 秒（PPT 生成可能较慢）
+    - _Requirements: 5.3, 7.1, 7.5_
+  - [x] 2.8 升级现有 `web/src/app/api/ppt/generate/route.ts`
+    - 移除 Basic Auth 相关逻辑（已由 presenton-client 处理）
+    - 确保使用升级后的 presenton-client
+    - _Requirements: 5.2, 5.6_
+  - [x] 2.7 编写 API Proxy JWT 验证属性测试
+    - **Property 1: JWT 验证网关**
+    - 验证无效/缺失 JWT 时所有 `/api/ppt/*` 路径返回 401
+    - 验证有效 JWT 时请求被正确转发
+    - **Validates: Requirements 2.3, 2.4**
+  - [x] 2.8 编写 API Proxy 透明转发属性测试
+    - **Property 5: API Proxy 透明转发**
+    - 验证路径映射正确（`/api/ppt/{subpath}` → `localhost:8000/api/v1/ppt/{subpath}`）
+    - 验证转发请求不包含 PPP 认证 headers
+    - 验证响应体和状态码原样传递
+    - **Validates: Requirements 7.1, 7.2, 7.3**
+
+- [x] 3. Checkpoint - 确保 API Proxy 层正常工作
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [x] 4. 安装 TipTap 依赖并创建编辑器组件
+
+  - [x] 4.1 安装 TipTap 相关 npm 依赖
+    - `@tiptap/react`, `@tiptap/starter-kit`, `@tiptap/pm`
+    - `@tiptap/extension-table`, `@tiptap/extension-table-row`, `@tiptap/extension-table-cell`, `@tiptap/extension-table-header`
+    - `@tiptap/extension-placeholder`
+    - 在 `web/package.json` 中添加依赖
+    - _Requirements: 3.1_
+  - [x] 4.2 创建 TipTap 编辑器组件 `web/src/components/proofread/tiptap-editor.tsx`
+    - 配置 StarterKit（标题 h1-h3、加粗、斜体、列表、引用、代码块）
+    - 配置 Table 扩展（表头、单元格、行）
+    - 配置 Placeholder 扩展
+    - 配置 History 扩展（maxDepth: 100）
+    - 支持 Markdown 快捷键（`#` → heading, `**` → bold, `-` → list）
+    - 接收 `content`, `onChange`, `placeholder`, `editable` props
+    - _Requirements: 3.1, 3.2, 3.3, 3.5_
+  - [x] 4.3 创建编辑器工具栏组件 `web/src/components/proofread/editor-toolbar.tsx`
+    - 格式化按钮：H1, H2, H3, Bold, Italic, BulletList, OrderedList, Table, Blockquote
+    - 操作按钮：保存、导出 PDF、导出 Word、生成 PPT
+    - 按钮状态与 TipTap editor 实例联动（active state）
+    - _Requirements: 3.1, 5.1_
+  - [x] 4.4 编写 TipTap 内容序列化往返属性测试
+    - **Property 2: TipTap 内容序列化往返**
+    - 使用 fast-check 生成随机富文本内容（标题、加粗、列表、表格）
+    - 验证序列化后反序列化结果与原始内容等价
+    - **Validates: Requirements 3.3**
+
+- [x] 5. 升级审校台页面集成 TipTap 编辑器
+  - [x] 5.1 重构 `web/src/app/review/[id]/proofread/page.tsx`
+    - 将 `<textarea>` 替换为 `<TipTapEditor>` 组件
+    - 保持三栏布局：章节导航（左）、编辑器（中）、AI 助手（右）
+    - 章节切换时保存当前内容并加载新章节
+    - 保存时序列化 TipTap 内容为 HTML 格式
+    - _Requirements: 3.1, 3.4, 3.6_
+  - [x] 5.2 实现内容格式转换工具 `web/src/lib/content-converter.ts`
+    - `convertModulesToMarkdown()`: 报告模块 → Markdown 格式
+    - 过滤 `status === 'hide'` 的模块
+    - 数值数据原样保留，不做四舍五入
+    - 表格转为 Markdown table 格式
+    - _Requirements: 12.1, 12.2, 12.3, 12.5_
+  - [x] 5.3 编写章节切换内容保持属性测试
+    - **Property 3: 章节切换内容保持**
+    - 模拟任意章节切换序列，验证每次切换回某章节时内容不变
+    - **Validates: Requirements 3.4**
+  - [x] 5.4 编写模块过滤正确性属性测试
+    - **Property 4: 模块过滤正确性**
+    - 使用 fast-check 生成随机模块集合（含 show/hide 状态）
+    - 验证输出仅包含 status 为 "show" 的模块
+    - **Validates: Requirements 5.6, 12.5**
+  - [x] 5.5 编写报告数据 Markdown 往返转换属性测试
+    - **Property 8: 报告数据 Markdown 往返转换**
+    - 生成随机报告模块数据（KPI 表格、内容分析表格、投流分析表格）
+    - 验证转换为 Markdown 后再解析回来，数值精确相等、行列数不变
+    - **Validates: Requirements 12.1, 12.2, 12.3, 12.4**
+
+- [x] 6. Checkpoint - 确保审校台 TipTap 编辑器正常工作
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [x] 7. 实现 AI 助手面板
+  - [x] 7.1 创建 AI 助手面板组件 `web/src/components/proofread/ai-assistant-panel.tsx`
+    - 接收 `reviewId`, `chapterTitle`, `chapterContent`, `onApplySuggestion` props
+    - 预设命令按钮：优化表达、补充数据、调整结构、润色文本
+    - 消息列表渲染（用户消息 + AI 回复）
+    - 输入框 + 发送按钮
+    - _Requirements: 4.1, 4.2, 4.3_
+  - [x] 7.2 实现 AI Chat streaming 接收逻辑
+    - 调用 `/api/ppt/chat` 端点
+    - 解析 Server-Sent Events 格式响应
+    - 逐步显示 AI 回复内容（streaming 效果）
+    - 处理 `type: "suggestion"` 消息，显示"应用"按钮
+    - _Requirements: 10.2, 10.3_
+  - [x] 7.3 实现"应用建议"功能
+    - 点击"应用"按钮将 AI 建议内容插入 TipTap 编辑器
+    - 支持替换选中文本或在光标位置插入
+    - _Requirements: 4.4_
+  - [x] 7.4 实现对话历史管理和错误处理
+    - 维护会话内对话历史，每次请求携带 `conversationHistory`
+    - 30 秒无数据超时警告 + 重试选项
+    - Presenton 不可用时显示错误提示并禁用 AI 按钮
+    - _Requirements: 4.5, 4.6, 10.4, 10.5_
+  - [x] 7.5 编写对话历史累积属性测试
+    - **Property 6: 对话历史累积**
+    - 模拟消息序列，验证第 n+1 条消息请求中包含前 n 条完整历史
+    - **Validates: Requirements 10.4**
+
+- [x] 8. 创建 PPT 编辑器页面
+  - [x] 8.1 创建 PPT 编辑器页面 `web/src/app/review/[id]/ppt-editor/[presentationId]/page.tsx`
+    - 三栏布局：幻灯片面板（左）、幻灯片画布（中）、AI Chat 面板（右）
+    - 从 Presenton API 获取演示文稿数据并渲染
+    - 提供"下载 PPTX"和"返回审校台"按钮
+    - _Requirements: 6.1, 6.2, 6.3, 6.7, 6.8_
+  - [x] 8.2 创建幻灯片面板组件 `web/src/components/ppt-editor/slide-panel.tsx`
+    - 显示所有幻灯片缩略图列表
+    - 点击缩略图切换当前编辑的幻灯片
+    - 支持拖拽排序（使用 HTML5 Drag and Drop 或轻量库）
+    - 支持添加新幻灯片和删除幻灯片
+    - 操作后立即持久化到 Presenton API
+    - _Requirements: 11.1, 11.2, 11.3, 11.4, 11.5, 11.6_
+  - [x] 8.3 创建幻灯片画布组件 `web/src/components/ppt-editor/slide-canvas.tsx`
+    - 使用 TipTap 编辑幻灯片文本内容
+    - 图片区域显示为不可编辑的占位块
+    - 内容变更时调用 `onContentChange` 回调
+    - _Requirements: 6.4_
+  - [x] 8.4 创建 PPT AI Chat 面板组件 `web/src/components/ppt-editor/ppt-chat-panel.tsx`
+    - 调用 `/api/ppt/chat` 并携带 `presentationId`
+    - 处理 `type: "slide_update"` 消息，实时更新对应幻灯片
+    - _Requirements: 6.5, 6.6_
+  - [x] 8.5 实现 PPT 流式生成触发和跳转逻辑
+    - 在审校台工具栏"生成 PPT"按钮点击后调用 `/api/ppt/presentation/prepare`（传入报告内容）
+    - 获取 `presentationId` 后立即跳转到 PPT 编辑器页面
+    - PPT 编辑器页面加载后连接 `/api/ppt/presentation/stream/{id}`（SSE）
+    - 逐页接收幻灯片数据，生成一页渲染一页（实时显示进度）
+    - 全部生成完毕后启用编辑功能
+    - 连接失败/超时显示错误信息 + 重连按钮
+    - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7_
+  - [x] 8.6 编写幻灯片列表操作正确性属性测试
+    - **Property 7: 幻灯片列表操作正确性**
+    - 验证添加后数量 +1、删除后数量 -1、移动后数量不变且顺序正确
+    - **Validates: Requirements 11.3, 11.4, 11.5**
+
+- [x] 9. Checkpoint - 确保 PPT 编辑器页面正常工作
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [x] 10. Docker 和 Supervisor 配置
+  - [x] 10.1 创建 Supervisor 配置文件 `presenton-api/supervisord.conf`
+    - 配置 `nextjs` 程序：`npx next start -p 3000`
+    - 配置 `presenton` 程序：`uvicorn main:app --host 127.0.0.1 --port 8000`
+    - 设置 `autorestart=true`, `startsecs=5`
+    - 配置日志输出路径
+    - _Requirements: 8.2, 8.4, 8.5_
+  - [x] 10.2 更新 `Dockerfile`
+    - 安装 Python 3.11+ 运行时和 pip 依赖
+    - 安装 Node.js 22 运行时
+    - 安装 supervisor 进程管理器
+    - 复制 `presenton-api/` 并安装 Python 依赖
+    - 仅暴露端口 3000
+    - 设置共享文件卷 `/app_data/`
+    - 入口点使用 `supervisord -c /app/presenton-api/supervisord.conf`
+    - _Requirements: 8.1, 8.3, 8.6, 8.7_
+  - [x] 10.3 更新 `docker-compose.yml`
+    - 添加共享卷映射 `/app_data/`
+    - 确保环境变量 `PRESENTON_INTERNAL_URL=http://localhost:8000` 传入
+    - _Requirements: 1.6, 8.7_
+
+- [ ] 11. 集成测试和最终验证
+  - [x] 11.1 编写审校台集成测试
+    - 测试完整流程：加载报告 → TipTap 编辑 → 保存 → 切换章节 → 验证内容
+    - 使用 MSW mock Presenton API 响应
+    - _Requirements: 3.1, 3.3, 3.4_
+  - [x] 11.2 编写 AI 助手集成测试
+    - 测试流程：发送消息 → 接收流式回复 → 应用建议到编辑器
+    - 验证对话历史正确累积
+    - _Requirements: 4.1, 4.4, 10.4_
+  - [x] 11.3 编写 PPT 生成流程集成测试
+    - 测试流程：点击生成 → 等待完成 → 验证跳转到编辑器
+    - 测试失败场景：超时、API 错误
+    - _Requirements: 5.2, 5.4, 5.5_
+  - [x] 11.4 编写 PPT 编辑器集成测试
+    - 测试流程：选择幻灯片 → 编辑内容 → AI 修改 → 导出
+    - 验证幻灯片管理操作（添加、删除、重排序）
+    - _Requirements: 6.3, 6.4, 6.5, 11.3, 11.4, 11.5_
+
+- [x] 12. Final checkpoint - 确保所有测试通过
+  - Ensure all tests pass, ask the user if questions arise.
+
+## Notes
+
+- Tasks marked with `*` are optional and can be skipped for faster MVP
+- 每个 task 引用了具体的 requirements 条目以确保可追溯性
+- Checkpoints 确保增量验证，避免问题累积
+- Property tests 使用 fast-check 库，每个属性至少 100 次迭代
+- 现有功能（Requirement 9）通过不修改现有路由和 API 来保证，无需额外 task
+- Presenton FastAPI 源码从 `D:\code\presenton/servers/fastapi/` 复制，编辑器组件参考 `D:\code\presenton/servers/nextjs/app/(presentation-generator)/`

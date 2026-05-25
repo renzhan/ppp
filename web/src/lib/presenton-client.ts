@@ -1,13 +1,12 @@
 /**
  * Presenton API Client
  * 
- * 与自部署的 Presenton 实例通信，用于生成和编辑 PPT。
- * Presenton 通过 Docker 部署在本地或服务器上，提供 REST API。
+ * 与内部 Presenton FastAPI 服务通信，用于生成和编辑 PPT。
+ * Presenton 作为内部服务运行在同一 Docker 容器内（localhost:8000），
+ * 无需独立认证，由 PPP JWT 认证统一保护。
  */
 
-const PRESENTON_BASE_URL = process.env.PRESENTON_BASE_URL || 'http://localhost:5000';
-const PRESENTON_USERNAME = process.env.PRESENTON_USERNAME || 'admin';
-const PRESENTON_PASSWORD = process.env.PRESENTON_PASSWORD || 'admin123';
+const PRESENTON_BASE_URL = process.env.PRESENTON_INTERNAL_URL || 'http://localhost:8000';
 
 export interface GeneratePresentationRequest {
   content: string;
@@ -58,14 +57,50 @@ export interface TemplateSummary {
   name: string;
 }
 
+export interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface ChatRequest {
+  message: string;
+  context?: {
+    chapterTitle?: string;
+    chapterContent?: string;
+    projectName?: string;
+    brand?: string;
+    category?: string;
+  };
+  conversationHistory?: ChatMessage[];
+  presentationId?: string;
+}
+
+export interface ReportModule {
+  status: 'show' | 'hide';
+  paragraphs?: Array<{ content: string }>;
+  tables?: Array<{
+    title?: string;
+    headers: string[];
+    rows: string[][];
+  }>;
+}
+
+export interface PreparePPTRequest {
+  projectName: string;
+  brand: string;
+  category: string;
+  content: string;
+  modules: Record<string, ReportModule>;
+  n_slides?: number;
+  language?: string;
+  tone?: 'professional' | 'default';
+}
+
 class PresentonClient {
   private baseUrl: string;
-  private authHeader: string;
 
   constructor(baseUrl?: string) {
     this.baseUrl = baseUrl || PRESENTON_BASE_URL;
-    const credentials = Buffer.from(`${PRESENTON_USERNAME}:${PRESENTON_PASSWORD}`).toString('base64');
-    this.authHeader = `Basic ${credentials}`;
   }
 
   private async request<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -74,7 +109,6 @@ class PresentonClient {
       ...options,
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': this.authHeader,
         ...options.headers,
       },
     });
@@ -96,6 +130,51 @@ class PresentonClient {
       method: 'POST',
       body: JSON.stringify(req),
     });
+  }
+
+  /**
+   * 准备演示文稿（创建记录，返回 ID）
+   * 用于 PPT 流式生成的第一步：先创建记录获取 ID，再通过 SSE 流式生成
+   */
+  async preparePresentation(payload: PreparePPTRequest): Promise<{ id: string }> {
+    return this.request<{ id: string }>('/api/v1/ppt/presentation/prepare', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  /**
+   * 获取 PPT 流式生成的 SSE 端点 URL
+   * 前端通过 EventSource 连接此 URL 逐页接收幻灯片数据
+   */
+  getStreamUrl(presentationId: string): string {
+    return `${this.baseUrl}/api/v1/ppt/presentation/stream/${presentationId}`;
+  }
+
+  /**
+   * AI Chat 流式对话
+   * 返回 ReadableStream，前端可逐步读取 AI 回复
+   */
+  async chatStream(payload: ChatRequest): Promise<ReadableStream> {
+    const url = `${this.baseUrl}/api/v1/ppt/chat/message/stream`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      const errorText = await res.text().catch(() => 'Unknown error');
+      throw new Error(`Presenton Chat API error (${res.status}): ${errorText}`);
+    }
+
+    if (!res.body) {
+      throw new Error('Presenton Chat API returned no streaming body');
+    }
+
+    return res.body;
   }
 
   /**
@@ -162,13 +241,11 @@ class PresentonClient {
    */
   async healthCheck(): Promise<boolean> {
     try {
-      const res = await fetch(`${this.baseUrl}/api/v1/ppt/presentation/generate`, {
-        method: 'OPTIONS',
-        headers: { 'Authorization': this.authHeader },
+      const res = await fetch(`${this.baseUrl}/api/v1/health`, {
+        method: 'GET',
         signal: AbortSignal.timeout(5000),
       });
-      // Any response that isn't a connection error means the service is up
-      return true;
+      return res.ok;
     } catch {
       return false;
     }
@@ -206,12 +283,10 @@ class PresentonClient {
       // exports dir not accessible from this path, try alternative
     }
 
-    // 方法2: 尝试从 Docker 容器内通过 /app_data/ URL 路径下载
-    // Presenton nginx 映射了 /app_data/ 路径
+    // 方法2: 尝试通过 HTTP 下载
     const url = `${this.baseUrl}/app_data/exports/`;
     try {
-      // 直接用已知的文件名模式尝试
-      const res = await fetch(url, { headers: { 'Authorization': this.authHeader } });
+      const res = await fetch(url);
       if (res.ok) {
         const html = await res.text();
         const matches = html.match(/[^">\s]+\.pptx/g) || [];
@@ -221,9 +296,7 @@ class PresentonClient {
           targetFile = matches[matches.length - 1];
         }
         if (targetFile) {
-          const fileRes = await fetch(`${this.baseUrl}/app_data/exports/${encodeURIComponent(targetFile)}`, {
-            headers: { 'Authorization': this.authHeader },
-          });
+          const fileRes = await fetch(`${this.baseUrl}/app_data/exports/${encodeURIComponent(targetFile)}`);
           if (fileRes.ok) {
             const buf = Buffer.from(await fileRes.arrayBuffer());
             return { buffer: buf, filename };

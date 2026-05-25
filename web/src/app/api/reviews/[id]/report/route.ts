@@ -52,9 +52,22 @@ export async function GET(
       }
     }
 
+    // If ReviewConfig.reportContent is empty, try to load from the latest ReportVersion
+    let reportContent = review.reportContent;
+    if (!reportContent || (typeof reportContent === 'object' && Object.keys(reportContent as object).length === 0)) {
+      const latestVersion = await prisma.reportVersion.findFirst({
+        where: { projectId: review.projectId },
+        orderBy: { versionNumber: 'desc' },
+        select: { content: true },
+      });
+      if (latestVersion?.content) {
+        reportContent = latestVersion.content;
+      }
+    }
+
     return NextResponse.json({
       id: review.id,
-      reportContent: review.reportContent,
+      reportContent,
     });
   } catch (error) {
     console.error('GET /api/reviews/[id]/report error:', error);

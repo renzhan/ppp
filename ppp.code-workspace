@@ -17,5 +17,7 @@
 		}
 	],
 	"settings": {
+		"debug.javascript.autoAttachFilter": "disabled",
+		"python.terminal.activateEnvironment": false
 	}
 }

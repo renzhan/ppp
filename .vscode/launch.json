@@ -1,33 +1,44 @@
 {
   "version": "0.2.0",
+  "compounds": [
+    {
+      "name": "Full Stack: Web + Presenton API",
+      "configurations": ["Web: open app", "Presenton API: dev"]
+    }
+  ],
   "configurations": [
     {
-      "name": "Next.js: dev",
-      "type": "node",
+      "name": "Web: open app",
+      "type": "pwa-chrome",
       "request": "launch",
-      "cwd": "${workspaceFolder}/web",
-      "runtimeExecutable": "npx",
-      "runtimeArgs": ["next", "dev"],
-      "console": "integratedTerminal",
-      "serverReadyAction": {
-        "pattern": "- Local:.+(https?://.+)",
-        "uriFormat": "%s",
-        "action": "openExternally"
-      },
-      "env": {
-        "NODE_OPTIONS": "--inspect"
-      }
+      "url": "http://127.0.0.1:3000",
+      "webRoot": "${workspaceFolder}/web",
+      "preLaunchTask": "Next.js: dev server"
     },
     {
-      "name": "Next.js: debug server-side",
-      "type": "node",
+      "name": "Web: open app (no debug)",
+      "type": "pwa-chrome",
       "request": "launch",
-      "cwd": "${workspaceFolder}/web",
-      "runtimeExecutable": "npx",
-      "runtimeArgs": ["next", "dev"],
+      "url": "http://127.0.0.1:3000",
+      "webRoot": "${workspaceFolder}/web",
+      "preLaunchTask": "Next.js: dev server",
+      "noDebug": true
+    },
+    {
+      "name": "Presenton API: dev",
+      "type": "python",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/presenton-api",
+      "program": "${workspaceFolder}/presenton-api/server.py",
+      "python": "${workspaceFolder}/presenton/.venv/bin/python",
+      "args": ["--port", "8000", "--reload", "true"],
       "console": "integratedTerminal",
+      "justMyCode": true,
+      "envFile": "${workspaceFolder}/presenton/.env",
       "env": {
-        "NODE_OPTIONS": "--inspect-brk"
+        "APP_DATA_DIRECTORY": "${workspaceFolder}/presenton-api/app_data",
+        "NEXT_PUBLIC_FAST_API": "http://127.0.0.1:8000",
+        "USER_CONFIG_PATH": "${workspaceFolder}/presenton-api/app_data/userConfig.json"
       }
     },
     {
@@ -35,6 +46,7 @@
       "type": "node",
       "request": "launch",
       "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env",
       "runtimeExecutable": "npx",
       "runtimeArgs": ["vitest", "run"],
       "console": "integratedTerminal"
@@ -44,6 +56,7 @@
       "type": "node",
       "request": "launch",
       "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env",
       "runtimeExecutable": "npx",
       "runtimeArgs": [
         "vitest",
@@ -58,6 +71,7 @@
       "type": "node",
       "request": "launch",
       "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env",
       "runtimeExecutable": "npx",
       "runtimeArgs": ["tsc", "--noEmit"],
       "console": "integratedTerminal"

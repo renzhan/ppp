@@ -1,63 +1,128 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { presentonClient } from '@/lib/presenton-client';
+import { NextRequest } from 'next/server';
+import { getSession } from '@/lib/auth';
+
+const PRESENTON_INTERNAL_URL = process.env.PRESENTON_INTERNAL_URL || 'http://localhost:8000';
 
 /**
  * GET /api/ppt/[presentationId]
- * 获取演示文稿详情（幻灯片列表、主题等）
+ *
+ * 获取演示文稿详情 - 转发到 Presenton API
+ *
+ * 流程：
+ * 1. JWT 验证（通过 getSession）
+ * 2. 转发请求到 Presenton（不带 auth headers）
+ * 3. 返回响应体和状态码
+ *
+ * Validates: Requirements 7.1, 7.2, 7.3
  */
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: { presentationId: string } }
 ) {
-  try {
-    const { presentationId } = params;
-    const presentation = await presentonClient.getPresentation(presentationId);
+  // 1. JWT 验证
+  const session = await getSession(request);
+  if (!session) {
+    return new Response('Unauthorized', { status: 401 });
+  }
 
-    return NextResponse.json({
-      ...presentation,
-      editorUrl: presentonClient.getEditorUrl(presentationId),
+  try {
+    // 2. 转发到 Presenton（不带 auth headers）
+    const response = await fetch(
+      `${PRESENTON_INTERNAL_URL}/api/v1/ppt/presentation/${params.presentationId}`,
+      {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+        signal: AbortSignal.timeout(30_000),
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => 'Presenton API error');
+      return new Response(errorText, { status: response.status });
+    }
+
+    // 3. 返回响应体和状态码
+    const data = await response.json();
+    return new Response(JSON.stringify(data), {
+      status: response.status,
+      headers: { 'Content-Type': 'application/json' },
     });
   } catch (error: unknown) {
-    console.error('Failed to get presentation:', error);
-    const message = error instanceof Error ? error.message : '获取 PPT 详情失败';
-    return NextResponse.json({ error: message }, { status: 500 });
+    if (error instanceof Error && error.name === 'TimeoutError') {
+      return new Response(
+        JSON.stringify({ error: '请求超时', code: 'PRESENTON_TIMEOUT' }),
+        { status: 504, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.error('PPT presentation GET proxy error:', error);
+    const message = error instanceof Error ? error.message : '代理错误';
+    return new Response(
+      JSON.stringify({ error: message, code: 'PROXY_ERROR' }),
+      { status: 502, headers: { 'Content-Type': 'application/json' } }
+    );
   }
 }
 
 /**
  * PUT /api/ppt/[presentationId]
- * 编辑演示文稿中的指定幻灯片
+ *
+ * 更新演示文稿 - 转发到 Presenton API
+ *
+ * 流程：
+ * 1. JWT 验证（通过 getSession）
+ * 2. 转发请求到 Presenton（不带 auth headers）
+ * 3. 返回响应体和状态码
+ *
+ * Validates: Requirements 7.1, 7.2, 7.3
  */
 export async function PUT(
   request: NextRequest,
   { params }: { params: { presentationId: string } }
 ) {
-  try {
-    const { presentationId } = params;
-    const body = await request.json();
-    const { slides, export_as = 'pptx' } = body;
+  // 1. JWT 验证
+  const session = await getSession(request);
+  if (!session) {
+    return new Response('Unauthorized', { status: 401 });
+  }
 
-    if (!slides || !Array.isArray(slides) || slides.length === 0) {
-      return NextResponse.json(
-        { error: '缺少 slides 参数' },
-        { status: 400 }
+  try {
+    // 2. 转发到 Presenton（不带 auth headers）
+    const body = await request.json();
+    const response = await fetch(
+      `${PRESENTON_INTERNAL_URL}/api/v1/ppt/presentation/${params.presentationId}`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(30_000),
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => 'Presenton API error');
+      return new Response(errorText, { status: response.status });
+    }
+
+    // 3. 返回响应体和状态码
+    const data = await response.json();
+    return new Response(JSON.stringify(data), {
+      status: response.status,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  } catch (error: unknown) {
+    if (error instanceof Error && error.name === 'TimeoutError') {
+      return new Response(
+        JSON.stringify({ error: '请求超时', code: 'PRESENTON_TIMEOUT' }),
+        { status: 504, headers: { 'Content-Type': 'application/json' } }
       );
     }
 
-    const result = await presentonClient.editPresentation({
-      presentation_id: presentationId,
-      slides,
-      export_as,
-    });
-
-    return NextResponse.json({
-      presentationId: result.presentation_id,
-      editUrl: presentonClient.getEditorUrl(result.presentation_id),
-      downloadUrl: presentonClient.getDownloadUrl(result.path),
-    });
-  } catch (error: unknown) {
-    console.error('Failed to edit presentation:', error);
-    const message = error instanceof Error ? error.message : '编辑 PPT 失败';
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error('PPT presentation PUT proxy error:', error);
+    const message = error instanceof Error ? error.message : '代理错误';
+    return new Response(
+      JSON.stringify({ error: message, code: 'PROXY_ERROR' }),
+      { status: 502, headers: { 'Content-Type': 'application/json' } }
+    );
   }
 }

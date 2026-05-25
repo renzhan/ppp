@@ -1,0 +1,31 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Next.js: dev server",
+      "type": "shell",
+      "command": "env -u NODE_OPTIONS -u VSCODE_INSPECTOR_OPTIONS DOTENV_CONFIG_PATH=../.env node -r dotenv/config ./node_modules/next/dist/bin/next dev --hostname 127.0.0.1",
+      "options": {
+        "cwd": "${workspaceFolder}/web"
+      },
+      "isBackground": true,
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "focus": false,
+        "clear": false
+      },
+      "problemMatcher": {
+        "owner": "nextjs",
+        "pattern": {
+          "regexp": "."
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".*(next dev|Starting\\.\\.\\.).*",
+          "endsPattern": ".*(Ready in|ready - started server on|started server on).*$"
+        }
+      }
+    }
+  ]
+}

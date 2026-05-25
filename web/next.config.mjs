@@ -2,7 +2,7 @@
 const nextConfig = {
   transpilePackages: ['../src/engines', '../src/shared', '../src/report', '../src/ingestion', '../src/export', '../src/validation'],
   experimental: {
-    serverExternalPackages: ['@napi-rs/canvas', '@napi-rs/canvas-win32-x64-msvc', 'pdfjs-dist', 'pdf-to-img', '@react-pdf/renderer', '@react-pdf/reconciler'],
+    serverComponentsExternalPackages: ['@napi-rs/canvas', '@napi-rs/canvas-win32-x64-msvc', 'pdfjs-dist', 'pdf-to-img', '@react-pdf/renderer', '@react-pdf/reconciler'],
   },
   // Skip failing static generation for API routes that require a database connection
   output: undefined,

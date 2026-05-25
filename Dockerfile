@@ -75,7 +75,7 @@ ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
 RUN npm run build
 
 # ============================================================
-# Stage 4: Production image
+# Stage 4: Production image (Node.js + Python + Supervisor)
 # ============================================================
 FROM node:22-bookworm-slim AS runner
 
@@ -85,6 +85,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libreoffice-writer \
     fonts-wqy-zenhei \
     fonts-noto-cjk \
+    python3 \
+    python3-pip \
+    python3-venv \
+    supervisor \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -92,6 +96,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
+# --- Next.js artifacts ---
 COPY --from=web-builder /app/web/node_modules ./web/node_modules
 COPY --from=web-builder /app/web/.next ./web/.next
 COPY --from=web-builder /app/web/package.json ./web/package.json
@@ -101,6 +106,15 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/generated ./generated
 COPY --from=builder /app/prisma ./prisma
 
+# --- Presenton FastAPI ---
+COPY presenton-api/ ./presenton-api/
+RUN python3 -m pip install --no-cache-dir --break-system-packages -r presenton-api/requirements.txt
+
+# --- Shared data volume ---
+RUN mkdir -p /app_data
+VOLUME /app_data
+
+# --- Entrypoint: run Prisma migrations then start supervisor ---
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
 

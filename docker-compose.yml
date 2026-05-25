@@ -12,6 +12,11 @@ services:
     environment:
       - NODE_ENV=production
       - NEXT_TELEMETRY_DISABLED=1
+      - PRESENTON_INTERNAL_URL=http://localhost:8000
     volumes:
       - ./prisma:/app/prisma:ro
+      - app_data:/app_data
     restart: unless-stopped
+
+volumes:
+  app_data:
