@@ -18,8 +18,8 @@ import type { LingxiClientConfig } from './lingxi-client.js';
  */
 export interface IPaichachaClient {
   fetchPugongyingData(noteIds: string[]): Promise<PugongyingNote[]>;
-  /** 获取聚光笔记层级离线报表（advertiserId + 日期范围，替代旧的 noteIds 模式） */
-  fetchJuguangData(advertiserId: number, startDate: string, endDate: string): Promise<JuguangNote[]>;
+  /** 获取聚光笔记层级离线报表（brandName + 日期范围） */
+  fetchJuguangData(brandName: string, startDate: string, endDate: string): Promise<JuguangNote[]>;
   /** 获取灵犀数据（brandName + keyword，Phase 1 写死） */
   fetchLingxiData(brandName: string, keyword: string): Promise<LingxiData>;
   /** 获取评论数据（全量评论，用于舆情分析） */
@@ -79,12 +79,12 @@ export class PaichachaClient implements IPaichachaClient {
   // ── Juguang ──
 
   async fetchJuguangData(
-    advertiserId: number,
+    brandName: string,
     startDate: string,
     endDate: string,
   ): Promise<JuguangNote[]> {
     if (!this.juguangClient) throw new Error('Juguang client not configured');
-    return this.juguangClient.fetchJuguangData(advertiserId, startDate, endDate);
+    return this.juguangClient.fetchJuguangData(brandName, startDate, endDate);
   }
 
   // ── Lingxi ──

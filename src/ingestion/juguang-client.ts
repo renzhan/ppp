@@ -21,6 +21,16 @@ const MAX_RETRIES = 3;
 
 // ── Raw types ──
 
+interface AdvertiserListResponse {
+  code: number;
+  message?: string;
+  data?: {
+    result?: {
+      advertisers?: Array<{ advertiser_id: number; advertiser_name: string }>;
+    };
+  };
+}
+
 /** 聚光笔记报表 API 返回的原始记录（值均为 string） */
 interface RawJuguangNote {
   note_id?: string;
@@ -58,16 +68,18 @@ export class JuguangClient {
 
   /**
    * 获取笔记层级离线报表数据（分页遍历全部）。
+   * 内部先通过品牌名称匹配 advertiserId。
    *
-   * @param advertiserId 广告主 ID
+   * @param brandName 品牌名称
    * @param startDate 开始日期 yyyy-MM-dd
    * @param endDate 结束日期 yyyy-MM-dd
    */
   async fetchJuguangData(
-    advertiserId: number,
+    brandName: string,
     startDate: string,
     endDate: string,
   ): Promise<JuguangNote[]> {
+    const advertiserId = await this.resolveAdvertiserId(brandName);
     const allRows: RawJuguangNote[] = [];
     let page = 1;
     let hasMore = true;
@@ -81,6 +93,21 @@ export class JuguangClient {
     }
 
     return allRows.map(mapToJuguangNote);
+  }
+
+  /** 根据品牌名称匹配 advertiser_id（取第一个，前端后续支持选择具体广告主） */
+  private async resolveAdvertiserId(brandName: string): Promise<number> {
+    const url = `${this.config.baseUrl}/api/v1/juguang/advertisers`;
+    const res = await fetch(url, { headers: { 'X-API-Key': this.config.apiKey } });
+    if (!res.ok) throw new Error(`获取广告主列表失败: HTTP ${res.status}`);
+    const json = await res.json() as AdvertiserListResponse;
+    if (json.code !== 200) throw new Error(`获取广告主列表失败: code=${json.code}`);
+    const advertisers = json.data?.result?.advertisers ?? [];
+
+    const match = advertisers.find(a => a.advertiser_name.includes(brandName));
+    if (match) return match.advertiser_id;
+
+    throw new Error(`未找到匹配品牌 "${brandName}" 的广告主`);
   }
 
   private async fetchPage(

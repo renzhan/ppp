@@ -88,9 +88,9 @@ export class DataIngestionService {
     // Fetch juguang data（参数后续由前端传入，当前写死联调用）
     try {
       juguangNotes = await this.paichachaClient.fetchJuguangData(
-        726286,          // advertiser_id
-        '2026-04-12',    // start_date
-        '2026-04-18',    // end_date
+        '爷爷不泡茶-派芽', // brand_name → 内部自动匹配 advertiser_id
+        '2026-04-01',      // start_date
+        '2026-04-30',      // end_date
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
