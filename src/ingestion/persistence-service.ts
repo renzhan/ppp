@@ -300,23 +300,40 @@ export class PrismaDataPersistenceService implements DataPersistenceService {
     });
   }
 
-  /** 全量替换评论数据（先删后插，按 noteId 维度） */
+  /** 增量更新评论数据（upsert by commentId，API 未返回的标记 isActive=false） */
   async saveComments(projectId: string, data: CommentData[]): Promise<void> {
     if (data.length === 0) return;
     const noteIds = [...new Set(data.map((d) => d.noteId))];
+    const incomingIds = new Set(data.map((d) => d.commentId));
+
     await prisma.$transaction(async (tx) => {
-      await tx.comment.deleteMany({ where: { projectId, noteId: { in: noteIds } } });
-      await tx.comment.createMany({
-        data: data.map((d) => ({
-          projectId,
-          noteId: d.noteId,
-          commentId: d.commentId,
-          parentCommentId: d.parentCommentId ?? null,
-          nickname: d.nickname ?? null,
-          content: d.content ?? null,
-          likes: d.likes,
-          commentTime: d.commentTime ?? null,
-        })),
+      // Upsert incoming comments
+      for (const d of data) {
+        await tx.comment.upsert({
+          where: { commentId: d.commentId },
+          create: {
+            projectId,
+            noteId: d.noteId,
+            commentId: d.commentId,
+            parentCommentId: d.parentCommentId ?? null,
+            nickname: d.nickname ?? null,
+            content: d.content ?? null,
+            likes: d.likes,
+            commentTime: d.commentTime ?? null,
+            isActive: true,
+          },
+          update: {
+            likes: d.likes,
+            content: d.content ?? null,
+            isActive: true,
+          },
+        });
+      }
+
+      // Mark comments not in the new batch as inactive (deleted on platform)
+      await tx.comment.updateMany({
+        where: { projectId, noteId: { in: noteIds }, commentId: { notIn: [...incomingIds] }, isActive: true },
+        data: { isActive: false },
       });
     });
   }

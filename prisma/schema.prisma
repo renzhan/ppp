@@ -170,10 +170,12 @@ model Comment {
   nickname        String?  @db.VarChar(255)
   content         String?  @db.Text
   likes           Int      @default(0)
+  isActive        Boolean  @default(true) @map("is_active")
   commentTime     String?  @map("comment_time") @db.VarChar(50)
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz()
 
   project Project @relation(fields: [projectId], references: [id])
+  @@unique([commentId])
   @@index([projectId])
   @@index([noteId])
   @@map("comments")
