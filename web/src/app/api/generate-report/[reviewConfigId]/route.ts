@@ -49,6 +49,12 @@ export async function POST(
     const templateLoader = new PromptTemplateLoader(templatesDir);
     const llmClient = createLLMClientFromEnv();
 
+    // Mark status as generating
+    await prisma.reviewConfig.update({
+      where: { id: reviewConfigId },
+      data: { status: 'generating' },
+    });
+
     const orchestrator = new ReportPipelineOrchestrator(
       loaderRegistry,
       templateLoader,
@@ -56,11 +62,15 @@ export async function POST(
       prisma as any,
     );
 
+    console.log('[generate-report] calling orchestrator.generateFullReport...');
+
     // Invoke full report generation
     const result = await orchestrator.generateFullReport({
       projectId: project.id,
       reviewConfigId,
     });
+
+    console.log('[generate-report] report generated successfully, versionId:', result.versionId);
 
     return NextResponse.json({
       success: true,

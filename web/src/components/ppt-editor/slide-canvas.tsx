@@ -181,7 +181,7 @@ function getImageFields(content: Record<string, unknown>): string[] {
 
 // ─── Visual Slide Preview (read-only, layout-based) ──────────────────────────
 
-function VisualSlidePreview({ slide }: { slide: PresentationSlide }) {
+function VisualSlidePreview({ slide, onContentChange, editable }: SlideCanvasProps) {
   return (
     <div className="flex h-full flex-col">
       {/* Slide type indicator */}
@@ -197,6 +197,8 @@ function VisualSlidePreview({ slide }: { slide: PresentationSlide }) {
           <SlideRenderer
             layout={slide.layout!}
             content={slide.content}
+            editable={editable}
+            onContentChange={onContentChange}
           />
         </div>
       </div>
@@ -317,7 +319,13 @@ export function SlideCanvas({
   const hasVisualLayout = slide.layout && VISUAL_LAYOUTS.has(slide.layout);
 
   if (hasVisualLayout) {
-    return <VisualSlidePreview slide={slide} />;
+    return (
+      <VisualSlidePreview
+        slide={slide}
+        onContentChange={onContentChange}
+        editable={editable}
+      />
+    );
   }
 
   // Fallback to TipTap editor for unknown layouts

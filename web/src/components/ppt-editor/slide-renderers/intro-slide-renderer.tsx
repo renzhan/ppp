@@ -1,68 +1,92 @@
 'use client';
 
-import React from 'react';
+import React, { useCallback } from 'react';
+import { InlineEditableText } from '../inline-editable-text';
 
 interface IntroSlideContent {
   title?: string;
-  description?: string;
-  presenterName?: string;
-  presentationDate?: string;
+  subtitle?: string;
+  author?: string;
+  date?: string;
 }
 
 interface IntroSlideRendererProps {
   content: IntroSlideContent;
+  editable?: boolean;
+  onContentChange?: (content: IntroSlideContent) => void;
 }
 
-export function IntroSlideRenderer({ content }: IntroSlideRendererProps) {
-  const { title, description, presenterName, presentationDate } = content;
+export function IntroSlideRenderer({ content, editable, onContentChange }: IntroSlideRendererProps) {
+  const { title, subtitle, author, date } = content;
 
-  const getInitials = (name: string) =>
-    name.split(' ').map((w) => w.charAt(0).toUpperCase()).join('');
+  const handleFieldChange = useCallback((field: string, value: string) => {
+    onContentChange?.({ ...content, [field]: value });
+  }, [content, onContentChange]);
 
   return (
-    <div className="flex h-full w-full items-center px-10 py-8">
-      {/* Left - decorative placeholder */}
-      <div className="flex-1 flex items-center justify-center pr-6">
-        <div className="w-full max-w-[280px] aspect-[4/3] rounded-xl bg-gradient-to-br from-purple-100 to-purple-50 flex items-center justify-center shadow-inner">
-          <span className="text-4xl font-bold text-purple-300">
-            {getInitials(title || 'P')}
-          </span>
-        </div>
-      </div>
-
-      {/* Right - content */}
-      <div className="flex-1 flex flex-col justify-center space-y-4 pl-6">
-        <h1 className="text-3xl font-bold text-gray-900 leading-tight">
-          {title || 'Untitled Presentation'}
-        </h1>
-
-        <div className="w-16 h-1 bg-purple-600 rounded-full" />
-
-        {description && (
-          <p className="text-sm text-gray-600 leading-relaxed">
-            {description}
-          </p>
+    <div className="flex h-full w-full flex-col items-center justify-center px-12 py-10 text-center bg-gradient-to-br from-indigo-50 via-white to-purple-50">
+      {/* Title */}
+      <h1 className="text-4xl font-bold text-gray-900 mb-4 max-w-[80%]">
+        {editable && onContentChange ? (
+          <InlineEditableText
+            content={title || ''}
+            onContentChange={(v) => handleFieldChange('title', v)}
+            placeholder="输入标题..."
+            editable={editable}
+          />
+        ) : (
+          title || 'Presentation Title'
         )}
+      </h1>
 
-        {/* Presenter info */}
-        {(presenterName || presentationDate) && (
-          <div className="mt-4 flex items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
-            {presenterName && (
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-purple-600 text-xs font-bold text-white">
-                {getInitials(presenterName)}
-              </div>
+      {/* Subtitle */}
+      {(subtitle || editable) && (
+        <p className="text-lg text-gray-600 mb-8 max-w-[70%]">
+          {editable && onContentChange ? (
+            <InlineEditableText
+              content={subtitle || ''}
+              onContentChange={(v) => handleFieldChange('subtitle', v)}
+              placeholder="输入副标题..."
+              editable={editable}
+            />
+          ) : (
+            subtitle
+          )}
+        </p>
+      )}
+
+      {/* Divider */}
+      <div className="w-20 h-1 bg-purple-600 rounded-full mb-6" />
+
+      {/* Author & Date */}
+      <div className="flex flex-col items-center gap-1">
+        {(author || editable) && (
+          <span className="text-sm font-medium text-gray-700">
+            {editable && onContentChange ? (
+              <InlineEditableText
+                content={author || ''}
+                onContentChange={(v) => handleFieldChange('author', v)}
+                placeholder="作者"
+                editable={editable}
+              />
+            ) : (
+              author
             )}
-            <div className="flex flex-col">
-              {presenterName && (
-                <span className="text-sm font-semibold text-gray-900">
-                  {presenterName}
-                </span>
-              )}
-              {presentationDate && (
-                <span className="text-xs text-gray-500">{presentationDate}</span>
-              )}
-            </div>
-          </div>
+          </span>
+        )}
+        {(date || editable) && (
+          <span className="text-xs text-gray-500">
+            {editable && onContentChange ? (
+              <InlineEditableText
+                content={date || ''}
+                onContentChange={(v) => handleFieldChange('date', v)}
+                placeholder="日期"
+                editable={editable}
+              />
+            ) : (
+              date
+            )}
+          </span>
         )}
       </div>
     </div>

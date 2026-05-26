@@ -12,7 +12,7 @@ import { NumberedBulletsRenderer } from './numbered-bullets-renderer';
 // ─── Layout type to renderer mapping ─────────────────────────────────────────
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-type RendererComponent = React.FC<{ content: any }>;
+type RendererComponent = React.FC<{ content: any; editable?: boolean; onContentChange?: (content: any) => void }>;
 
 const LAYOUT_RENDERERS: Record<string, RendererComponent> = {
   'general:intro-slide': IntroSlideRenderer,
@@ -48,13 +48,15 @@ function FallbackRenderer({ content }: { content: Record<string, unknown> }) {
 interface SlideRendererProps {
   layout: string;
   content: Record<string, unknown>;
+  editable?: boolean;
+  onContentChange?: (content: Record<string, unknown>) => void;
 }
 
-export function SlideRenderer({ layout, content }: SlideRendererProps) {
+export function SlideRenderer({ layout, content, editable, onContentChange }: SlideRendererProps) {
   const Renderer = LAYOUT_RENDERERS[layout];
 
   if (Renderer) {
-    return <Renderer content={content} />;
+    return <Renderer content={content} editable={editable} onContentChange={onContentChange} />;
   }
 
   return <FallbackRenderer content={content} />;

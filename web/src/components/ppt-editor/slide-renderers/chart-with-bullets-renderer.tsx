@@ -1,6 +1,7 @@
 'use client';
 
-import React from 'react';
+import React, { useCallback } from 'react';
+import { InlineEditableText } from '../inline-editable-text';
 
 interface ChartDataItem {
   name?: string;
@@ -26,6 +27,8 @@ interface ChartWithBulletsContent {
 
 interface ChartWithBulletsRendererProps {
   content: ChartWithBulletsContent;
+  editable?: boolean;
+  onContentChange?: (content: ChartWithBulletsContent) => void;
 }
 
 function SimpleBarChart({ data }: { data: ChartDataItem[] }) {
@@ -51,11 +54,12 @@ function SimpleBarChart({ data }: { data: ChartDataItem[] }) {
   );
 }
 
-export function ChartWithBulletsRenderer({ content }: ChartWithBulletsRendererProps) {
+export function ChartWithBulletsRenderer({ content, editable, onContentChange }: ChartWithBulletsRendererProps) {
   const { title, description } = content;
   const bullets = content.bullets || content.bulletPoints || [];
+  const bulletsKey = content.bullets ? 'bullets' : 'bulletPoints';
 
-  // Normalize chart data - handle both array and object with data property
+  // Normalize chart data
   let chartItems: ChartDataItem[] = [];
   if (Array.isArray(content.chartData)) {
     chartItems = content.chartData;
@@ -63,16 +67,48 @@ export function ChartWithBulletsRenderer({ content }: ChartWithBulletsRendererPr
     chartItems = content.chartData.data;
   }
 
+  const handleTitleChange = useCallback((newTitle: string) => {
+    onContentChange?.({ ...content, title: newTitle });
+  }, [content, onContentChange]);
+
+  const handleDescriptionChange = useCallback((newDesc: string) => {
+    onContentChange?.({ ...content, description: newDesc });
+  }, [content, onContentChange]);
+
+  const handleBulletFieldChange = useCallback((index: number, field: string, value: string) => {
+    const updatedBullets = [...bullets];
+    updatedBullets[index] = { ...updatedBullets[index], [field]: value };
+    onContentChange?.({ ...content, [bulletsKey]: updatedBullets });
+  }, [bullets, bulletsKey, content, onContentChange]);
+
   return (
     <div className="flex h-full w-full px-10 py-8">
       {/* Left - title, description, chart */}
       <div className="flex-1 flex flex-col pr-6">
         <h1 className="text-2xl font-bold text-gray-900 mb-1">
-          {title || 'Data Overview'}
+          {editable && onContentChange ? (
+            <InlineEditableText
+              content={title || ''}
+              onContentChange={handleTitleChange}
+              placeholder="输入标题..."
+              editable={editable}
+            />
+          ) : (
+            title || 'Data Overview'
+          )}
         </h1>
-        {description && (
+        {(description || editable) && (
           <p className="text-xs text-gray-600 mb-4 leading-relaxed">
-            {description}
+            {editable && onContentChange ? (
+              <InlineEditableText
+                content={description || ''}
+                onContentChange={handleDescriptionChange}
+                placeholder="输入描述..."
+                editable={editable}
+              />
+            ) : (
+              description
+            )}
           </p>
         )}
 
@@ -95,12 +131,34 @@ export function ChartWithBulletsRenderer({ content }: ChartWithBulletsRendererPr
             key={index}
             className="rounded-xl bg-purple-600 px-4 py-3 text-white shadow-sm"
           >
-            {bullet.title && (
-              <h3 className="text-sm font-semibold mb-0.5">{bullet.title}</h3>
+            {(bullet.title || editable) && (
+              <h3 className="text-sm font-semibold mb-0.5">
+                {editable && onContentChange ? (
+                  <InlineEditableText
+                    content={bullet.title || ''}
+                    onContentChange={(v) => handleBulletFieldChange(index, 'title', v)}
+                    placeholder="标题..."
+                    editable={editable}
+                    className="text-white"
+                  />
+                ) : (
+                  bullet.title
+                )}
+              </h3>
             )}
-            {bullet.description && (
+            {(bullet.description || editable) && (
               <p className="text-xs opacity-90 leading-relaxed">
-                {bullet.description}
+                {editable && onContentChange ? (
+                  <InlineEditableText
+                    content={bullet.description || ''}
+                    onContentChange={(v) => handleBulletFieldChange(index, 'description', v)}
+                    placeholder="描述..."
+                    editable={editable}
+                    className="text-white"
+                  />
+                ) : (
+                  bullet.description
+                )}
               </p>
             )}
           </div>

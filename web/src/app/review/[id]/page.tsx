@@ -91,6 +91,11 @@ export default function ReviewDetailPage({ params }: { params: { id: string } })
       if (!res.ok) throw new Error('获取复盘详情失败');
       return res.json();
     },
+    refetchInterval: (query) => {
+      // Poll every 3s while report is generating
+      const status = query.state.data?.status;
+      return status && status !== 'completed' ? 3000 : false;
+    },
   });
 
   const { data: reportData } = useQuery<ReportContent>({
@@ -133,13 +138,27 @@ export default function ReviewDetailPage({ params }: { params: { id: string } })
             <p className="mt-0.5 text-sm text-slate-500">{review.project.projectName}</p>
           </div>
         </div>
-        <Link
-          href={`/review/${id}/proofread`}
-          className="inline-flex h-9 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-medium text-white transition hover:bg-blue-700"
-        >
-          <BookOpen size={14} />
-          进入审校台
-        </Link>
+        {review.status === 'completed' ? (
+          <Link
+            href={`/review/${id}/proofread`}
+            className="inline-flex h-9 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-medium text-white transition hover:bg-blue-700"
+          >
+            <BookOpen size={14} />
+            进入审校台
+          </Link>
+        ) : review.status === 'generating' ? (
+          <span className="inline-flex h-9 items-center gap-2 rounded-lg bg-slate-100 px-4 text-sm font-medium text-slate-500">
+            <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            草稿生成中...
+          </span>
+        ) : (
+          <span className="inline-flex h-9 items-center gap-2 rounded-lg bg-slate-50 px-4 text-sm text-slate-400">
+            等待生成
+          </span>
+        )}
       </div>
 
       {/* Section: 项目信息 */}
@@ -309,12 +328,12 @@ function InfoItem({ label, value }: { label: string; value: string }) {
 function ReportContentDisplay({ content }: { content: unknown }) {
   if (!content) return null;
 
-  // If content is a string, render as HTML
+  // If content is a string, render as markdown
   if (typeof content === 'string') {
     return (
       <div
         className="prose prose-sm max-w-none text-slate-700"
-        dangerouslySetInnerHTML={{ __html: content }}
+        dangerouslySetInnerHTML={{ __html: simpleMarkdownToHtml(content) }}
       />
     );
   }
@@ -332,7 +351,7 @@ function ReportContentDisplay({ content }: { content: unknown }) {
               {section.content && (
                 <div
                   className="prose prose-sm max-w-none text-slate-700"
-                  dangerouslySetInnerHTML={{ __html: section.content }}
+                  dangerouslySetInnerHTML={{ __html: simpleMarkdownToHtml(section.content) }}
                 />
               )}
             </div>
@@ -350,7 +369,7 @@ function ReportContentDisplay({ content }: { content: unknown }) {
             <h3 className="mb-1 text-sm font-semibold text-slate-800">{key}</h3>
             <div className="text-sm text-slate-700">
               {typeof value === 'string' ? (
-                <div dangerouslySetInnerHTML={{ __html: value }} />
+                <div dangerouslySetInnerHTML={{ __html: simpleMarkdownToHtml(value) }} />
               ) : (
                 <pre className="whitespace-pre-wrap rounded bg-slate-50 p-3 text-xs">
                   {JSON.stringify(value, null, 2)}
@@ -364,4 +383,73 @@ function ReportContentDisplay({ content }: { content: unknown }) {
   }
 
   return null;
+}
+
+/**
+ * Simple markdown to HTML converter.
+ * Supports: headings, bold, italic, lists, horizontal rules, paragraphs.
+ */
+function simpleMarkdownToHtml(md: string): string {
+  if (!md) return '';
+
+  // Ensure markdown block markers are on their own lines
+  let normalized = md
+    .replace(/([^\n])(\n?)(---+)/g, '$1\n$3')
+    .replace(/([^\n])(\n?)(#{1,6}\s)/g, '$1\n$3');
+
+  const lines = normalized.split('\n');
+  const htmlLines: string[] = [];
+  let inList = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    // Horizontal rule (---, ***, ___ with optional spaces)
+    if (/^[-*_]{3,}\s*$/.test(trimmed)) {
+      if (inList) { htmlLines.push('</ul>'); inList = false; }
+      htmlLines.push('<hr>');
+      continue;
+    }
+
+    // Headings (## text)
+    const headingMatch = trimmed.match(/^(#{1,6})\s+(.+)$/);
+    if (headingMatch) {
+      if (inList) { htmlLines.push('</ul>'); inList = false; }
+      const level = headingMatch[1].length;
+      htmlLines.push(`<h${level}>${inlineFormat(headingMatch[2])}</h${level}>`);
+      continue;
+    }
+
+    // List items (- or * at start)
+    const listMatch = trimmed.match(/^[-*]\s+(.+)$/);
+    if (listMatch) {
+      if (!inList) { htmlLines.push('<ul>'); inList = true; }
+      htmlLines.push(`<li>${inlineFormat(listMatch[1])}</li>`);
+      continue;
+    }
+
+    // Empty line
+    if (!trimmed) {
+      if (inList) { htmlLines.push('</ul>'); inList = false; }
+      continue;
+    }
+
+    // Regular paragraph
+    if (inList) { htmlLines.push('</ul>'); inList = false; }
+    htmlLines.push(`<p>${inlineFormat(trimmed)}</p>`);
+  }
+
+  if (inList) htmlLines.push('</ul>');
+  return htmlLines.join('\n');
+}
+
+function inlineFormat(text: string): string {
+  return text
+    // Bold: **text** or __text__
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/__(.+?)__/g, '<strong>$1</strong>')
+    // Italic: *text* or _text_
+    .replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, '<em>$1</em>')
+    // Inline code: `text`
+    .replace(/`([^`]+)`/g, '<code>$1</code>');
 }

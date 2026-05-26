@@ -202,6 +202,12 @@ export default function NewReviewPage() {
           body: formData,
         });
       }
+
+      // Trigger report generation (non-blocking, runs in background)
+      fetch(`/api/generate-report/${review.id}`, { method: 'POST' }).catch((err) => {
+        console.error('Report generation trigger failed:', err);
+      });
+
       router.push(`/review/${review.id}`);
     },
     onError: (err: Error) => {

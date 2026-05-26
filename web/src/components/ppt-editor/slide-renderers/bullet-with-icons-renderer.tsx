@@ -1,6 +1,7 @@
 'use client';
 
-import React from 'react';
+import React, { useCallback } from 'react';
+import { InlineEditableText } from '../inline-editable-text';
 
 interface BulletItem {
   title?: string;
@@ -17,6 +18,8 @@ interface BulletWithIconsContent {
 
 interface BulletWithIconsRendererProps {
   content: BulletWithIconsContent;
+  editable?: boolean;
+  onContentChange?: (content: BulletWithIconsContent) => void;
 }
 
 const BULLET_COLORS = [
@@ -26,20 +29,53 @@ const BULLET_COLORS = [
   'bg-amber-600',
 ];
 
-export function BulletWithIconsRenderer({ content }: BulletWithIconsRendererProps) {
+export function BulletWithIconsRenderer({ content, editable, onContentChange }: BulletWithIconsRendererProps) {
   const { title, description } = content;
   const bullets = content.bullets || content.bulletPoints || [];
+  const bulletsKey = content.bullets ? 'bullets' : 'bulletPoints';
+
+  const handleTitleChange = useCallback((newTitle: string) => {
+    onContentChange?.({ ...content, title: newTitle });
+  }, [content, onContentChange]);
+
+  const handleDescriptionChange = useCallback((newDesc: string) => {
+    onContentChange?.({ ...content, description: newDesc });
+  }, [content, onContentChange]);
+
+  const handleBulletFieldChange = useCallback((index: number, field: string, value: string) => {
+    const updatedBullets = [...bullets];
+    updatedBullets[index] = { ...updatedBullets[index], [field]: value };
+    onContentChange?.({ ...content, [bulletsKey]: updatedBullets });
+  }, [bullets, bulletsKey, content, onContentChange]);
 
   return (
     <div className="flex h-full w-full flex-col px-10 py-8">
       {/* Title */}
       <h1 className="text-3xl font-bold text-gray-900 mb-2">
-        {title || 'Key Points'}
+        {editable && onContentChange ? (
+          <InlineEditableText
+            content={title || ''}
+            onContentChange={handleTitleChange}
+            placeholder="输入标题..."
+            editable={editable}
+          />
+        ) : (
+          title || 'Key Points'
+        )}
       </h1>
 
-      {description && (
+      {(description || editable) && (
         <p className="text-sm text-gray-600 mb-6 leading-relaxed">
-          {description}
+          {editable && onContentChange ? (
+            <InlineEditableText
+              content={description || ''}
+              onContentChange={handleDescriptionChange}
+              placeholder="输入描述..."
+              editable={editable}
+            />
+          ) : (
+            description
+          )}
         </p>
       )}
 
@@ -58,14 +94,32 @@ export function BulletWithIconsRenderer({ content }: BulletWithIconsRendererProp
 
             {/* Content */}
             <div className="flex-1 min-w-0">
-              {bullet.title && (
+              {(bullet.title || editable) && (
                 <h3 className="text-base font-semibold text-gray-900 mb-0.5">
-                  {bullet.title}
+                  {editable && onContentChange ? (
+                    <InlineEditableText
+                      content={bullet.title || ''}
+                      onContentChange={(v) => handleBulletFieldChange(index, 'title', v)}
+                      placeholder="要点标题..."
+                      editable={editable}
+                    />
+                  ) : (
+                    bullet.title
+                  )}
                 </h3>
               )}
-              {bullet.description && (
+              {(bullet.description || editable) && (
                 <p className="text-xs text-gray-600 leading-relaxed">
-                  {bullet.description}
+                  {editable && onContentChange ? (
+                    <InlineEditableText
+                      content={bullet.description || ''}
+                      onContentChange={(v) => handleBulletFieldChange(index, 'description', v)}
+                      placeholder="要点描述..."
+                      editable={editable}
+                    />
+                  ) : (
+                    bullet.description
+                  )}
                 </p>
               )}
             </div>

@@ -1,6 +1,7 @@
 'use client';
 
-import React from 'react';
+import React, { useCallback } from 'react';
+import { InlineEditableText } from '../inline-editable-text';
 
 interface MetricItem {
   label?: string;
@@ -15,10 +16,22 @@ interface MetricsContent {
 
 interface MetricsRendererProps {
   content: MetricsContent;
+  editable?: boolean;
+  onContentChange?: (content: MetricsContent) => void;
 }
 
-export function MetricsRenderer({ content }: MetricsRendererProps) {
+export function MetricsRenderer({ content, editable, onContentChange }: MetricsRendererProps) {
   const { title, metrics = [] } = content;
+
+  const handleTitleChange = useCallback((newTitle: string) => {
+    onContentChange?.({ ...content, title: newTitle });
+  }, [content, onContentChange]);
+
+  const handleMetricFieldChange = useCallback((index: number, field: string, value: string) => {
+    const updatedMetrics = [...metrics];
+    updatedMetrics[index] = { ...updatedMetrics[index], [field]: value };
+    onContentChange?.({ ...content, metrics: updatedMetrics });
+  }, [metrics, content, onContentChange]);
 
   const getGridCols = (count: number) => {
     if (count <= 2) return 'grid-cols-2';
@@ -29,7 +42,16 @@ export function MetricsRenderer({ content }: MetricsRendererProps) {
     <div className="flex h-full w-full flex-col items-center justify-center px-10 py-8">
       {/* Title */}
       <h1 className="text-3xl font-bold text-gray-900 text-center mb-8">
-        {title || 'Key Metrics'}
+        {editable && onContentChange ? (
+          <InlineEditableText
+            content={title || ''}
+            onContentChange={handleTitleChange}
+            placeholder="输入标题..."
+            editable={editable}
+          />
+        ) : (
+          title || 'Key Metrics'
+        )}
       </h1>
 
       {/* Metrics grid */}
@@ -38,19 +60,47 @@ export function MetricsRenderer({ content }: MetricsRendererProps) {
           <div key={index} className="flex flex-col items-center text-center space-y-2">
             {/* Label */}
             <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-              {metric.label}
+              {editable && onContentChange ? (
+                <InlineEditableText
+                  content={metric.label || ''}
+                  onContentChange={(v) => handleMetricFieldChange(index, 'label', v)}
+                  placeholder="标签"
+                  editable={editable}
+                />
+              ) : (
+                metric.label
+              )}
             </span>
 
             {/* Value */}
             <span className="text-3xl font-bold text-purple-600">
-              {metric.value}
+              {editable && onContentChange ? (
+                <InlineEditableText
+                  content={metric.value || ''}
+                  onContentChange={(v) => handleMetricFieldChange(index, 'value', v)}
+                  placeholder="数值"
+                  editable={editable}
+                />
+              ) : (
+                metric.value
+              )}
             </span>
 
             {/* Description box */}
-            {metric.description && (
+            {(metric.description || editable) && (
               <div className="mt-2 w-full rounded-lg bg-purple-600 px-3 py-2.5 shadow-sm">
                 <p className="text-xs text-white leading-relaxed">
-                  {metric.description}
+                  {editable && onContentChange ? (
+                    <InlineEditableText
+                      content={metric.description || ''}
+                      onContentChange={(v) => handleMetricFieldChange(index, 'description', v)}
+                      placeholder="描述"
+                      editable={editable}
+                      className="text-white"
+                    />
+                  ) : (
+                    metric.description
+                  )}
                 </p>
               </div>
             )}
