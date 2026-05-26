@@ -27,12 +27,22 @@ export async function POST(request: NextRequest) {
   try {
     // 2. 转发到 Presenton（不带 auth headers）
     const body = await request.json();
+
+    // 前端使用 camelCase，后端使用 snake_case，在此做字段映射
+    const backendBody: Record<string, unknown> = {
+      message: body.message,
+      presentation_id: body.presentationId ?? body.presentation_id,
+    };
+    if (body.conversationId ?? body.conversation_id) {
+      backendBody.conversation_id = body.conversationId ?? body.conversation_id;
+    }
+
     const response = await fetch(
       `${PRESENTON_INTERNAL_URL}/api/v1/ppt/chat/message/stream`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify(backendBody),
         signal: AbortSignal.timeout(60_000),
       }
     );

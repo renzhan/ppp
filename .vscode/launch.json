@@ -30,11 +30,11 @@
       "request": "launch",
       "cwd": "${workspaceFolder}/presenton-api",
       "program": "${workspaceFolder}/presenton-api/server.py",
-      "python": "${workspaceFolder}/presenton/.venv/bin/python",
+      "python": "${workspaceFolder}/presenton-api/.venv/bin/python",
       "args": ["--port", "8000", "--reload", "true"],
       "console": "integratedTerminal",
       "justMyCode": true,
-      "envFile": "${workspaceFolder}/presenton/.env",
+      "envFile": "${workspaceFolder}/presenton-api/.env",
       "env": {
         "APP_DATA_DIRECTORY": "${workspaceFolder}/presenton-api/app_data",
         "NEXT_PUBLIC_FAST_API": "http://127.0.0.1:8000",

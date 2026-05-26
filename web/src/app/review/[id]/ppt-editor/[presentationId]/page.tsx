@@ -90,7 +90,9 @@ export default function PPTEditorPage({
       setStreamingStatus('streaming');
     };
 
-    eventSource.onmessage = (event) => {
+    // Presenton sends SSE with "event: response" field, so we need addEventListener
+    // (onmessage only fires for events without an event field)
+    const handleSSEMessage = (event: MessageEvent) => {
       // Reset timeout on each message
       if (streamTimeoutRef.current) {
         clearTimeout(streamTimeoutRef.current);
@@ -104,8 +106,76 @@ export default function PPTEditorPage({
       try {
         const data = JSON.parse(event.data);
 
-        if (data.type === 'slide') {
-          // Received a new slide - add it to the presentation
+        if (data.type === 'chunk') {
+          // Presenton sends slide data as JSON chunks
+          // Try to parse the chunk as a slide object
+          try {
+            const slideData = JSON.parse(data.chunk);
+            if (slideData && typeof slideData.index === 'number' && slideData.content) {
+              const newSlide: PresentationSlide = {
+                index: slideData.index,
+                type: slideData.content?.type || 'content',
+                content: slideData.content || {},
+                layout: slideData.layout,
+              };
+
+              setPresentation((prev) => {
+                if (!prev) {
+                  return {
+                    id: presentationId,
+                    title: 'PPT 生成中...',
+                    slides: [newSlide],
+                  };
+                }
+                const updatedSlides = [...prev.slides];
+                if (slideData.index < updatedSlides.length) {
+                  updatedSlides[slideData.index] = newSlide;
+                } else {
+                  updatedSlides.push(newSlide);
+                }
+                return { ...prev, slides: updatedSlides };
+              });
+
+              setStreamProgress((prev) => ({
+                current: (prev?.current || 0) + 1,
+                total: prev?.total || 15,
+              }));
+            }
+          } catch {
+            // Not a valid slide JSON chunk - skip (could be opening/closing brackets)
+          }
+        } else if (data.type === 'slide_assets') {
+          // Presenton sends slide_assets with the final slide data including assets
+          if (data.slide && typeof data.slide_index === 'number') {
+            const newSlide: PresentationSlide = {
+              index: data.slide_index,
+              type: data.slide.content?.type || 'content',
+              content: data.slide.content || {},
+              layout: data.slide.layout,
+            };
+
+            setPresentation((prev) => {
+              if (!prev) {
+                return {
+                  id: presentationId,
+                  title: 'PPT 生成中...',
+                  slides: [newSlide],
+                };
+              }
+              const updatedSlides = [...prev.slides];
+              if (data.slide_index < updatedSlides.length) {
+                updatedSlides[data.slide_index] = newSlide;
+              } else {
+                while (updatedSlides.length <= data.slide_index) {
+                  updatedSlides.push({ index: updatedSlides.length, type: 'content', content: {} });
+                }
+                updatedSlides[data.slide_index] = newSlide;
+              }
+              return { ...prev, slides: updatedSlides };
+            });
+          }
+        } else if (data.type === 'slide') {
+          // Legacy format support
           const newSlide: PresentationSlide = {
             index: data.index,
             type: data.data?.type || 'content',
@@ -121,7 +191,6 @@ export default function PPTEditorPage({
                 slides: [newSlide],
               };
             }
-            // Add or update slide at the given index
             const updatedSlides = [...prev.slides];
             if (data.index < updatedSlides.length) {
               updatedSlides[data.index] = newSlide;
@@ -135,11 +204,8 @@ export default function PPTEditorPage({
             current: data.current,
             total: data.total,
           });
-        } else if (data.type === 'slide_assets_ready') {
-          // Assets ready for a slide - could trigger thumbnail refresh
-          // For now, no-op
-        } else if (data.type === 'done') {
-          // All slides generated
+        } else if (data.type === 'complete') {
+          // Presenton sends complete event with full presentation data
           if (streamTimeoutRef.current) {
             clearTimeout(streamTimeoutRef.current);
           }
@@ -147,7 +213,30 @@ export default function PPTEditorPage({
           setStreamingStatus('done');
           setEditingEnabled(true);
 
-          // If the done event includes full presentation data, use it
+          // The complete event has the presentation data under the "presentation" key
+          const presData = data.presentation;
+          if (presData) {
+            setPresentation({
+              id: presData.id || presentationId,
+              title: presData.title || 'Presentation',
+              slides: (presData.slides || []).map((s: Record<string, unknown>, i: number) => ({
+                index: (s.index as number) ?? i,
+                type: (s.content as Record<string, unknown>)?.type as string || 'content',
+                content: (s.content as Record<string, unknown>) || {},
+                layout: s.layout as string,
+              })),
+              theme: presData.theme,
+            });
+          }
+        } else if (data.type === 'done') {
+          // Legacy done event
+          if (streamTimeoutRef.current) {
+            clearTimeout(streamTimeoutRef.current);
+          }
+          eventSource.close();
+          setStreamingStatus('done');
+          setEditingEnabled(true);
+
           if (data.presentation) {
             setPresentation((prev) => ({
               ...prev,
@@ -163,12 +252,17 @@ export default function PPTEditorPage({
           }
           eventSource.close();
           setStreamingStatus('error');
-          setStreamError(data.message || 'PPT 生成过程中出错');
+          setStreamError(data.detail || data.message || 'PPT 生成过程中出错');
         }
       } catch {
         // Malformed JSON - skip
       }
     };
+
+    // Listen for named "response" events (Presenton uses event: response)
+    eventSource.addEventListener('response', handleSSEMessage);
+    // Also listen for unnamed messages (fallback)
+    eventSource.onmessage = handleSSEMessage;
 
     eventSource.onerror = () => {
       if (streamTimeoutRef.current) {

@@ -122,11 +122,11 @@ export function AiAssistantPanel({
         setErrorMessage(null);
       } else {
         setServiceAvailable(false);
-        setErrorMessage('AI 服务暂时不可用');
+        setErrorMessage('AI 服务暂时不可用，请稍后重试');
       }
     } catch {
       setServiceAvailable(false);
-      setErrorMessage('AI 服务暂时不可用');
+      setErrorMessage('AI 服务暂时不可用，请稍后重试');
     }
   }, []);
 

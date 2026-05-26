@@ -1,40 +1,45 @@
 'use client';
 
-import { useState, useCallback, useRef, useEffect } from 'react';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { type Editor } from '@tiptap/react';
 import {
   ArrowLeft,
-  Table2,
-  X,
-  ChevronRight,
-  MessageCircle,
-  Send,
+  Download,
+  Loader2,
+  Presentation,
+  AlertCircle,
+  RotateCcw,
+  Wifi,
+  WifiOff,
 } from 'lucide-react';
 import { Loading } from '@/components/ui/loading';
-import { TipTapEditor } from '@/components/proofread/tiptap-editor';
-import { EditorToolbar } from '@/components/proofread/editor-toolbar';
+import { SlidePanel } from '@/components/ppt-editor/slide-panel';
+import { SlideCanvas } from '@/components/ppt-editor/slide-canvas';
+import { PPTChatPanel } from '@/components/ppt-editor/ppt-chat-panel';
 import { cn } from '@/lib/utils';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-interface ReportSection {
-  title: string;
-  content: string;
+interface PresentationSlide {
+  index: number;
+  type: string;
+  content: Record<string, unknown>;
+  layout?: string;
 }
 
-interface ReportData {
+interface PresentationData {
   id: string;
-  reportContent: ReportSection[] | Record<string, unknown> | string | null;
+  title: string;
+  slides: PresentationSlide[];
+  theme?: Record<string, unknown>;
 }
 
 interface ReviewDetail {
   id: string;
   projectId: string;
   status: string;
-  modules: Record<string, boolean>;
+  modules: Record<string, unknown>;
+  presentationId?: string | null;
   reportContent: unknown;
   project: {
     id: string;
@@ -45,72 +50,7 @@ interface ReviewDetail {
   };
 }
 
-interface ChatMessage {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-}
-
-interface NoteRecord {
-  id: string;
-  kolNickName: string | null;
-  kolFanNum: number | null;
-  noteLink: string | null;
-  noteId: string | null;
-  impNum: number;
-  readNum: number;
-  likeNum: number;
-  favNum: number;
-  cmtNum: number;
-  shareNum: number;
-}
-
-// ─── Helper: Parse report content into sections ──────────────────────────────
-
-function parseReportSections(content: unknown): ReportSection[] {
-  if (!content) return [];
-
-  if (typeof content === 'string') {
-    // Try to split by headings
-    const lines = content.split('\n');
-    const sections: ReportSection[] = [];
-    let currentTitle = '报告内容';
-    let currentContent: string[] = [];
-
-    for (const line of lines) {
-      const headingMatch = line.match(/^#{1,3}\s+(.+)/);
-      if (headingMatch) {
-        if (currentContent.length > 0) {
-          sections.push({ title: currentTitle, content: currentContent.join('\n') });
-        }
-        currentTitle = headingMatch[1];
-        currentContent = [];
-      } else {
-        currentContent.push(line);
-      }
-    }
-    if (currentContent.length > 0 || sections.length === 0) {
-      sections.push({ title: currentTitle, content: currentContent.join('\n') });
-    }
-    return sections;
-  }
-
-  if (Array.isArray(content)) {
-    return content.map((item, idx) => ({
-      title: item.title || `章节 ${idx + 1}`,
-      content: typeof item.content === 'string' ? item.content : JSON.stringify(item.content || '', null, 2),
-    }));
-  }
-
-  if (typeof content === 'object' && content !== null) {
-    return Object.entries(content as Record<string, unknown>).map(([key, value]) => ({
-      title: key,
-      content: typeof value === 'string' ? value : JSON.stringify(value, null, 2),
-    }));
-  }
-
-  return [];
-}
+type StreamingStatus = 'idle' | 'connecting' | 'generating' | 'streaming' | 'done' | 'error';
 
 // ─── Page Component ──────────────────────────────────────────────────────────
 
@@ -118,255 +58,668 @@ export default function ProofreadPage({ params }: { params: { id: string } }) {
   const { id } = params;
 
   // State
-  const [activeChapterIdx, setActiveChapterIdx] = useState(0);
-  const [editorContent, setEditorContent] = useState('');
-  const [sections, setSections] = useState<ReportSection[]>([]);
-  const [isSaving, setIsSaving] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [saveMessage, setSaveMessage] = useState<string | null>(null);
-  const [showSourceData, setShowSourceData] = useState(false);
-  const [editorInstance, setEditorInstance] = useState<Editor | null>(null);
+  const [review, setReview] = useState<ReviewDetail | null>(null);
+  const [isLoadingReview, setIsLoadingReview] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  // AI Chat state
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
-  const [chatInput, setChatInput] = useState('');
-  const chatEndRef = useRef<HTMLDivElement>(null);
+  const [presentationId, setPresentationId] = useState<string | null>(null);
+  const [presentation, setPresentation] = useState<PresentationData | null>(null);
+  const [activeSlideIndex, setActiveSlideIndex] = useState(0);
+  const [streamingStatus, setStreamingStatus] = useState<StreamingStatus>('idle');
+  const [streamProgress, setStreamProgress] = useState<{ current: number; total: number } | null>(null);
+  const [streamError, setStreamError] = useState<string | null>(null);
+  const [editingEnabled, setEditingEnabled] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportDropdownOpen, setExportDropdownOpen] = useState(false);
 
-  // Fetch review detail
-  const { data: review, isLoading: reviewLoading } = useQuery<ReviewDetail>({
-    queryKey: ['review', id],
-    queryFn: async () => {
-      const res = await fetch(`/api/reviews/${id}`);
-      if (!res.ok) throw new Error('获取复盘详情失败');
-      return res.json();
-    },
-  });
+  const eventSourceRef = useRef<EventSource | null>(null);
+  const streamTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasStartedRef = useRef(false);
+  const exportDropdownRef = useRef<HTMLDivElement>(null);
 
-  // Fetch report content
-  const { data: reportData, isLoading: reportLoading } = useQuery<ReportData>({
-    queryKey: ['review-report', id],
-    queryFn: async () => {
-      const res = await fetch(`/api/reviews/${id}/report`);
-      if (!res.ok) throw new Error('获取报告内容失败');
-      return res.json();
-    },
-  });
+  // ─── Fetch Review Data ───────────────────────────────────────────────────
 
-  // Fetch source data (notes) for comparison
-  const { data: sourceNotes, isLoading: notesLoading } = useQuery<NoteRecord[]>({
-    queryKey: ['review-source-notes', review?.projectId],
-    queryFn: async () => {
-      const res = await fetch(`/api/projects/${review!.projectId}/notes`);
-      if (!res.ok) return [];
-      const data = await res.json();
-      return data.notes || [];
-    },
-    enabled: !!review?.projectId && showSourceData,
-  });
-
-  // Initialize sections from report data
   useEffect(() => {
-    if (reportData?.reportContent) {
-      const parsed = parseReportSections(reportData.reportContent);
-      setSections(parsed);
-      if (parsed.length > 0) {
-        setEditorContent(parsed[0].content);
-      }
-    }
-  }, [reportData]);
+    const fetchReview = async () => {
+      try {
+        const res = await fetch(`/api/reviews/${id}`);
+        if (!res.ok) throw new Error('获取复盘详情失败');
+        const data: ReviewDetail = await res.json();
+        setReview(data);
 
-  // Save mutation
-  const saveMutation = useMutation({
-    mutationFn: async (content: unknown) => {
-      const res = await fetch(`/api/reviews/${id}/report`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content }),
+        if (data.presentationId) {
+          setPresentationId(data.presentationId);
+        }
+      } catch (err) {
+        setLoadError(err instanceof Error ? err.message : '加载失败');
+      } finally {
+        setIsLoadingReview(false);
+      }
+    };
+
+    fetchReview();
+  }, [id]);
+
+  // ─── SSE Streaming Logic ─────────────────────────────────────────────────
+
+  const connectToStream = useCallback((presId: string) => {
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+    }
+    if (streamTimeoutRef.current) {
+      clearTimeout(streamTimeoutRef.current);
+    }
+
+    setStreamingStatus('streaming');
+    setStreamError(null);
+
+    const eventSource = new EventSource(
+      `/api/ppt/presentation/stream/${presId}`
+    );
+    eventSourceRef.current = eventSource;
+
+    // Set a connection timeout (300 seconds)
+    streamTimeoutRef.current = setTimeout(() => {
+      eventSource.close();
+      setStreamingStatus('error');
+      setStreamError('连接超时，PPT 生成时间过长');
+    }, 300_000);
+
+    eventSource.onopen = () => {
+      setStreamingStatus('streaming');
+    };
+
+    const handleSSEMessage = (event: MessageEvent) => {
+      // Reset timeout on each message
+      if (streamTimeoutRef.current) {
+        clearTimeout(streamTimeoutRef.current);
+      }
+      streamTimeoutRef.current = setTimeout(() => {
+        eventSource.close();
+        setStreamingStatus('error');
+        setStreamError('连接超时，长时间未收到数据');
+      }, 300_000);
+
+      try {
+        const data = JSON.parse(event.data);
+
+        if (data.type === 'chunk') {
+          try {
+            const slideData = JSON.parse(data.chunk);
+            if (slideData && typeof slideData.index === 'number' && slideData.content) {
+              const newSlide: PresentationSlide = {
+                index: slideData.index,
+                type: slideData.content?.type || 'content',
+                content: slideData.content || {},
+                layout: slideData.layout,
+              };
+
+              setPresentation((prev) => {
+                if (!prev) {
+                  return {
+                    id: presId,
+                    title: 'PPT 生成中...',
+                    slides: [newSlide],
+                  };
+                }
+                const updatedSlides = [...prev.slides];
+                if (slideData.index < updatedSlides.length) {
+                  updatedSlides[slideData.index] = newSlide;
+                } else {
+                  updatedSlides.push(newSlide);
+                }
+                return { ...prev, slides: updatedSlides };
+              });
+
+              setStreamProgress((prev) => ({
+                current: (prev?.current || 0) + 1,
+                total: prev?.total || 15,
+              }));
+            }
+          } catch {
+            // Not a valid slide JSON chunk - skip
+          }
+        } else if (data.type === 'slide_assets') {
+          if (data.slide && typeof data.slide_index === 'number') {
+            const newSlide: PresentationSlide = {
+              index: data.slide_index,
+              type: data.slide.content?.type || 'content',
+              content: data.slide.content || {},
+              layout: data.slide.layout,
+            };
+
+            setPresentation((prev) => {
+              if (!prev) {
+                return {
+                  id: presId,
+                  title: 'PPT 生成中...',
+                  slides: [newSlide],
+                };
+              }
+              const updatedSlides = [...prev.slides];
+              if (data.slide_index < updatedSlides.length) {
+                updatedSlides[data.slide_index] = newSlide;
+              } else {
+                while (updatedSlides.length <= data.slide_index) {
+                  updatedSlides.push({ index: updatedSlides.length, type: 'content', content: {} });
+                }
+                updatedSlides[data.slide_index] = newSlide;
+              }
+              return { ...prev, slides: updatedSlides };
+            });
+          }
+        } else if (data.type === 'slide') {
+          const newSlide: PresentationSlide = {
+            index: data.index,
+            type: data.data?.type || 'content',
+            content: data.data?.content || {},
+            layout: data.data?.layout,
+          };
+
+          setPresentation((prev) => {
+            if (!prev) {
+              return {
+                id: presId,
+                title: 'PPT 生成中...',
+                slides: [newSlide],
+              };
+            }
+            const updatedSlides = [...prev.slides];
+            if (data.index < updatedSlides.length) {
+              updatedSlides[data.index] = newSlide;
+            } else {
+              updatedSlides.push(newSlide);
+            }
+            return { ...prev, slides: updatedSlides };
+          });
+        } else if (data.type === 'progress') {
+          setStreamProgress({
+            current: data.current,
+            total: data.total,
+          });
+        } else if (data.type === 'complete') {
+          if (streamTimeoutRef.current) {
+            clearTimeout(streamTimeoutRef.current);
+          }
+          eventSource.close();
+          setStreamingStatus('done');
+          setEditingEnabled(true);
+
+          const presData = data.presentation;
+          if (presData) {
+            setPresentation({
+              id: presData.id || presId,
+              title: presData.title || 'Presentation',
+              slides: (presData.slides || []).map((s: Record<string, unknown>, i: number) => ({
+                index: (s.index as number) ?? i,
+                type: (s.content as Record<string, unknown>)?.type as string || 'content',
+                content: (s.content as Record<string, unknown>) || {},
+                layout: s.layout as string,
+              })),
+              theme: presData.theme,
+            });
+          }
+        } else if (data.type === 'done') {
+          if (streamTimeoutRef.current) {
+            clearTimeout(streamTimeoutRef.current);
+          }
+          eventSource.close();
+          setStreamingStatus('done');
+          setEditingEnabled(true);
+
+          if (data.presentation) {
+            setPresentation((prev) => ({
+              ...prev,
+              id: data.presentation.id || presId,
+              title: data.presentation.title || prev?.title || 'Presentation',
+              slides: data.presentation.slides || prev?.slides || [],
+              theme: data.presentation.theme || prev?.theme,
+            }));
+          }
+        } else if (data.type === 'error') {
+          if (streamTimeoutRef.current) {
+            clearTimeout(streamTimeoutRef.current);
+          }
+          eventSource.close();
+          setStreamingStatus('error');
+          setStreamError(data.detail || data.message || 'PPT 生成过程中出错');
+        }
+      } catch {
+        // Malformed JSON - skip
+      }
+    };
+
+    eventSource.addEventListener('response', handleSSEMessage);
+    eventSource.onmessage = handleSSEMessage;
+
+    eventSource.onerror = () => {
+      if (streamTimeoutRef.current) {
+        clearTimeout(streamTimeoutRef.current);
+      }
+      eventSource.close();
+
+      setPresentation((prev) => {
+        if (prev && prev.slides.length > 0) {
+          setStreamingStatus('done');
+          setEditingEnabled(true);
+          return prev;
+        }
+        setStreamingStatus('error');
+        setStreamError('SSE 连接失败或中断');
+        return prev;
       });
-      if (!res.ok) throw new Error('保存失败');
-      return res.json();
-    },
-  });
-
-  // Save handler - serializes TipTap content as HTML
-  const handleSave = useCallback(async () => {
-    setIsSaving(true);
-    setSaveMessage(null);
-
-    // Update current section content with HTML from editor
-    const updatedSections = [...sections];
-    if (updatedSections[activeChapterIdx]) {
-      updatedSections[activeChapterIdx] = {
-        ...updatedSections[activeChapterIdx],
-        content: editorContent,
-      };
-    }
-    setSections(updatedSections);
-
-    try {
-      await saveMutation.mutateAsync(updatedSections);
-      setSaveMessage('保存成功');
-      setTimeout(() => setSaveMessage(null), 3000);
-    } catch {
-      setSaveMessage('保存失败，请重试');
-    } finally {
-      setIsSaving(false);
-    }
-  }, [sections, activeChapterIdx, editorContent, saveMutation]);
-
-  // Chapter navigation - saves current content before switching
-  const handleChapterClick = useCallback((idx: number) => {
-    if (idx === activeChapterIdx) return;
-
-    // Save current chapter content (HTML from TipTap) before switching
-    setSections((prev) => {
-      const updated = [...prev];
-      if (updated[activeChapterIdx]) {
-        updated[activeChapterIdx] = { ...updated[activeChapterIdx], content: editorContent };
-      }
-      return updated;
-    });
-    setActiveChapterIdx(idx);
-  }, [activeChapterIdx, editorContent]);
-
-  // Load new chapter content when active chapter changes
-  useEffect(() => {
-    if (sections[activeChapterIdx]) {
-      setEditorContent(sections[activeChapterIdx].content);
-    }
-  }, [activeChapterIdx, sections]);
-
-  // Editor content change handler (receives HTML from TipTap)
-  const handleEditorChange = useCallback((html: string) => {
-    setEditorContent(html);
+    };
   }, []);
 
-  // Editor ready callback - captures editor instance for toolbar
-  const handleEditorReady = useCallback((editor: Editor | null) => {
-    setEditorInstance(editor as Editor | null);
-  }, []);
+  // ─── Generate PPT ────────────────────────────────────────────────────────
 
-  // Router for navigation
-  const router = useRouter();
+  const generatePPT = useCallback(async (reviewData: ReviewDetail) => {
+    setStreamingStatus('generating');
+    setStreamError(null);
 
-  // Generate PPT handler - calls prepare API and navigates to PPT editor
-  const handleGeneratePPT = useCallback(async () => {
-    if (!review) return;
-    setIsGenerating(true);
     try {
-      // Save current chapter content before generating
-      const updatedSections = [...sections];
-      if (updatedSections[activeChapterIdx]) {
-        updatedSections[activeChapterIdx] = {
-          ...updatedSections[activeChapterIdx],
-          content: editorContent,
-        };
+      // Build modules map from review data
+      const modules: Record<string, { status: 'show' | 'hide'; paragraphs?: Array<{ content: string }> }> = {};
+      if (reviewData.modules && typeof reviewData.modules === 'object') {
+        for (const [key, value] of Object.entries(reviewData.modules)) {
+          if (typeof value === 'object' && value !== null) {
+            modules[key] = value as { status: 'show' | 'hide'; paragraphs?: Array<{ content: string }> };
+          }
+        }
       }
 
-      // Build the content for PPT generation
-      // Combine all sections into markdown-like content
-      const fullContent = updatedSections
-        .map((s) => `## ${s.title}\n\n${s.content}`)
-        .join('\n\n');
-
-      // Build modules from report data (if available as structured data)
-      const modules: Record<string, { status: 'show' | 'hide'; paragraphs?: Array<{ content: string }>; tables?: Array<{ title?: string; headers: string[]; rows: string[][] }> }> = {};
-      for (const section of updatedSections) {
-        modules[section.title] = {
-          status: 'show',
-          paragraphs: [{ content: section.content }],
-        };
-      }
-
-      // Call prepare API
-      const prepareRes = await fetch('/api/ppt/presentation/prepare', {
+      const generateRes = await fetch('/api/ppt/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          projectName: review.project.projectName,
-          brand: review.project.brand,
-          category: review.project.category,
-          content: fullContent,
+          projectName: reviewData.project.projectName,
+          brand: reviewData.project.brand,
+          category: reviewData.project.category,
           modules,
           n_slides: 15,
           language: '中文',
           tone: 'professional',
+          reviewId: id,
         }),
       });
 
-      if (!prepareRes.ok) {
-        const errData = await prepareRes.json().catch(() => ({ error: '准备 PPT 失败' }));
-        throw new Error(errData.error || '准备 PPT 失败');
+      if (!generateRes.ok) {
+        const errData = await generateRes.json().catch(() => ({ error: '生成 PPT 失败' }));
+        throw new Error(errData.error || '生成 PPT 失败');
       }
 
-      const { id: presentationId } = await prepareRes.json();
+      const { presentationId: newPresentationId } = await generateRes.json();
+      setPresentationId(newPresentationId);
 
-      // Navigate to PPT editor page immediately
-      router.push(`/review/${id}/ppt-editor/${presentationId}`);
+      // Persist presentationId to the review record
+      await fetch(`/api/reviews/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ presentationId: newPresentationId }),
+      }).catch(() => {
+        // Non-critical: if save fails, we still have it in state
+      });
+
+      // Connect to SSE stream for slide generation
+      connectToStream(newPresentationId);
     } catch (err) {
-      console.error('Generate PPT failed:', err);
-      setSaveMessage(err instanceof Error ? err.message : '生成 PPT 失败');
-      setTimeout(() => setSaveMessage(null), 5000);
-      setIsGenerating(false);
+      setStreamingStatus('error');
+      setStreamError(err instanceof Error ? err.message : '生成 PPT 失败');
     }
-  }, [review, sections, activeChapterIdx, editorContent, id, router]);
+  }, [id, connectToStream]);
 
-  // Export PDF handler
-  const handleExportPDF = useCallback(() => {
-    window.open(`/api/reviews/${id}/export?format=pdf`, '_blank');
-  }, [id]);
+  // ─── Load Existing Presentation ──────────────────────────────────────────
 
-  // Export Word handler
-  const handleExportWord = useCallback(() => {
-    window.open(`/api/reviews/${id}/export?format=word`, '_blank');
-  }, [id]);
+  const loadPresentation = useCallback(async (presId: string) => {
+    setStreamingStatus('connecting');
+    try {
+      const res = await fetch(`/api/ppt/${presId}`);
+      if (res.ok) {
+        const data: PresentationData = await res.json();
+        if (data.slides && data.slides.length > 0) {
+          setPresentation(data);
+          setStreamingStatus('done');
+          setEditingEnabled(true);
+          return;
+        }
+      }
+    } catch {
+      // Fetch failed - try streaming
+    }
 
-  // AI Chat handler
-  const handleSendMessage = useCallback(() => {
-    if (!chatInput.trim()) return;
+    // No existing slides - connect to stream (generation might still be in progress)
+    connectToStream(presId);
+  }, [connectToStream]);
 
-    const userMessage: ChatMessage = {
-      id: `user-${Date.now()}`,
-      role: 'user',
-      content: chatInput.trim(),
-    };
+  // ─── Main Effect: Decide what to do on mount ─────────────────────────────
 
-    setChatMessages((prev) => [...prev, userMessage]);
-    setChatInput('');
-
-    // Placeholder AI response (will be replaced by real AI integration in Task 7)
-    setTimeout(() => {
-      const assistantMessage: ChatMessage = {
-        id: `assistant-${Date.now()}`,
-        role: 'assistant',
-        content: `关于"${userMessage.content}"的分析：这是一个AI助手的模拟回复。在实际使用中，AI会基于报告内容和源数据为您提供专业的分析和建议。`,
-      };
-      setChatMessages((prev) => [...prev, assistantMessage]);
-    }, 1000);
-  }, [chatInput]);
-
-  // Scroll chat to bottom
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [chatMessages]);
+    if (isLoadingReview || !review || hasStartedRef.current) return;
+    hasStartedRef.current = true;
 
-  // Loading state
-  if (reviewLoading || reportLoading) {
-    return <Loading size="lg" text="正在加载审校台..." className="py-20" />;
+    if (presentationId) {
+      // Already have a presentationId - load it
+      loadPresentation(presentationId);
+    } else {
+      // No presentationId - auto-generate
+      generatePPT(review);
+    }
+  }, [isLoadingReview, review, presentationId, loadPresentation, generatePPT]);
+
+  // ─── Cleanup on unmount ──────────────────────────────────────────────────
+
+  useEffect(() => {
+    return () => {
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+      }
+      if (streamTimeoutRef.current) {
+        clearTimeout(streamTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // ─── Close export dropdown on click outside ──────────────────────────────
+
+  useEffect(() => {
+    if (!exportDropdownOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (exportDropdownRef.current && !exportDropdownRef.current.contains(e.target as Node)) {
+        setExportDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [exportDropdownOpen]);
+
+  // ─── Slide Operations ────────────────────────────────────────────────────
+
+  const handleSelectSlide = useCallback((index: number) => {
+    setActiveSlideIndex(index);
+  }, []);
+
+  const handleReorderSlides = useCallback(
+    async (fromIndex: number, toIndex: number) => {
+      if (!presentation || !presentationId) return;
+
+      setPresentation((prev) => {
+        if (!prev) return prev;
+        const slides = [...prev.slides];
+        const [moved] = slides.splice(fromIndex, 1);
+        slides.splice(toIndex, 0, moved);
+        const reindexed = slides.map((s, i) => ({ ...s, index: i }));
+        return { ...prev, slides: reindexed };
+      });
+
+      if (activeSlideIndex === fromIndex) {
+        setActiveSlideIndex(toIndex);
+      } else if (fromIndex < activeSlideIndex && toIndex >= activeSlideIndex) {
+        setActiveSlideIndex(activeSlideIndex - 1);
+      } else if (fromIndex > activeSlideIndex && toIndex <= activeSlideIndex) {
+        setActiveSlideIndex(activeSlideIndex + 1);
+      }
+
+      try {
+        await fetch(`/api/ppt/${presentationId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'reorder', fromIndex, toIndex }),
+        });
+      } catch (err) {
+        console.error('Failed to persist slide reorder:', err);
+      }
+    },
+    [presentation, activeSlideIndex, presentationId]
+  );
+
+  const handleDeleteSlide = useCallback(
+    async (index: number) => {
+      if (!presentation || !presentationId || presentation.slides.length <= 1) return;
+
+      setPresentation((prev) => {
+        if (!prev) return prev;
+        const slides = prev.slides.filter((_, i) => i !== index);
+        const reindexed = slides.map((s, i) => ({ ...s, index: i }));
+        return { ...prev, slides: reindexed };
+      });
+
+      if (activeSlideIndex >= index && activeSlideIndex > 0) {
+        setActiveSlideIndex(activeSlideIndex - 1);
+      }
+
+      try {
+        await fetch(`/api/ppt/${presentationId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'delete', index }),
+        });
+      } catch (err) {
+        console.error('Failed to persist slide deletion:', err);
+      }
+    },
+    [presentation, activeSlideIndex, presentationId]
+  );
+
+  const handleAddSlide = useCallback(
+    async (atIndex: number) => {
+      if (!presentation || !presentationId) return;
+
+      const newSlide: PresentationSlide = {
+        index: atIndex,
+        type: 'content',
+        content: { title: '', body: '' },
+      };
+
+      setPresentation((prev) => {
+        if (!prev) return prev;
+        const slides = [...prev.slides];
+        slides.splice(atIndex, 0, newSlide);
+        const reindexed = slides.map((s, i) => ({ ...s, index: i }));
+        return { ...prev, slides: reindexed };
+      });
+
+      if (atIndex <= activeSlideIndex) {
+        setActiveSlideIndex(activeSlideIndex + 1);
+      }
+
+      try {
+        await fetch(`/api/ppt/${presentationId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'add', index: atIndex, slide: newSlide }),
+        });
+      } catch (err) {
+        console.error('Failed to persist slide addition:', err);
+      }
+    },
+    [presentation, activeSlideIndex, presentationId]
+  );
+
+  // ─── Content Change Handler ──────────────────────────────────────────────
+
+  const handleContentChange = useCallback(
+    (content: Record<string, unknown>) => {
+      if (!presentation) return;
+
+      setPresentation((prev) => {
+        if (!prev) return prev;
+        const slides = [...prev.slides];
+        if (slides[activeSlideIndex]) {
+          slides[activeSlideIndex] = { ...slides[activeSlideIndex], content };
+        }
+        return { ...prev, slides };
+      });
+    },
+    [presentation, activeSlideIndex]
+  );
+
+  // ─── AI Slide Update Handler ─────────────────────────────────────────────
+
+  const handleSlideUpdate = useCallback(
+    (slideIndex: number, content: Record<string, unknown>) => {
+      setPresentation((prev) => {
+        if (!prev) return prev;
+        const slides = [...prev.slides];
+        if (slides[slideIndex]) {
+          slides[slideIndex] = {
+            ...slides[slideIndex],
+            content: { ...slides[slideIndex].content, ...content },
+          };
+        }
+        return { ...prev, slides };
+      });
+    },
+    []
+  );
+
+  // ─── Download PPTX ──────────────────────────────────────────────────────
+
+  const handleDownloadPPTX = useCallback(async () => {
+    if (!presentationId) return;
+    setIsExporting(true);
+    setExportDropdownOpen(false);
+    try {
+      const res = await fetch(`/api/ppt/${presentationId}/export`, {
+        method: 'POST',
+      });
+      if (!res.ok) throw new Error('导出失败');
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${presentation?.title || 'presentation'}.pptx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Export PPTX failed:', err);
+    } finally {
+      setIsExporting(false);
+    }
+  }, [presentationId, presentation?.title]);
+
+  // ─── Download PDF ────────────────────────────────────────────────────────
+
+  const handleDownloadPDF = useCallback(async () => {
+    if (!presentationId) return;
+    setIsExporting(true);
+    setExportDropdownOpen(false);
+    try {
+      const res = await fetch(`/api/ppt/${presentationId}/export?format=pdf`, {
+        method: 'POST',
+      });
+      if (!res.ok) throw new Error('导出 PDF 失败');
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${presentation?.title || 'presentation'}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Export PDF failed:', err);
+    } finally {
+      setIsExporting(false);
+    }
+  }, [presentationId, presentation?.title]);
+
+  // ─── Reconnect / Retry Handler ───────────────────────────────────────────
+
+  const handleRetry = useCallback(() => {
+    setStreamError(null);
+    if (presentationId) {
+      connectToStream(presentationId);
+    } else if (review) {
+      generatePPT(review);
+    }
+  }, [presentationId, review, connectToStream, generatePPT]);
+
+  // ─── Loading State ───────────────────────────────────────────────────────
+
+  if (isLoadingReview) {
+    return <Loading size="lg" text="正在加载复盘数据..." className="py-20" />;
   }
 
-  if (!review) {
+  if (loadError || !review) {
     return (
-      <div className="rounded-lg border border-rose-200 bg-rose-50 p-6 text-sm text-rose-600">
-        复盘记录不存在
+      <div className="flex h-screen flex-col items-center justify-center gap-4">
+        <AlertCircle size={48} className="text-rose-400" />
+        <p className="text-sm text-rose-600">{loadError || '复盘记录不存在'}</p>
+        <Link
+          href={`/review/${id}`}
+          className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
+        >
+          <ArrowLeft size={14} />
+          返回复盘详情
+        </Link>
       </div>
     );
   }
 
+  // ─── Generating State (calling /api/ppt/generate) ────────────────────────
+
+  if (streamingStatus === 'generating') {
+    return (
+      <div className="flex h-screen flex-col items-center justify-center gap-4">
+        <Loader2 size={32} className="animate-spin text-blue-600" />
+        <p className="text-sm text-slate-600">正在生成 PPT，请稍候...</p>
+        <p className="text-xs text-slate-400">这可能需要 1-2 分钟</p>
+      </div>
+    );
+  }
+
+  // ─── Connecting State ────────────────────────────────────────────────────
+
+  if (streamingStatus === 'connecting' && !presentation) {
+    return (
+      <div className="flex h-screen flex-col items-center justify-center gap-4">
+        <Loader2 size={32} className="animate-spin text-blue-600" />
+        <p className="text-sm text-slate-600">正在加载演示文稿...</p>
+      </div>
+    );
+  }
+
+  // ─── Error State (no slides loaded) ──────────────────────────────────────
+
+  if (streamingStatus === 'error' && !presentation) {
+    return (
+      <div className="flex h-screen flex-col items-center justify-center gap-4">
+        <AlertCircle size={48} className="text-rose-400" />
+        <p className="text-sm text-rose-600">{streamError || '连接失败'}</p>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleRetry}
+            className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
+          >
+            <RotateCcw size={14} />
+            重试
+          </button>
+          <Link
+            href={`/review/${id}`}
+            className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
+          >
+            <ArrowLeft size={14} />
+            返回复盘详情
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── Main PPT Editor View ────────────────────────────────────────────────
+
+  const slides = presentation?.slides || [];
+  const currentSlide = slides[activeSlideIndex];
+
   return (
     <div className="flex h-[calc(100vh-3rem)] flex-col">
-      {/* Top toolbar */}
-      <div className="flex items-center justify-between border-b bg-white px-4 py-2">
+      {/* Top bar */}
+      <header className="flex items-center justify-between border-b bg-white px-4 py-2">
         <div className="flex items-center gap-3">
           <Link
             href={`/review/${id}`}
@@ -376,250 +729,144 @@ export default function ProofreadPage({ params }: { params: { id: string } }) {
             <ArrowLeft size={16} />
           </Link>
           <div>
-            <h1 className="text-base font-semibold text-gray-900">审校台</h1>
+            <h1 className="text-base font-semibold text-gray-900">
+              {presentation?.title || 'PPT 编辑器'}
+            </h1>
             <p className="text-xs text-slate-500">{review.project.projectName}</p>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowSourceData(!showSourceData)}
-            className={cn(
-              'inline-flex h-8 items-center gap-1.5 rounded-md border px-3 text-xs font-medium transition',
-              showSourceData
-                ? 'border-blue-300 bg-blue-50 text-blue-700'
-                : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-            )}
-          >
-            <Table2 size={14} />
-            查看源数据对照
-          </button>
-          {saveMessage && (
-            <span className={cn(
-              'text-xs',
-              saveMessage === '保存成功' ? 'text-emerald-600' : 'text-rose-600'
-            )}>
-              {saveMessage}
-            </span>
+          {/* Streaming status indicator */}
+          {streamingStatus === 'streaming' && (
+            <div className="flex items-center gap-1.5 rounded-md bg-blue-50 px-2.5 py-1">
+              <Wifi size={12} className="animate-pulse text-blue-600" />
+              <span className="text-xs text-blue-700">
+                生成中
+                {streamProgress
+                  ? ` (${streamProgress.current}/${streamProgress.total})`
+                  : '...'}
+              </span>
+            </div>
           )}
-        </div>
-      </div>
+          {streamingStatus === 'done' && (
+            <div className="flex items-center gap-1.5 rounded-md bg-emerald-50 px-2.5 py-1">
+              <Wifi size={12} className="text-emerald-600" />
+              <span className="text-xs text-emerald-700">生成完毕</span>
+            </div>
+          )}
+          {streamingStatus === 'error' && presentation && (
+            <button
+              onClick={handleRetry}
+              className="flex items-center gap-1.5 rounded-md bg-amber-50 px-2.5 py-1 transition hover:bg-amber-100"
+            >
+              <WifiOff size={12} className="text-amber-600" />
+              <span className="text-xs text-amber-700">连接中断 - 点击重连</span>
+            </button>
+          )}
 
-      {/* Main content area */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Left panel: Chapter directory */}
-        <aside className="w-56 flex-shrink-0 overflow-y-auto border-r bg-slate-50 p-3">
-          <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
-            章节目录
-          </h2>
-          <nav className="space-y-0.5" aria-label="章节导航">
-            {sections.length === 0 ? (
-              <p className="text-xs text-slate-400 italic">暂无章节内容</p>
-            ) : (
-              sections.map((section, idx) => (
+          {/* Export dropdown */}
+          <div className="relative" ref={exportDropdownRef}>
+            <button
+              onClick={() => setExportDropdownOpen(!exportDropdownOpen)}
+              disabled={isExporting || !editingEnabled}
+              className="inline-flex h-8 items-center gap-1.5 rounded-md bg-blue-600 px-3 text-xs font-medium text-white transition hover:bg-blue-700 disabled:opacity-50"
+              aria-label="导出"
+            >
+              {isExporting ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <Download size={14} />
+              )}
+              下载
+              <svg className="ml-0.5 h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            {exportDropdownOpen && (
+              <div className="absolute right-0 top-full z-50 mt-1 w-32 rounded-md border border-slate-200 bg-white py-1 shadow-lg">
                 <button
-                  key={idx}
-                  onClick={() => handleChapterClick(idx)}
-                  className={cn(
-                    'flex w-full items-center gap-1.5 rounded-md px-2.5 py-2 text-left text-sm transition',
-                    idx === activeChapterIdx
-                      ? 'bg-blue-100 font-medium text-blue-800'
-                      : 'text-slate-600 hover:bg-slate-100'
-                  )}
+                  onClick={handleDownloadPPTX}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-50"
                 >
-                  <ChevronRight
-                    size={12}
-                    className={cn(
-                      'flex-shrink-0 transition-transform',
-                      idx === activeChapterIdx && 'rotate-90'
-                    )}
-                  />
-                  <span className="truncate">{section.title}</span>
+                  <Presentation size={12} />
+                  PPTX
                 </button>
-              ))
-            )}
-          </nav>
-        </aside>
-
-        {/* Center panel: Editor */}
-        <div className="flex flex-1 flex-col overflow-hidden">
-          {/* Source data comparison panel (toggle) */}
-          {showSourceData && (
-            <SourceDataPanel
-              notes={sourceNotes || []}
-              isLoading={notesLoading}
-              onClose={() => setShowSourceData(false)}
-            />
-          )}
-
-          {/* Editor area with toolbar */}
-          <div className="flex-1 overflow-y-auto p-6">
-            {sections.length === 0 ? (
-              <div className="flex h-full items-center justify-center text-sm text-slate-400">
-                暂无报告内容，请先生成复盘报告
-              </div>
-            ) : (
-              <div className="mx-auto max-w-3xl">
-                <h2 className="mb-4 text-lg font-semibold text-slate-800">
-                  {sections[activeChapterIdx]?.title || ''}
-                </h2>
-                {/* Editor Toolbar */}
-                <EditorToolbar
-                  editor={editorInstance}
-                  onGeneratePPT={handleGeneratePPT}
-                  onSave={handleSave}
-                  onExportPDF={handleExportPDF}
-                  onExportWord={handleExportWord}
-                  isSaving={isSaving}
-                  isGenerating={isGenerating}
-                />
-                {/* TipTap Rich Text Editor */}
-                <TipTapEditor
-                  content={editorContent}
-                  onChange={handleEditorChange}
-                  onEditorReady={handleEditorReady}
-                  placeholder="在此编辑报告内容..."
-                  editable={true}
-                  className="rounded-t-none border-t-0"
-                />
+                <button
+                  onClick={handleDownloadPDF}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-50"
+                >
+                  <Download size={12} />
+                  PDF
+                </button>
               </div>
             )}
           </div>
         </div>
+      </header>
 
-        {/* Right panel: AI Assistant (placeholder - full implementation in Task 7) */}
-        <aside className="flex w-72 flex-shrink-0 flex-col border-l bg-white">
-          <div className="flex items-center gap-2 border-b px-4 py-3">
-            <MessageCircle size={16} className="text-blue-600" />
-            <h2 className="text-sm font-semibold text-slate-800">AI 助手</h2>
-          </div>
+      {/* Three-panel layout */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Left panel: Slide thumbnails */}
+        <SlidePanel
+          slides={slides}
+          activeIndex={activeSlideIndex}
+          onSelectSlide={handleSelectSlide}
+          onReorderSlides={handleReorderSlides}
+          onDeleteSlide={handleDeleteSlide}
+          onAddSlide={handleAddSlide}
+        />
 
-          {/* Chat messages */}
-          <div className="flex-1 overflow-y-auto p-3 space-y-3">
-            {chatMessages.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-8 text-center">
-                <MessageCircle size={32} className="mb-2 text-slate-300" />
-                <p className="text-xs text-slate-400">
-                  向AI助手提问关于报告内容的问题
-                </p>
-              </div>
-            )}
-            {chatMessages.map((msg) => (
-              <div
-                key={msg.id}
-                className={cn(
-                  'rounded-lg px-3 py-2 text-xs leading-relaxed',
-                  msg.role === 'user'
-                    ? 'ml-4 bg-blue-600 text-white'
-                    : 'mr-4 bg-slate-100 text-slate-700'
-                )}
-              >
-                {msg.content}
-              </div>
-            ))}
-            <div ref={chatEndRef} />
-          </div>
-
-          {/* Chat input */}
-          <div className="border-t p-3">
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSendMessage();
-                  }
-                }}
-                placeholder="输入问题..."
-                className="flex-1 rounded-md border border-slate-200 px-3 py-2 text-xs focus:border-blue-300 focus:outline-none focus:ring-1 focus:ring-blue-100"
-                aria-label="AI助手输入框"
-              />
-              <button
-                onClick={handleSendMessage}
-                disabled={!chatInput.trim()}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-blue-600 text-white transition hover:bg-blue-700 disabled:opacity-50"
-                aria-label="发送消息"
-              >
-                <Send size={14} />
-              </button>
+        {/* Center panel: Slide canvas */}
+        <main className="flex flex-1 flex-col overflow-hidden bg-slate-100">
+          <div className="flex flex-1 items-center justify-center p-6">
+            <div className="flex aspect-[16/9] w-full max-w-4xl flex-col overflow-hidden rounded-lg border bg-white shadow-sm">
+              {currentSlide ? (
+                <SlideCanvas
+                  key={activeSlideIndex}
+                  slide={currentSlide}
+                  onContentChange={handleContentChange}
+                  editable={editingEnabled}
+                />
+              ) : (
+                <div className="flex flex-1 items-center justify-center">
+                  {streamingStatus === 'streaming' ? (
+                    <div className="flex flex-col items-center gap-3">
+                      <Loader2 size={24} className="animate-spin text-blue-500" />
+                      <p className="text-sm text-slate-500">正在生成幻灯片...</p>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center gap-3">
+                      <Presentation size={32} className="text-slate-300" />
+                      <p className="text-sm text-slate-400">无幻灯片内容</p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
-        </aside>
-      </div>
-    </div>
-  );
-}
 
-// ─── Source Data Panel Component ─────────────────────────────────────────────
-
-function SourceDataPanel({
-  notes,
-  isLoading,
-  onClose,
-}: {
-  notes: NoteRecord[];
-  isLoading: boolean;
-  onClose: () => void;
-}) {
-  return (
-    <div className="border-b bg-slate-50">
-      <div className="flex items-center justify-between px-4 py-2">
-        <h3 className="text-sm font-semibold text-slate-700">源数据对照</h3>
-        <button
-          onClick={onClose}
-          className="inline-flex h-6 w-6 items-center justify-center rounded text-slate-400 hover:bg-slate-200 hover:text-slate-600"
-          aria-label="关闭源数据面板"
-        >
-          <X size={14} />
-        </button>
-      </div>
-
-      <div className="max-h-64 overflow-auto px-4 pb-3">
-        {isLoading ? (
-          <Loading size="sm" text="加载源数据..." className="py-4" />
-        ) : notes.length === 0 ? (
-          <p className="py-4 text-center text-xs text-slate-400">暂无源数据</p>
-        ) : (
-          <div className="overflow-x-auto rounded-md border bg-white">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b bg-slate-100">
-                  <th className="whitespace-nowrap px-3 py-2 text-left font-medium text-slate-600">博主昵称</th>
-                  <th className="whitespace-nowrap px-3 py-2 text-left font-medium text-slate-600">粉丝量</th>
-                  <th className="whitespace-nowrap px-3 py-2 text-left font-medium text-slate-600">笔记ID</th>
-                  <th className="whitespace-nowrap px-3 py-2 text-right font-medium text-slate-600">曝光量</th>
-                  <th className="whitespace-nowrap px-3 py-2 text-right font-medium text-slate-600">阅读量</th>
-                  <th className="whitespace-nowrap px-3 py-2 text-right font-medium text-slate-600">点赞</th>
-                  <th className="whitespace-nowrap px-3 py-2 text-right font-medium text-slate-600">收藏</th>
-                  <th className="whitespace-nowrap px-3 py-2 text-right font-medium text-slate-600">评论</th>
-                  <th className="whitespace-nowrap px-3 py-2 text-right font-medium text-slate-600">分享</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {notes.slice(0, 50).map((note) => (
-                  <tr key={note.id} className="hover:bg-slate-50">
-                    <td className="whitespace-nowrap px-3 py-1.5 text-slate-700">{note.kolNickName || '-'}</td>
-                    <td className="whitespace-nowrap px-3 py-1.5 text-slate-700">{note.kolFanNum ?? '-'}</td>
-                    <td className="whitespace-nowrap px-3 py-1.5 text-slate-500 font-mono">{note.noteId || '-'}</td>
-                    <td className="whitespace-nowrap px-3 py-1.5 text-right text-slate-700">{note.impNum}</td>
-                    <td className="whitespace-nowrap px-3 py-1.5 text-right text-slate-700">{note.readNum}</td>
-                    <td className="whitespace-nowrap px-3 py-1.5 text-right text-slate-700">{note.likeNum}</td>
-                    <td className="whitespace-nowrap px-3 py-1.5 text-right text-slate-700">{note.favNum}</td>
-                    <td className="whitespace-nowrap px-3 py-1.5 text-right text-slate-700">{note.cmtNum}</td>
-                    <td className="whitespace-nowrap px-3 py-1.5 text-right text-slate-700">{note.shareNum}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {notes.length > 50 && (
-              <div className="border-t px-3 py-2 text-center text-xs text-slate-400">
-                显示前 50 条，共 {notes.length} 条数据
-              </div>
+          {/* Slide navigation bar */}
+          <div className="flex items-center justify-center border-t bg-white px-4 py-2">
+            <span className="text-xs text-slate-500">
+              {slides.length > 0
+                ? `${activeSlideIndex + 1} / ${slides.length}`
+                : '0 / 0'}
+            </span>
+            {!editingEnabled && streamingStatus === 'streaming' && (
+              <span className="ml-3 text-xs text-blue-500">
+                （生成完毕后可编辑）
+              </span>
             )}
           </div>
+        </main>
+
+        {/* Right panel: AI Chat */}
+        {presentationId && (
+          <PPTChatPanel
+            presentationId={presentationId}
+            onSlideUpdate={handleSlideUpdate}
+          />
         )}
       </div>
     </div>

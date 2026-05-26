@@ -124,6 +124,7 @@ export async function PUT(
       viralMetric,
       modules,
       launchPhases,
+      presentationId,
     } = body;
 
     // Build update data with only provided fields
@@ -138,6 +139,7 @@ export async function PUT(
     if (viralMetric !== undefined) updateData.viralMetric = viralMetric;
     if (modules !== undefined) updateData.modules = modules;
     if (launchPhases !== undefined) updateData.launchPhases = launchPhases;
+    if (presentationId !== undefined) updateData.presentationId = presentationId;
 
     const updated = await prisma.reviewConfig.update({
       where: { id },

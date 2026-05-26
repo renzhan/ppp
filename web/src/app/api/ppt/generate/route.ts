@@ -97,23 +97,207 @@ export async function POST(request: NextRequest) {
     // 构建 instructions
     const instructions = buildInstructions(brand, category);
 
-    const result = await presentonClient.generatePresentation({
-      content,
-      n_slides: n_slides || 15,
-      language,
-      template: 'general',
-      tone: tone as 'professional' | 'default',
-      verbosity: 'standard',
-      instructions,
-      include_title_slide: true,
-      include_table_of_contents: false,
-      export_as: 'pptx',
+    // Use the three-step flow: create → outlines → prepare
+    // Then the PPT editor can stream slide generation
+    const PRESENTON_URL = process.env.PRESENTON_INTERNAL_URL || 'http://localhost:8000';
+
+    // Step 1: Create presentation record
+    const createRes = await fetch(`${PRESENTON_URL}/api/v1/ppt/presentation/create`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        content,
+        n_slides: n_slides || 15,
+        language,
+        tone: tone || 'professional',
+        verbosity: 'standard',
+        instructions,
+        include_title_slide: true,
+        include_table_of_contents: false,
+      }),
     });
 
+    if (!createRes.ok) {
+      const errorText = await createRes.text().catch(() => 'Presenton create failed');
+      throw new Error(`Presenton create error (${createRes.status}): ${errorText}`);
+    }
+
+    const presentationRecord = await createRes.json();
+    const presentationId = presentationRecord.id;
+
+    // Step 2: Generate outlines via SSE stream (consume the stream to completion)
+    const outlinesRes = await fetch(`${PRESENTON_URL}/api/v1/ppt/outlines/stream/${presentationId}`, {
+      method: 'GET',
+      headers: { 'Accept': 'text/event-stream' },
+    });
+
+    if (!outlinesRes.ok) {
+      const errorText = await outlinesRes.text().catch(() => 'Outlines generation failed');
+      throw new Error(`Presenton outlines error (${outlinesRes.status}): ${errorText}`);
+    }
+
+    // Parse SSE stream to extract the presentation data (which includes outlines)
+    const outlinesBody = await outlinesRes.text();
+    let outlines: Array<{ content: string; title?: string }> = [];
+    let presentationTitle = '';
+
+    // SSE format: "event: response\ndata: {json}\n\n"
+    const sseLines = outlinesBody.split('\n');
+    for (const line of sseLines) {
+      if (!line.startsWith('data: ')) continue;
+      const jsonStr = line.slice(6); // Remove "data: " prefix
+      try {
+        const parsed = JSON.parse(jsonStr);
+        if (parsed.type === 'complete' && parsed.presentation) {
+          // The complete event contains the full presentation record with outlines
+          const presData = parsed.presentation;
+          if (presData.outlines?.slides) {
+            outlines = presData.outlines.slides;
+          }
+          if (presData.title) {
+            presentationTitle = presData.title;
+          }
+        }
+      } catch {
+        // Skip non-JSON or malformed events
+      }
+    }
+
+    if (outlines.length === 0) {
+      // Check if there was an error in the stream
+      for (const line of sseLines) {
+        if (!line.startsWith('data: ')) continue;
+        try {
+          const parsed = JSON.parse(line.slice(6));
+          if (parsed.type === 'error') {
+            throw new Error(`Outline generation failed: ${parsed.detail}`);
+          }
+        } catch (e) {
+          if (e instanceof Error && e.message.startsWith('Outline generation')) throw e;
+        }
+      }
+      throw new Error('Failed to generate presentation outlines - no outlines received');
+    }
+
+    // Step 3: Prepare the presentation with a minimal layout
+    // We construct a basic layout inline to avoid needing the export runtime
+    // or Next.js template API for schema extraction.
+    const minimalLayout = {
+      name: 'general',
+      ordered: false,
+      icon_weight: 'regular',
+      slides: [
+        {
+          id: 'general:intro-slide',
+          name: 'Intro Slide',
+          description: 'A clean slide with title, description, and presenter info',
+          json_schema: {
+            type: 'object',
+            properties: {
+              title: { type: 'string', description: 'Main title of the slide' },
+              description: { type: 'string', description: 'Main description text' },
+              presenterName: { type: 'string', description: 'Presenter name' },
+              presentationDate: { type: 'string', description: 'Date of presentation' },
+            },
+          },
+        },
+        {
+          id: 'general:bullet-with-icons',
+          name: 'Bullet Points with Icons',
+          description: 'Slide with bullet points and icons',
+          json_schema: {
+            type: 'object',
+            properties: {
+              title: { type: 'string', description: 'Section title' },
+              bullets: { type: 'array', items: { type: 'object', properties: { title: { type: 'string' }, description: { type: 'string' }, icon: { type: 'string' } } }, description: 'List of bullet points' },
+            },
+          },
+        },
+        {
+          id: 'general:basic-info',
+          name: 'Basic Info',
+          description: 'Simple text content slide',
+          json_schema: {
+            type: 'object',
+            properties: {
+              title: { type: 'string', description: 'Slide title' },
+              content: { type: 'string', description: 'Main content text' },
+            },
+          },
+        },
+        {
+          id: 'general:metrics',
+          name: 'Metrics',
+          description: 'Slide showing key metrics/numbers',
+          json_schema: {
+            type: 'object',
+            properties: {
+              title: { type: 'string', description: 'Section title' },
+              metrics: { type: 'array', items: { type: 'object', properties: { label: { type: 'string' }, value: { type: 'string' }, description: { type: 'string' } } }, description: 'Key metrics to display' },
+            },
+          },
+        },
+        {
+          id: 'general:chart-with-bullets',
+          name: 'Chart with Bullets',
+          description: 'Slide with a chart and bullet points',
+          json_schema: {
+            type: 'object',
+            properties: {
+              title: { type: 'string', description: 'Chart title' },
+              chartData: { type: 'array', items: { type: 'object', properties: { label: { type: 'string' }, value: { type: 'number' } } }, description: 'Chart data points' },
+              bullets: { type: 'array', items: { type: 'string' }, description: 'Key takeaways' },
+            },
+          },
+        },
+        {
+          id: 'general:table-info',
+          name: 'Table',
+          description: 'Slide with tabular data',
+          json_schema: {
+            type: 'object',
+            properties: {
+              title: { type: 'string', description: 'Table title' },
+              headers: { type: 'array', items: { type: 'string' }, description: 'Column headers' },
+              rows: { type: 'array', items: { type: 'array', items: { type: 'string' } }, description: 'Table rows' },
+            },
+          },
+        },
+        {
+          id: 'general:numbered-bullets',
+          name: 'Numbered Bullets',
+          description: 'Slide with numbered list items',
+          json_schema: {
+            type: 'object',
+            properties: {
+              title: { type: 'string', description: 'Section title' },
+              items: { type: 'array', items: { type: 'object', properties: { title: { type: 'string' }, description: { type: 'string' } } }, description: 'Numbered items' },
+            },
+          },
+        },
+      ],
+    };
+
+    // Call prepare with outlines and the minimal layout
+    const prepareRes = await fetch(`${PRESENTON_URL}/api/v1/ppt/presentation/prepare`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        presentation_id: presentationId,
+        outlines,
+        layout: minimalLayout,
+        title: presentationTitle || projectName,
+      }),
+    });
+
+    if (!prepareRes.ok) {
+      const errorText = await prepareRes.text().catch(() => 'Prepare failed');
+      throw new Error(`Presenton prepare error (${prepareRes.status}): ${errorText}`);
+    }
+
     return NextResponse.json({
-      presentationId: result.presentation_id,
-      editUrl: presentonClient.getEditorUrl(result.presentation_id),
-      downloadUrl: presentonClient.getDownloadUrl(result.path),
+      presentationId,
+      editUrl: `/review/${body.reviewId || ''}/ppt-editor/${presentationId}`,
     });
   } catch (error: unknown) {
     console.error('PPT generation failed:', error);

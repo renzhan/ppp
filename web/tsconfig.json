@@ -27,7 +27,8 @@
       "@/ingestion/*": ["../src/ingestion/*"],
       "@/export/*": ["../src/export/*"],
       "@/validation/*": ["../src/validation/*"],
-      "@/project/*": ["../src/project/*"]
+      "@/project/*": ["../src/project/*"],
+      "@/pipeline/*": ["../src/pipeline/*"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],

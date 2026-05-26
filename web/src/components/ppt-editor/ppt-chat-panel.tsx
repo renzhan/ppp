@@ -172,8 +172,8 @@ export function PPTChatPanel({
             try {
               const event = JSON.parse(dataStr);
 
-              if (event.type === 'text') {
-                accumulatedContent += event.content || '';
+              if (event.type === 'text' || event.type === 'chunk') {
+                accumulatedContent += event.content || event.chunk || '';
                 setMessages((prev) =>
                   prev.map((msg) =>
                     msg.id === assistantMessageId
@@ -197,9 +197,10 @@ export function PPTChatPanel({
                       : msg
                   )
                 );
-              } else if (event.type === 'done') {
+              } else if (event.type === 'done' || event.type === 'complete') {
                 break;
               }
+              // Ignore 'status' and 'trace' events silently
             } catch {
               // Skip malformed JSON lines
               continue;

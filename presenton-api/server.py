@@ -26,7 +26,7 @@ def _load_env_file(path: Path) -> None:
 
 def _load_local_env_files() -> None:
     root = Path(__file__).resolve().parent
-    for candidate in (root / ".env", root.parent / ".env", root.parent / "presenton" / ".env"):
+    for candidate in (root / ".env", root.parent / ".env"):
         _load_env_file(candidate)
 
 

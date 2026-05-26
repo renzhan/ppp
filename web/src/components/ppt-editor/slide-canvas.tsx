@@ -6,6 +6,7 @@ import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import { Image as ImageIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { SlideRenderer } from './slide-renderers';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -21,6 +22,18 @@ export interface SlideCanvasProps {
   onContentChange: (content: Record<string, unknown>) => void;
   editable?: boolean;
 }
+
+// ─── Layout types that have visual renderers ─────────────────────────────────
+
+const VISUAL_LAYOUTS = new Set([
+  'general:intro-slide',
+  'general:basic-info',
+  'general:bullet-with-icons',
+  'general:chart-with-bullets',
+  'general:metrics',
+  'general:table-info',
+  'general:numbered-bullets',
+]);
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -44,7 +57,6 @@ function slideContentToHtml(content: Record<string, unknown>): string {
   }
 
   if (typeof content.body === 'string' && content.body) {
-    // Split by newlines and wrap in paragraphs
     const paragraphs = content.body.split('\n').filter(Boolean);
     for (const p of paragraphs) {
       parts.push(`<p>${escapeHtml(p)}</p>`);
@@ -91,20 +103,17 @@ function htmlToSlideContent(
 ): Record<string, unknown> {
   const updated: Record<string, unknown> = { ...originalContent };
 
-  // Parse the HTML to extract text content
   const parser = typeof DOMParser !== 'undefined' ? new DOMParser() : null;
   if (!parser) return updated;
 
   const doc = parser.parseFromString(html, 'text/html');
   const body = doc.body;
 
-  // Extract title from h1
   const h1 = body.querySelector('h1');
   if (h1 && 'title' in originalContent) {
     updated.title = h1.textContent || '';
   }
 
-  // Extract subtitle/heading from h2
   const h2 = body.querySelector('h2');
   if (h2) {
     if ('subtitle' in originalContent) {
@@ -114,7 +123,6 @@ function htmlToSlideContent(
     }
   }
 
-  // Extract body text from paragraphs
   const paragraphs = body.querySelectorAll('p');
   if (paragraphs.length > 0) {
     const bodyText = Array.from(paragraphs)
@@ -128,7 +136,6 @@ function htmlToSlideContent(
     }
   }
 
-  // Extract bullets from ul/li
   const ul = body.querySelector('ul');
   if (ul) {
     const items = Array.from(ul.querySelectorAll('li')).map(
@@ -172,9 +179,34 @@ function getImageFields(content: Record<string, unknown>): string[] {
   return imageKeys;
 }
 
-// ─── Slide Canvas Component ──────────────────────────────────────────────────
+// ─── Visual Slide Preview (read-only, layout-based) ──────────────────────────
 
-export function SlideCanvas({
+function VisualSlidePreview({ slide }: { slide: PresentationSlide }) {
+  return (
+    <div className="flex h-full flex-col">
+      {/* Slide type indicator */}
+      <div className="flex items-center gap-2 border-b bg-slate-50 px-4 py-1.5">
+        <span className="rounded bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700">
+          {slide.layout}
+        </span>
+      </div>
+
+      {/* Visual slide preview in 16:9 container */}
+      <div className="flex-1 flex items-center justify-center overflow-hidden bg-gray-100 p-4">
+        <div className="relative w-full aspect-video max-h-full bg-white rounded-lg shadow-md overflow-hidden">
+          <SlideRenderer
+            layout={slide.layout!}
+            content={slide.content}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── TipTap Editor Slide (editable, fallback) ────────────────────────────────
+
+function EditorSlideCanvas({
   slide,
   onContentChange,
   editable = true,
@@ -222,7 +254,6 @@ export function SlideCanvas({
   });
 
   // Sync content when slide changes
-  // We use a key-based approach via the parent, but also handle programmatic updates
   useMemo(() => {
     if (editor && initialHtml !== editor.getHTML()) {
       editor.commands.setContent(initialHtml, { emitUpdate: false });
@@ -272,5 +303,29 @@ export function SlideCanvas({
         </div>
       )}
     </div>
+  );
+}
+
+// ─── Slide Canvas Component ──────────────────────────────────────────────────
+
+export function SlideCanvas({
+  slide,
+  onContentChange,
+  editable = true,
+}: SlideCanvasProps) {
+  // Use visual renderer if the slide has a recognized layout
+  const hasVisualLayout = slide.layout && VISUAL_LAYOUTS.has(slide.layout);
+
+  if (hasVisualLayout) {
+    return <VisualSlidePreview slide={slide} />;
+  }
+
+  // Fallback to TipTap editor for unknown layouts
+  return (
+    <EditorSlideCanvas
+      slide={slide}
+      onContentChange={onContentChange}
+      editable={editable}
+    />
   );
 }

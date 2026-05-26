@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef } from 'react';
 import { Plus, Trash2, GripVertical } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { SlideRenderer } from './slide-renderers';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -21,6 +22,18 @@ export interface SlidePanelProps {
   onDeleteSlide: (index: number) => void;
   onAddSlide: (atIndex: number) => void;
 }
+
+// ─── Layout types that have visual renderers ─────────────────────────────────
+
+const VISUAL_LAYOUTS = new Set([
+  'general:intro-slide',
+  'general:basic-info',
+  'general:bullet-with-icons',
+  'general:chart-with-bullets',
+  'general:metrics',
+  'general:table-info',
+  'general:numbered-bullets',
+]);
 
 // ─── Slide Panel Component ───────────────────────────────────────────────────
 
@@ -150,9 +163,17 @@ export function SlidePanel({
               <GripVertical size={12} className="text-slate-400" />
             </div>
 
-            {/* Slide thumbnail placeholder */}
-            <div className="mb-1.5 flex aspect-[16/9] w-full items-center justify-center rounded bg-slate-100 text-xs text-slate-400">
-              {idx + 1}
+            {/* Slide thumbnail */}
+            <div className="mb-1.5 aspect-[16/9] w-full overflow-hidden rounded bg-white border border-slate-100">
+              {slide.layout && VISUAL_LAYOUTS.has(slide.layout) ? (
+                <div className="w-full h-full origin-top-left scale-[0.18] pointer-events-none" style={{ width: '555%', height: '555%' }}>
+                  <SlideRenderer layout={slide.layout} content={slide.content} />
+                </div>
+              ) : (
+                <div className="flex h-full w-full items-center justify-center text-xs text-slate-400">
+                  {idx + 1}
+                </div>
+              )}
             </div>
 
             {/* Slide title */}

@@ -148,3 +148,19 @@ docs/**
 
 # Debug output (rendered PNG images)
 debug-output/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.venv/
+
+# Uploads
+web/uploads/
+
+# Workspace files
+*.code-workspace
+
+# Large binary - distributed via Docker build
+presentation-export/py/
