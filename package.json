@@ -1,6 +1,7 @@
 {
   "name": "marketing-review-system",
   "version": "1.0.0",
+  "presentationExportVersion": "v0.2.9",
   "description": "小红书营销项目复盘报告自动生成系统",
   "type": "module",
   "scripts": {
@@ -40,9 +41,9 @@
     "vitest": "2.1.8"
   },
   "optionalDependencies": {
-    "@img/sharp-linux-x64": "^0.33.5",
-    "@img/sharp-libvips-linux-x64": "^1.1.0",
+    "@img/sharp-linux-x64": "^0.34.5",
+    "@img/sharp-libvips-linux-x64": "^1.2.4",
     "@rollup/rollup-win32-x64-msvc": "^4.60.4",
-    "sharp": "^0.33.5"
+    "sharp": "^0.34.5"
   }
 }

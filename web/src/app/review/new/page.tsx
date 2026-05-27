@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Plus, Trash2, Upload, FileText, AlertCircle, Search } from 'lucide-react';
@@ -88,6 +88,14 @@ const ALLOWED_PLAN_EXTENSIONS = ['.pdf', '.docx', '.doc', '.pptx', '.ppt'];
 // ─── Page Component ──────────────────────────────────────────────────────────
 
 export default function NewReviewPage() {
+  return (
+    <Suspense fallback={<Loading />}>
+      <NewReviewPageContent />
+    </Suspense>
+  );
+}
+
+function NewReviewPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const preselectedProjectId = searchParams.get('projectId') || '';

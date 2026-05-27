@@ -11,7 +11,8 @@ import { AudienceAssetsDataLoader } from './chapter-08-audience-assets';
 import { OptimizationDataLoader } from './chapter-09-optimization';
 import { EndPageDataLoader } from './chapter-10-end-page';
 
-export { ChapterDataLoaderRegistry, ChapterDataContext, ChapterDataLoader, BaseChapterDataLoader } from './types';
+export { ChapterDataLoaderRegistry, BaseChapterDataLoader } from './types';
+export type { ChapterDataContext, ChapterDataLoader } from './types';
 export { CoverDataLoader } from './chapter-01-cover';
 export { ProjectReviewDataLoader } from './chapter-02-project-review';
 export { DataOverviewDataLoader } from './chapter-03-data-overview';

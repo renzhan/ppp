@@ -1,0 +1,60 @@
+# Dependencies
+node_modules/
+web/node_modules/
+
+# Build outputs
+dist/
+.next/
+web/.next/
+out/
+
+# Generated (will be regenerated in build)
+generated/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+presenton-api/.venv/
+presenton-api/__pycache__/
+presenton-api/.pytest_cache/
+
+# Environment files
+.env
+.env.*
+!.env.example
+presenton-api/.env
+
+# IDE / Editor
+.vscode/
+.kiro/
+*.code-workspace
+
+# Git
+.git/
+
+# Logs
+*.log
+logs/
+
+# Tests
+tests/
+presenton-api/tests/
+
+# Documentation
+docs/
+
+# Debug
+debug-output/
+
+# Cache
+fastembed_cache/
+presenton-api/fastembed_cache/
+
+# Uploads (runtime data)
+web/uploads/
+
+# OS files
+.DS_Store
+Thumbs.db

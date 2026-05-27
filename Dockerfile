@@ -4,11 +4,6 @@
 FROM node:22-bookworm-slim AS deps
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libreoffice-core \
-    libreoffice-impress \
-    libreoffice-writer \
-    fonts-wqy-zenhei \
-    fonts-noto-cjk \
     python3 \
     make \
     g++ \
@@ -26,7 +21,7 @@ COPY package.json package-lock.json ./
 RUN npm ci
 
 COPY web/package.json web/package-lock.json ./web/
-RUN cd web && npm ci
+RUN cd web && npm install --prefer-offline
 
 # ============================================================
 # Stage 2: Generate Prisma client + build root TS
@@ -39,7 +34,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends openssl \
 WORKDIR /app
 
 COPY --from=deps /app/node_modules ./node_modules
-COPY package.json tsconfig.json ./
+COPY package.json tsconfig.json prisma.config.ts ./
 COPY src/ ./src/
 COPY prisma/ ./prisma/
 
@@ -56,21 +51,24 @@ RUN apt-get update && apt-get install -y --no-install-recommends openssl \
 
 WORKDIR /app
 
+# Copy root node_modules (needed for transpilePackages resolution)
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/generated ./generated
+
+# Copy web node_modules from deps stage
+COPY --from=deps /app/web/node_modules ./web/node_modules
 
 COPY web/ ./web/
 
 # Next.js transpilePackages uses ../src/ relative to web directory
 COPY src/ ./src/
 COPY prisma/ ./prisma/
+COPY package.json ./
 
 WORKDIR /app/web
-RUN npm ci
 
 # Provide a dummy DATABASE_URL so Prisma client can initialize during static generation.
-# No actual DB connection is made; routes that need it will fail gracefully at build time.
 ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
 RUN npm run build
 
@@ -80,6 +78,7 @@ RUN npm run build
 FROM node:22-bookworm-slim AS runner
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    openssl \
     libreoffice-core \
     libreoffice-impress \
     libreoffice-writer \
@@ -89,6 +88,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-pip \
     python3-venv \
     supervisor \
+    libcairo2 \
+    libpango-1.0-0 \
+    libpangocairo-1.0-0 \
+    libjpeg62-turbo \
+    libgif7 \
+    librsvg2-2 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -96,28 +101,49 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
+# --- Root node_modules (for Prisma CLI, etc.) ---
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/generated ./generated
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/prisma ./prisma
+COPY package.json ./
+
 # --- Next.js artifacts ---
 COPY --from=web-builder /app/web/node_modules ./web/node_modules
 COPY --from=web-builder /app/web/.next ./web/.next
 COPY --from=web-builder /app/web/package.json ./web/package.json
 COPY --from=web-builder /app/web/next.config.mjs ./web/next.config.mjs
 
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/generated ./generated
-COPY --from=builder /app/prisma ./prisma
+# --- Source (needed by Next.js transpilePackages at runtime for SSR) ---
+COPY src/ ./src/
 
 # --- Presenton FastAPI ---
 COPY presenton-api/ ./presenton-api/
 RUN python3 -m pip install --no-cache-dir --break-system-packages -r presenton-api/requirements.txt
 
+# --- Presentation Export Runtime (download from GitHub releases) ---
+COPY scripts/sync-presentation-export.cjs ./scripts/sync-presentation-export.cjs
+RUN apt-get update && apt-get install -y --no-install-recommends unzip && rm -rf /var/lib/apt/lists/* \
+    && node scripts/sync-presentation-export.cjs --force \
+    && chmod +x /app/presentation-export/py/convert-linux-x64 \
+    && rm -rf .cache/presentation-export
+
+ENV EXPORT_PACKAGE_ROOT=/app/presentation-export
+ENV EXPORT_RUNTIME_DIR=/app/presentation-export
+ENV BUILT_PYTHON_MODULE_PATH=/app/presentation-export/py/convert-linux-x64
+
 # --- Shared data volume ---
 RUN mkdir -p /app_data
 VOLUME /app_data
 
+# --- Supervisord config ---
+COPY presenton-api/supervisord.conf /app/presenton-api/supervisord.conf
+RUN sed -i 's/\r$//' /app/presenton-api/supervisord.conf
+
 # --- Entrypoint: run Prisma migrations then start supervisor ---
 COPY docker-entrypoint.sh /docker-entrypoint.sh
-RUN chmod +x /docker-entrypoint.sh
+RUN sed -i 's/\r$//' /docker-entrypoint.sh && chmod +x /docker-entrypoint.sh
 
-EXPOSE 3000
+EXPOSE 3000 8000
 
 ENTRYPOINT ["/docker-entrypoint.sh"]

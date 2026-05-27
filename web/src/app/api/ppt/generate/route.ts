@@ -286,7 +286,7 @@ export async function POST(request: NextRequest) {
         presentation_id: presentationId,
         outlines,
         layout: minimalLayout,
-        title: presentationTitle || projectName,
+        title: projectName,
       }),
     });
 
@@ -347,8 +347,7 @@ function buildFullContent(
 ): string {
   const sections: string[] = [];
 
-  sections.push(`# ${projectName} - 小红书种草项目复盘`);
-  sections.push(`品牌: ${brand} | 品类: ${category}`);
+  sections.push(`# ${projectName}`);
   sections.push('');
 
   // M2: 项目回顾
