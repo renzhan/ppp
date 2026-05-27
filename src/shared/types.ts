@@ -261,6 +261,12 @@ export interface BrandData {
   penetrationRate?: number;        // 人群渗透率（%），后续扩展
   monthlySearchVolume?: number;    // 月搜索指数，后续扩展
   period: string;                  // 周期
+  // move_analyse
+  newUserNum?: number;             // 新增资产总数
+  aipsTransNum?: number;           // AIPS人群变化数
+  aipsCompareStartRatio?: number;  // AIPS本品变化率(%)
+  tiTransNum?: number;             // TI人群变化数
+  tiCompareStartRatio?: number;    // TI本品变化率(%)
 }
 
 /**

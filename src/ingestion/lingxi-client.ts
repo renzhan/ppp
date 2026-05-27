@@ -55,38 +55,45 @@ export class LingxiClient {
   // ── 统一入口 ──
 
   async fetchLingxiData(brandName: string, keyword: string): Promise<LingxiData> {
-    const data: LingxiData = {};
+    const endDate = daysAgo(1);
+    const startDate = oneMonthAgoPlusOne(endDate);
 
-    const brand = await this.fetchBrandData(brandName);
-    data.brand = brand;
+    const brand = await this.fetchBrandData(brandName, startDate, endDate);
+    const kw = await this.fetchKeywordData(brandName, keyword, startDate, endDate);
 
-    const kw = await this.fetchKeywordData(brandName, keyword);
-    data.keyword = [kw];
-
-    return data;
+    return { brand, keyword: [kw] };
   }
 
-  // ── asset_analyse → 品牌-AIPS / 品牌-TI ──
+  // ── asset_analyse + move_analyse → 品牌数据 ──
 
-  async fetchBrandData(brandName: string): Promise<BrandData> {
+  async fetchBrandData(brandName: string, startDate: string, endDate: string): Promise<BrandData> {
     const res = await this.callTask('asset_analyse', brandName, {});
     const captured = res.data?.captured ?? [];
 
     const aips = extractAips(captured);
     const ti = extractTi(captured);
 
+    // 人流流转数据
+    let moveData: Partial<BrandData> = {};
+    try {
+      const moveRes = await this.callTask('move_analyse', brandName, { startDate, endDate });
+      const moveCaptured = moveRes.data?.captured ?? [];
+      moveData = extractMoveAnalyseData(moveCaptured, startDate, endDate);
+    } catch (e) {
+      console.error(`[lingxi] move_analyse 失败: ${(e as Error).message}`);
+    }
+
     return {
       aips,
       ti,
       period: getPeriod(),
+      ...moveData,
     };
   }
 
   // ── keyword_trend → 月搜索指数 ──
 
-  async fetchKeywordData(brandName: string, keyword: string): Promise<KeywordData> {
-    const endDate = daysAgo(1);
-    const startDate = oneMonthAgoPlusOne(endDate); // endDate 同一天的上个月 +1天
+  async fetchKeywordData(brandName: string, keyword: string, startDate: string, endDate: string): Promise<KeywordData> {
     const res = await this.callTask('keyword_trend', brandName, {
       trendKeyword: keyword,
       startTime: startDate,
@@ -96,11 +103,7 @@ export class LingxiClient {
 
     const searchVolume = extractSum(captured, startDate, endDate);
 
-    return {
-      keyword,
-      searchVolume,
-      period: getPeriod(),
-    };
+    return { keyword, searchVolume, period: getPeriod() };
   }
 
   // ── 截图 ──
@@ -196,6 +199,36 @@ function extractAips(captured: CapturedItem[]): number {
   const hit = captured.find(c => c.url.includes('asset/overall'));
   const item = hit?.data?.data?.list?.find((l: any) => l.name === 'AIPS 人群总数');
   return Number(item?.userNum ?? 0);
+}
+
+/** move_analyse → 提取新增资产总数 / AIPS变化 / TI变化 */
+function extractMoveAnalyseData(captured: CapturedItem[], startDate: string, endDate: string): Partial<BrandData> {
+  // 新增资产总数 — assertTrans/detail/card 不含 pathFrom，校验日期
+  const detail = captured.find(c => {
+    if (!c.url.includes('assertTrans/detail/card') || c.url.includes('pathFrom')) return false;
+    return c.url.includes(`endDate=${endDate}`);
+  });
+  const newUserNum = Number(detail?.data?.data?.card?.find((cd: any) =>
+    cd.tableResult?.[0]?.cardIndexName === '新增资产总数'
+  )?.tableResult?.[0]?.newUserNum ?? 0);
+
+  // AIPS人群变化数/率 & TI人群变化数/率 — assertTrans/card 不含 pathFrom，校验日期
+  const card = captured.find(c => {
+    if (!c.url.includes('assertTrans/card') || c.url.includes('pathFrom')) return false;
+    return c.url.includes(`endDate=${endDate}`);
+  });
+  const items: any[] = card?.data?.data ?? [];
+
+  const allItem = items.find(i => i.tableResult?.[0]?.groupLevel === 'all');
+  const tiItem = items.find(i => i.tableResult?.[0]?.groupLevel === 'TI');
+
+  return {
+    newUserNum,
+    aipsTransNum: Number(allItem?.tableResult?.[0]?.aipsTransNum ?? 0),
+    aipsCompareStartRatio: Number(allItem?.tableResult?.[0]?.compareStartRatio ?? 0),
+    tiTransNum: Number(tiItem?.tableResult?.[0]?.tiTransNum ?? 0),
+    tiCompareStartRatio: Number(tiItem?.tableResult?.[0]?.compareStartRatio ?? 0),
+  };
 }
 
 /** asset/overall → list[] → name="TI 深度兴趣人群数" → userNum */
