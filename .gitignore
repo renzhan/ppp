@@ -152,3 +152,22 @@ debug-output/
 # mydoc
 mydoc/
 .DS_Store
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.venv/
+
+# Uploads
+web/uploads/
+
+# Workspace files
+*.code-workspace
+
+# Large binary - distributed via Docker build
+presentation-export/py/
+
+*.tar
+.idea/
