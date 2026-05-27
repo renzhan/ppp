@@ -100,6 +100,9 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV NEXT_PUBLIC_FAST_API=http://127.0.0.1:8000
+ENV NEXTJS_INTERNAL_URL=http://127.0.0.1:3000
+ENV APP_DATA_DIRECTORY=/app_data
 
 # --- Root node_modules (for Prisma CLI, etc.) ---
 COPY --from=builder /app/node_modules ./node_modules
@@ -120,17 +123,6 @@ COPY src/ ./src/
 # --- Presenton FastAPI ---
 COPY presenton-api/ ./presenton-api/
 RUN python3 -m pip install --no-cache-dir --break-system-packages -r presenton-api/requirements.txt
-
-# --- Presentation Export Runtime (download from GitHub releases) ---
-COPY scripts/sync-presentation-export.cjs ./scripts/sync-presentation-export.cjs
-RUN apt-get update && apt-get install -y --no-install-recommends unzip && rm -rf /var/lib/apt/lists/* \
-    && node scripts/sync-presentation-export.cjs --force \
-    && chmod +x /app/presentation-export/py/convert-linux-x64 \
-    && rm -rf .cache/presentation-export
-
-ENV EXPORT_PACKAGE_ROOT=/app/presentation-export
-ENV EXPORT_RUNTIME_DIR=/app/presentation-export
-ENV BUILT_PYTHON_MODULE_PATH=/app/presentation-export/py/convert-linux-x64
 
 # --- Shared data volume ---
 RUN mkdir -p /app_data

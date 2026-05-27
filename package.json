@@ -1,7 +1,6 @@
 {
   "name": "marketing-review-system",
   "version": "1.0.0",
-  "presentationExportVersion": "v0.2.9",
   "description": "小红书营销项目复盘报告自动生成系统",
   "type": "module",
   "scripts": {
