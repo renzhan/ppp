@@ -9,6 +9,8 @@ import type {
   PugongyingNote,
   JuguangNote,
   CommentData,
+  QianguaStatsData,
+  QianguaHotNotePublishData,
   LingxiData,
   BusinessAnnotation,
   ManualInputData,
@@ -35,6 +37,8 @@ export interface DataPersistenceService {
   saveManualInput(projectId: string, input: ManualInputData): Promise<void>;
   /** 全量替换评论数据（先删后插，按 noteId 维度） */
   saveComments(projectId: string, data: CommentData[]): Promise<void>;
+  /** 千瓜数据（按 dataType 分片存储） */
+  saveQianguaData(projectId: string, stats: QianguaStatsData, hotNotePublish: QianguaHotNotePublishData): Promise<void>;
 }
 
 /**
@@ -334,6 +338,19 @@ export class PrismaDataPersistenceService implements DataPersistenceService {
       await tx.comment.updateMany({
         where: { projectId, noteId: { in: noteIds }, commentId: { notIn: [...incomingIds] }, isActive: true },
         data: { isActive: false },
+      });
+    });
+  }
+
+  async saveQianguaData(
+    projectId: string, stats: QianguaStatsData, hotNotePublish: QianguaHotNotePublishData,
+  ): Promise<void> {
+    await prisma.$transaction(async (tx) => {
+      await tx.qianguaData.createMany({
+        data: [
+          { projectId, dataType: 'stats', dataContent: stats as object },
+          { projectId, dataType: 'hot_note_publish', dataContent: hotNotePublish as object },
+        ],
       });
     });
   }

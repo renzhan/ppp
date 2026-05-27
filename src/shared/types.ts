@@ -207,6 +207,26 @@ export interface CommentData {
   commentTime?: string | null;     // 评论时间
 }
 
+// ---- 千瓜数据 ----
+
+/**
+ * 千瓜-品牌数据卡片
+ */
+export interface QianguaStatsData {
+  current: Record<string, number>;
+  last?: Record<string, number>;
+  change?: Record<string, number>;
+  period: string;
+}
+
+/**
+ * 千瓜-爆文发布时间分布
+ */
+export interface QianguaHotNotePublishData {
+  week: Array<{ text: string; hotNoteCount: number; lowFansHotNoteCount: number; lowFansHotNoteRate: number }>;
+  hour: Array<{ text: string; hotNoteCount: number; lowFansHotNoteCount: number; lowFansHotNoteRate: number }>;
+}
+
 // ---- 灵犀数据 ----
 
 /**
@@ -612,4 +632,7 @@ export interface EnvConfig {
   /** 灵犀 API */
   LINGXI_BASE_URL: string;
   LINGXI_API_KEY: string;
+  /** 千瓜 API */
+  QIANGUA_BASE_URL: string;
+  QIANGUA_API_KEY: string;
 }

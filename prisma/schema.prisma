@@ -54,6 +54,7 @@ model Project {
 
   // Relations
   comments           Comment[]
+  qianguaData        QianguaData[]
   notes              Note[]
   juguangData        JuguangData[]
   businessAnnotations BusinessAnnotation[]
@@ -179,6 +180,19 @@ model Comment {
   @@index([projectId])
   @@index([noteId])
   @@map("comments")
+}
+
+// 千瓜数据表
+model QianguaData {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  projectId   String   @map("project_id") @db.Uuid
+  dataType    String   @map("data_type") @db.VarChar(50)
+  dataContent Json     @map("data_content")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  project Project @relation(fields: [projectId], references: [id])
+  @@index([projectId])
+  @@map("qiangua_data")
 }
 
 // 业务标注表

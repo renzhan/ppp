@@ -5,13 +5,15 @@
  * Implements retry logic with exponential backoff and response validation.
  */
 
-import type { PugongyingNote, JuguangNote, LingxiData, CommentData } from '../shared/types.js';
+import type { PugongyingNote, JuguangNote, LingxiData, CommentData, QianguaStatsData, QianguaHotNotePublishData } from '../shared/types.js';
 import { PugongyingClient } from './pugongying-client.js';
 import type { PugongyingClientConfig } from './pugongying-client.js';
 import { JuguangClient } from './juguang-client.js';
 import type { JuguangClientConfig } from './juguang-client.js';
 import { LingxiClient } from './lingxi-client.js';
 import type { LingxiClientConfig } from './lingxi-client.js';
+import { QianguaClient } from './qiangua-client.js';
+import type { QianguaClientConfig } from './qiangua-client.js';
 
 /**
  * Interface for the Paichacha API client
@@ -24,6 +26,8 @@ export interface IPaichachaClient {
   fetchLingxiData(brandName: string, keyword: string): Promise<LingxiData>;
   /** 获取评论数据（全量评论，用于舆情分析） */
   fetchCommentData(noteIds: string[]): Promise<CommentData[]>;
+  /** 获取千瓜数据（品牌数据卡片 + 爆文发布时间分布） */
+  fetchQianguaData(brandName: string): Promise<{ stats: QianguaStatsData; hotNotePublish: QianguaHotNotePublishData }>;
 }
 
 /**
@@ -46,6 +50,7 @@ export class PaichachaClient implements IPaichachaClient {
   private readonly pugongyingClient?: PugongyingClient;
   private readonly juguangClient?: JuguangClient;
   private readonly lingxiClient?: LingxiClient;
+  private readonly qianguaClient?: QianguaClient;
 
   constructor(
     baseUrl: string,
@@ -54,6 +59,7 @@ export class PaichachaClient implements IPaichachaClient {
     pugongyingConfig?: PugongyingClientConfig,
     juguangConfig?: JuguangClientConfig,
     lingxiConfig?: LingxiClientConfig,
+    qianguaConfig?: QianguaClientConfig,
   ) {
     this.baseUrl = baseUrl.replace(/\/+$/, '');
     this.apiKey = apiKey;
@@ -66,6 +72,9 @@ export class PaichachaClient implements IPaichachaClient {
     }
     if (lingxiConfig) {
       this.lingxiClient = new LingxiClient(lingxiConfig);
+    }
+    if (qianguaConfig) {
+      this.qianguaClient = new QianguaClient(qianguaConfig);
     }
   }
 
@@ -99,5 +108,12 @@ export class PaichachaClient implements IPaichachaClient {
   async fetchCommentData(noteIds: string[]): Promise<CommentData[]> {
     if (!this.pugongyingClient) throw new Error('Pugongying client not configured');
     return this.pugongyingClient.fetchComments(noteIds);
+  }
+
+  // ── Qiangua ──
+
+  async fetchQianguaData(brandName: string): Promise<{ stats: QianguaStatsData; hotNotePublish: QianguaHotNotePublishData }> {
+    if (!this.qianguaClient) throw new Error('Qiangua client not configured');
+    return this.qianguaClient.fetchQianguaData(brandName);
   }
 }
