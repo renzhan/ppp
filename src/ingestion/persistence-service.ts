@@ -14,6 +14,7 @@ import type {
   LingxiData,
   BusinessAnnotation,
   ManualInputData,
+  NoteBaseRecord,
 } from '../shared/types.js';
 
 /**
@@ -35,6 +36,8 @@ export interface DataPersistenceService {
 
   /** Insert manual input records (benchmark, KPI targets, brand search index, topic exposure) */
   saveManualInput(projectId: string, input: ManualInputData): Promise<void>;
+  /** Upsert 笔记底表数据（业务底表Excel导入） */
+  saveNoteBaseData(projectId: string, records: NoteBaseRecord[]): Promise<void>;
   /** 全量替换评论数据（先删后插，按 noteId 维度） */
   saveComments(projectId: string, data: CommentData[]): Promise<void>;
   /** 千瓜数据（按 dataType 分片存储） */
@@ -353,5 +356,53 @@ export class PrismaDataPersistenceService implements DataPersistenceService {
         ],
       });
     });
+  }
+
+  /**
+   * Upsert 笔记底表数据到 note_base 表。
+   * 业务底表Excel导入的运营标注与费用数据，蒲公英API不提供这些字段。
+   * Uses Prisma transaction with upsert for each record (unique on project_id + note_id).
+   */
+  async saveNoteBaseData(projectId: string, records: NoteBaseRecord[]): Promise<void> {
+    if (records.length === 0) return;
+
+    await prisma.$transaction(
+      records.map((record) =>
+        prisma.noteBase.upsert({
+          where: {
+            projectId_noteId: {
+              projectId,
+              noteId: record.noteId,
+            },
+          },
+          create: {
+            projectId,
+            noteId: record.noteId,
+            noteLink: record.noteLink ?? null,
+            cooperationForm: record.cooperationForm ?? null,
+            isRegistered: record.isRegistered,
+            contentDirection: record.contentDirection ?? null,
+            kolType: record.kolType ?? null,
+            spuName: record.spuName ?? null,
+            contentCost: record.contentCost,
+            contentSettlement: record.contentSettlement,
+            adSpend: record.adSpend,
+            totalCost: record.totalCost,
+          },
+          update: {
+            noteLink: record.noteLink ?? null,
+            cooperationForm: record.cooperationForm ?? null,
+            isRegistered: record.isRegistered,
+            contentDirection: record.contentDirection ?? null,
+            kolType: record.kolType ?? null,
+            spuName: record.spuName ?? null,
+            contentCost: record.contentCost,
+            contentSettlement: record.contentSettlement,
+            adSpend: record.adSpend,
+            totalCost: record.totalCost,
+          },
+        })
+      )
+    );
   }
 }
