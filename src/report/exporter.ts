@@ -42,11 +42,11 @@ function exportAsJSON(report: Report): Buffer {
 
 /**
  * Export as HTML. If htmlContent is provided, use it directly.
- * Otherwise, generate a basic HTML wrapper around the report JSON.
+ * Otherwise, throw an error indicating HTML content must be pre-generated.
  */
 function exportAsHTML(_report: Report, htmlContent?: string): Buffer {
   if (htmlContent) {
     return Buffer.from(htmlContent, 'utf-8');
   }
-  throw new Error('HTML export requires pre-generated HTML content. Use generateHtmlReport() first.');
+  throw new Error('HTML export requires pre-generated HTML content.');
 }

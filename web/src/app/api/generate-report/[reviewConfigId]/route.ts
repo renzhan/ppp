@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { createLLMClientFromEnv } from '@/report/llm-client';
-import { generateHtmlReport } from '@/report/html-report-generator';
+import { ReportPipelineOrchestrator } from '@/pipeline/orchestrator';
+import { createChapterDataLoaderRegistry } from '@/pipeline/loaders/index';
+import { PromptTemplateLoader } from '@/pipeline/template-loader';
+import path from 'path';
 
 /**
  * POST /api/generate-report/[reviewConfigId]
  *
- * 触发复盘报告生成 — 直接通过 LLM 生成完整可编辑 HTML 页面。
- * 生成的 HTML 包含 ECharts 图表、数据表格、导出PDF/DOCX按钮、内容可编辑。
+ * 触发复盘报告生成 — 通过逐章节管线（Orchestrator）生成完整10章报告。
+ * 每章独立加载数据 → 填充提示词模板 → 调用LLM → 解析响应。
  */
 export async function POST(
   request: NextRequest,
@@ -48,33 +51,36 @@ export async function POST(
       data: { status: 'generating' },
     });
 
-    console.log('[generate-report] calling generateHtmlReport...');
+    console.log('[generate-report] starting chapter-by-chapter pipeline...');
 
-    // Generate HTML report via LLM
+    // Initialize pipeline components
+    const loaderRegistry = createChapterDataLoaderRegistry(prisma as any);
+    const templatesDir = path.resolve(process.cwd(), '..', 'src', 'prompts', 'chapters');
+    const templateLoader = new PromptTemplateLoader(templatesDir);
     const llmClient = createLLMClientFromEnv();
-    const result = await generateHtmlReport(project.id, {
+
+    const orchestrator = new ReportPipelineOrchestrator(
+      loaderRegistry,
+      templateLoader,
       llmClient,
-      editable: true,
-      exportButtons: true,
-      timeout: 120000,
+      prisma as any,
+    );
+
+    // Generate full 10-chapter report
+    const result = await orchestrator.generateFullReport({
+      projectId: project.id,
+      reviewConfigId,
+      timeout: 60000,
     });
 
-    console.log('[generate-report] HTML report generated, length:', result.html.length);
-
-    // Save HTML content to ReviewConfig.reportContent
-    await prisma.reviewConfig.update({
-      where: { id: reviewConfigId },
-      data: {
-        reportContent: { type: 'html', html: result.html, generatedAt: result.generatedAt },
-        status: 'completed',
-      },
-    });
+    console.log(`[generate-report] pipeline completed: ${result.chapters.filter(c => c.status === 'generated').length}/10 chapters generated`);
 
     return NextResponse.json({
       success: true,
       versionId: result.versionId,
-      generatedAt: result.generatedAt,
-      htmlLength: result.html.length,
+      versionNumber: result.versionNumber,
+      chaptersGenerated: result.chapters.filter(c => c.status === 'generated').length,
+      chaptersErrored: result.chapters.filter(c => c.status === 'error').length,
     });
   } catch (error) {
     console.error('POST /api/generate-report/[reviewConfigId] error:', error);

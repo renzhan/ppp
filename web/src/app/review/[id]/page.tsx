@@ -98,24 +98,14 @@ export default function ReviewDetailPage({ params }: { params: { id: string } })
     },
   });
 
-  const { data: reportData } = useQuery<ReportContent>({
-    queryKey: ['review-report', id],
-    queryFn: async () => {
-      const res = await fetch(`/api/reviews/${id}/report`);
-      if (!res.ok) throw new Error('获取报告内容失败');
-      return res.json();
-    },
-    enabled: !!review,
-  });
-
   if (isLoading) {
-    return <Loading size="lg" text="正在加载复盘详情..." className="py-20" />;
+    return <Loading size="lg" text="正在加载复盘配置..." className="py-20" />;
   }
 
   if (isError) {
     return (
       <div className="rounded-lg border border-rose-200 bg-rose-50 p-6 text-sm text-rose-600">
-        {(error as Error).message || '获取复盘详情失败'}
+        {(error as Error).message || '获取复盘配置失败'}
       </div>
     );
   }
@@ -134,17 +124,17 @@ export default function ReviewDetailPage({ params }: { params: { id: string } })
             <ArrowLeft size={16} />
           </Link>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-gray-900">复盘详情</h1>
+            <h1 className="text-2xl font-bold tracking-tight text-gray-900">复盘配置</h1>
             <p className="mt-0.5 text-sm text-slate-500">{review.project.projectName}</p>
           </div>
         </div>
         {review.status === 'completed' ? (
           <Link
             href={`/review/${id}/proofread`}
-            className="inline-flex h-9 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-medium text-white transition hover:bg-blue-700"
+            className="inline-flex h-9 items-center gap-2 rounded-lg bg-emerald-600 px-4 text-sm font-medium text-white transition hover:bg-emerald-700"
           >
             <BookOpen size={14} />
-            进入审校台
+            审校台
           </Link>
         ) : review.status === 'generating' ? (
           <span className="inline-flex h-9 items-center gap-2 rounded-lg bg-slate-100 px-4 text-sm font-medium text-slate-500">
@@ -294,13 +284,6 @@ export default function ReviewDetailPage({ params }: { params: { id: string } })
           </a>
         </DetailSection>
       )}
-
-      {/* Section: 报告内容 */}
-      {reportData?.reportContent ? (
-        <DetailSection title="复盘报告">
-          <ReportContentDisplay content={reportData.reportContent} />
-        </DetailSection>
-      ) : null}
     </div>
   );
 }

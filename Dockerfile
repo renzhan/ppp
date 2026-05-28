@@ -79,15 +79,8 @@ FROM node:22-bookworm-slim AS runner
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     openssl \
-    libreoffice-core \
-    libreoffice-impress \
-    libreoffice-writer \
     fonts-wqy-zenhei \
     fonts-noto-cjk \
-    python3 \
-    python3-pip \
-    python3-venv \
-    supervisor \
     libcairo2 \
     libpango-1.0-0 \
     libpangocairo-1.0-0 \
@@ -100,8 +93,6 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
-ENV NEXT_PUBLIC_FAST_API=http://127.0.0.1:8000
-ENV NEXTJS_INTERNAL_URL=http://127.0.0.1:3000
 ENV APP_DATA_DIRECTORY=/app_data
 
 # --- Root node_modules (for Prisma CLI, etc.) ---
@@ -120,22 +111,14 @@ COPY --from=web-builder /app/web/next.config.mjs ./web/next.config.mjs
 # --- Source (needed by Next.js transpilePackages at runtime for SSR) ---
 COPY src/ ./src/
 
-# --- Presenton FastAPI ---
-COPY presenton-api/ ./presenton-api/
-RUN python3 -m pip install --no-cache-dir --break-system-packages -r presenton-api/requirements.txt
-
 # --- Shared data volume ---
 RUN mkdir -p /app_data
 VOLUME /app_data
 
-# --- Supervisord config ---
-COPY presenton-api/supervisord.conf /app/presenton-api/supervisord.conf
-RUN sed -i 's/\r$//' /app/presenton-api/supervisord.conf
-
-# --- Entrypoint: run Prisma migrations then start supervisor ---
+# --- Entrypoint: run Prisma migrations then start Next.js ---
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN sed -i 's/\r$//' /docker-entrypoint.sh && chmod +x /docker-entrypoint.sh
 
-EXPOSE 3000 8000
+EXPOSE 3000
 
 ENTRYPOINT ["/docker-entrypoint.sh"]

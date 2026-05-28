@@ -17,6 +17,3 @@ export { runCalculationPipeline, onEngagementConfigChange } from './calculation/
 // ---- Report Generation Layer ----
 export { generateReport } from './report/pipeline.js';
 export { assembleReport, exportReport } from './report/index.js';
-
-// ---- HTML Report Generation (Direct LLM → HTML) ----
-export { generateHtmlReport, type HtmlReportOptions, type HtmlReportResult } from './report/html-report-generator.js';

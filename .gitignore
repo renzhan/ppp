@@ -166,8 +166,5 @@ web/uploads/
 # Workspace files
 *.code-workspace
 
-# Large binary - distributed via Docker build
-presentation-export/py/
-
 *.tar
 .idea/

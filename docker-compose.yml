@@ -12,14 +12,9 @@ services:
     environment:
       - NODE_ENV=production
       - NEXT_TELEMETRY_DISABLED=1
-      - PRESENTON_INTERNAL_URL=http://localhost:8000
-      # Presenton API LLM config (mapped from root .env)
-      - LLM=${LLM:-custom}
-      - CUSTOM_LLM_URL=${LLM_BASE_URL:-}
-      - CUSTOM_LLM_API_KEY=${LLM_API_KEY:-}
-      - CUSTOM_MODEL=${LLM_MODEL:-gpt-5.1}
-      - OPENAI_API_KEY=${LLM_API_KEY:-}
-      - OPENAI_MODEL=${LLM_MODEL:-gpt-5.1}
+      - LLM_BASE_URL=${LLM_BASE_URL:-}
+      - LLM_API_KEY=${LLM_API_KEY:-}
+      - LLM_MODEL=${LLM_MODEL:-gpt-5.1}
     volumes:
       - ./prisma:/app/prisma:ro
       - app_data:/app_data

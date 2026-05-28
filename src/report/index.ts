@@ -6,7 +6,5 @@ export { parsePlanDocument, generateOptimizationSuggestions, saveEditedSuggestio
 export { exportReport } from './exporter.js';
 export { generateReport, type GenerateReportOptions } from './pipeline.js';
 
-// HTML Report Generation (new approach - direct LLM to HTML)
-export { generateHtmlReport, type HtmlReportOptions, type HtmlReportResult } from './html-report-generator.js';
+// HTML Report Data Assembly (used by stream route for chapter-by-chapter generation)
 export { assembleReportData, type HtmlReportData } from './html-report-data-assembler.js';
-export { buildHtmlReportPrompt, type PromptBuildOptions } from './html-report-prompt-builder.js';

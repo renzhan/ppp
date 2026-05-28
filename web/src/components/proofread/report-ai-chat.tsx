@@ -79,7 +79,7 @@ export function ReportAiChat({
     abortRef.current = controller;
 
     try {
-      const res = await fetch('/api/ppt/chat', {
+      const res = await fetch(`/api/reviews/${reviewId}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

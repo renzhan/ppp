@@ -129,6 +129,13 @@ function NewReviewPageContent() {
   const [planFile, setPlanFile] = useState<File | null>(null);
   const [planFileName, setPlanFileName] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [contentCostCaliber, setContentCostCaliber] = useState<'consumption' | 'settlement'>('consumption');
+  const [trafficCostCaliber, setTrafficCostCaliber] = useState<'consumption' | 'settlement'>('consumption');
+  const [costCaliberType, setCostCaliberType] = useState<'content' | 'traffic'>('content');
+  const [hasUnofficialCooperation, setHasUnofficialCooperation] = useState<boolean>(false);
+  const [executionPeriodStart, setExecutionPeriodStart] = useState('');
+  const [executionPeriodEnd, setExecutionPeriodEnd] = useState('');
+  const [historicalAcquisitionCost, setHistoricalAcquisitionCost] = useState('');
 
   // ─── Data Fetching ───────────────────────────────────────────────────────
   const { data: projects } = useQuery<Project[]>({
@@ -147,6 +154,17 @@ function NewReviewPageContent() {
     const set = new Set(projects.map((p) => p.category).filter(Boolean));
     return Array.from(set).sort();
   }, [projects]);
+
+  // Real-time cost calculation based on selected caliber
+  const { data: costData, isLoading: isCostLoading } = useQuery<{ contentCost: number; trafficCost: number; totalCost: number }>({
+    queryKey: ['project-cost', selectedProjectId, contentCostCaliber, trafficCostCaliber],
+    queryFn: async () => {
+      const res = await fetch(`/api/projects/${selectedProjectId}/cost?contentCaliber=${contentCostCaliber}&trafficCaliber=${trafficCostCaliber}`);
+      if (!res.ok) throw new Error('计算费用失败');
+      return res.json();
+    },
+    enabled: !!selectedProjectId,
+  });
 
   const brandOptions = useMemo(() => {
     if (!projects) return [];
@@ -320,6 +338,13 @@ function NewReviewPageContent() {
       viralMetric,
       modules,
       launchPhases,
+      hasUnofficialCooperation,
+      executionPeriod: executionPeriodStart && executionPeriodEnd
+        ? { start: executionPeriodStart, end: executionPeriodEnd }
+        : null,
+      historicalAcquisitionCost: historicalAcquisitionCost ? parseFloat(historicalAcquisitionCost) : null,
+      contentCostCaliber,
+      trafficCostCaliber,
     });
   };
 
@@ -445,6 +470,66 @@ function NewReviewPageContent() {
             </div>
           </div>
         )}
+      </FormSection>
+
+      {/* Section: 项目执行配置 */}
+      <FormSection title="项目执行配置">
+        <div className="space-y-4">
+          {/* 是否有（非官方）合作 */}
+          <div>
+            <label className="mb-2 block text-xs font-medium text-slate-600">是否有（非官方）合作</label>
+            <div className="flex gap-4">
+              <RadioOption
+                name="hasUnofficialCooperation"
+                value="yes"
+                checked={hasUnofficialCooperation === true}
+                onChange={() => setHasUnofficialCooperation(true)}
+                label="是"
+              />
+              <RadioOption
+                name="hasUnofficialCooperation"
+                value="no"
+                checked={hasUnofficialCooperation === false}
+                onChange={() => setHasUnofficialCooperation(false)}
+                label="否"
+              />
+            </div>
+          </div>
+
+          {/* 项目执行周期 */}
+          <div>
+            <label className="mb-2 block text-xs font-medium text-slate-600">项目执行周期</label>
+            <div className="flex items-center gap-3">
+              <input
+                type="date"
+                value={executionPeriodStart}
+                onChange={(e) => setExecutionPeriodStart(e.target.value)}
+                className="rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+              <span className="text-slate-400">—</span>
+              <input
+                type="date"
+                value={executionPeriodEnd}
+                onChange={(e) => setExecutionPeriodEnd(e.target.value)}
+                className="rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+
+          {/* 历史项目拉新成本基准值 */}
+          <div>
+            <label className="mb-2 block text-xs font-medium text-slate-600">历史项目拉新成本基准值（元）</label>
+            <input
+              type="number"
+              step="any"
+              value={historicalAcquisitionCost}
+              onChange={(e) => setHistoricalAcquisitionCost(e.target.value)}
+              placeholder="请输入历史项目拉新成本基准值"
+              className="w-64 rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+            <p className="mt-1 text-xs text-slate-400">非必填，用于与本次项目拉新成本对比</p>
+          </div>
+        </div>
       </FormSection>
 
       {/* Section: 复盘背景（大盘数据） */}
@@ -573,6 +658,101 @@ function NewReviewPageContent() {
               />
             </div>
           </div>
+        </div>
+      </FormSection>
+
+      {/* Section: 金额口径与总费用 */}
+      <FormSection title="金额口径与总费用">
+        {/* 第一级：选择口径类型 */}
+        <div className="space-y-4">
+          <div>
+            <label className="mb-2 block text-xs font-medium text-slate-600">选择金额口径</label>
+            <div className="flex gap-4">
+              <RadioOption
+                name="costCaliberType"
+                value="content"
+                checked={costCaliberType === 'content'}
+                onChange={() => setCostCaliberType('content')}
+                label="内容金额口径"
+              />
+              <RadioOption
+                name="costCaliberType"
+                value="traffic"
+                checked={costCaliberType === 'traffic'}
+                onChange={() => setCostCaliberType('traffic')}
+                label="投流金额口径"
+              />
+            </div>
+          </div>
+
+          {/* 第二级：根据选择的口径类型，选择消耗/结算 */}
+          {costCaliberType === 'content' && (
+            <div className="ml-4 rounded-md border border-slate-200 bg-slate-50 p-3">
+              <label className="mb-2 block text-xs font-medium text-slate-600">内容金额口径</label>
+              <div className="flex gap-4">
+                <RadioOption
+                  name="contentCostCaliber"
+                  value="consumption"
+                  checked={contentCostCaliber === 'consumption'}
+                  onChange={() => setContentCostCaliber('consumption')}
+                  label="内容消耗金额（博主报价+平台服务费）"
+                />
+                <RadioOption
+                  name="contentCostCaliber"
+                  value="settlement"
+                  checked={contentCostCaliber === 'settlement'}
+                  onChange={() => setContentCostCaliber('settlement')}
+                  label="内容结算金额"
+                />
+              </div>
+            </div>
+          )}
+
+          {costCaliberType === 'traffic' && (
+            <div className="ml-4 rounded-md border border-slate-200 bg-slate-50 p-3">
+              <label className="mb-2 block text-xs font-medium text-slate-600">投流金额口径</label>
+              <div className="flex gap-4">
+                <RadioOption
+                  name="trafficCostCaliber"
+                  value="consumption"
+                  checked={trafficCostCaliber === 'consumption'}
+                  onChange={() => setTrafficCostCaliber('consumption')}
+                  label="投流消耗金额（聚光fee）"
+                />
+                <RadioOption
+                  name="trafficCostCaliber"
+                  value="settlement"
+                  checked={trafficCostCaliber === 'settlement'}
+                  onChange={() => setTrafficCostCaliber('settlement')}
+                  label="投流结算金额"
+                />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* 总费用实时计算展示 */}
+        <div className="mt-4 rounded-md border border-blue-100 bg-blue-50 p-4">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-slate-700">总费用（实时计算）</span>
+            {!selectedProjectId ? (
+              <span className="text-sm text-slate-400">请先选择项目</span>
+            ) : isCostLoading ? (
+              <span className="text-sm text-slate-400">计算中...</span>
+            ) : costData ? (
+              <span className="text-lg font-bold text-blue-700">
+                ¥{costData.totalCost.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+            ) : (
+              <span className="text-sm text-slate-400">--</span>
+            )}
+          </div>
+          {costData && selectedProjectId && (
+            <div className="mt-2 flex gap-6 text-xs text-slate-500">
+              <span>内容费用：¥{costData.contentCost.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              <span>投流费用：¥{costData.trafficCost.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            </div>
+          )}
         </div>
       </FormSection>
 

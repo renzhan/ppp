@@ -35,7 +35,6 @@
 ppp_pi_new/
 ├── src/                    # 后端 TypeScript 源码（数据处理、报告生成引擎）
 ├── web/                    # Next.js 14 前端应用
-├── presenton-api/          # Presenton FastAPI 服务（AI PPT 生成）
 ├── prisma/                 # Prisma ORM schema 和 migrations
 ├── docker-compose.yml      # Docker Compose 配置
 ├── Dockerfile              # 多阶段构建 Dockerfile
@@ -65,17 +64,9 @@ cp .env.example .env
 | `LLM_MODEL` | 使用的模型名称 |
 | `ENCRYPTION_KEY` | 加密密钥（至少 32 字符） |
 
-Presenton 相关（本地开发时可选）：
-
-| 变量 | 说明 | 默认值 |
-|------|------|--------|
-| `PRESENTON_INTERNAL_URL` | Presenton API 地址 | `http://localhost:8000` |
-
 ---
 
 ## 本地开发
-
-本地开发需要分别启动三个服务：
 
 ### 1. 安装依赖
 
@@ -87,16 +78,6 @@ npm install
 # 前端 Next.js
 cd web
 npm install
-cd ..
-
-# Presenton FastAPI（Python）
-cd presenton-api
-python -m venv .venv
-# Windows:
-.venv\Scripts\activate
-# macOS/Linux:
-# source .venv/bin/activate
-pip install -r requirements.txt
 cd ..
 ```
 
@@ -122,30 +103,7 @@ npm run build
 
 编译产物输出到 `dist/` 目录。
 
-### 4. 启动 Presenton FastAPI 服务
-
-```bash
-cd presenton-api
-
-# 激活虚拟环境
-# Windows:
-.venv\Scripts\activate
-# macOS/Linux:
-# source .venv/bin/activate
-
-# 启动开发服务器（带热重载）
-python server.py --port 8000 --reload true
-```
-
-服务启动后监听 `http://127.0.0.1:8000`。
-
-验证服务可用：
-```bash
-curl http://localhost:8000/api/v1/health
-# 应返回: {"status": "ok"}
-```
-
-### 5. 启动 Next.js 前端（开发模式）
+### 4. 启动 Next.js 前端（开发模式）
 
 ```bash
 cd web
@@ -154,15 +112,12 @@ npm run dev
 
 前端启动后访问 `http://localhost:3000`。
 
-### 6. 启动顺序总结
+### 5. 启动顺序总结
 
 | 顺序 | 服务 | 命令 | 端口 |
 |------|------|------|------|
 | 1 | PostgreSQL | 外部服务（Supabase 或本地） | 5432 |
-| 2 | Presenton FastAPI | `python server.py --port 8000 --reload true` | 8000 |
-| 3 | Next.js 前端 | `cd web && npm run dev` | 3000 |
-
-> 注意：Presenton 服务绑定在 `127.0.0.1`，仅本地可访问。前端通过 API Proxy（`/api/ppt/*`）转发请求到 Presenton，无需直接访问 8000 端口。
+| 2 | Next.js 前端 | `cd web && npm run dev` | 3000 |
 
 ---
 
@@ -175,26 +130,20 @@ docker compose up --build -d
 ```
 
 这会：
-1. 多阶段构建镜像（Node.js + Python + Supervisor）
+1. 多阶段构建镜像（Node.js）
 2. 安装所有依赖并编译
 3. 启动容器，自动执行数据库迁移
-4. 通过 Supervisor 同时运行 Next.js (3000) 和 Presenton (8000)
+4. 启动 Next.js 服务 (3000)
 
 ### 仅暴露端口
 
-- **3000** — Next.js 前端 + API Proxy（对外唯一入口）
-- 8000 — Presenton FastAPI（容器内部，不对外暴露）
+- **3000** — Next.js 前端 + API（对外唯一入口）
 
 ### 查看日志
 
 ```bash
-# 查看所有服务日志
+# 查看服务日志
 docker compose logs -f
-
-# 查看 Supervisor 管理的各服务日志（进入容器）
-docker compose exec app cat /var/log/nextjs.out.log
-docker compose exec app cat /var/log/presenton.out.log
-docker compose exec app cat /var/log/presenton.err.log
 ```
 
 ### 停止服务
@@ -211,7 +160,7 @@ docker compose up --build -d
 
 ### 共享数据卷
 
-`/app_data/` 卷用于存储 Presenton 生成的 PPTX 文件和图片资源。数据在容器重启后保留。
+`/app_data/` 卷用于存储上传的文件和生成的报告数据。数据在容器重启后保留。
 
 ---
 
@@ -226,7 +175,6 @@ docker compose up --build -d
 | `npm run build` | 编译后端 TypeScript | `ppp_pi_new/` |
 | `cd web && npm run dev` | 启动前端开发服务器 | `ppp_pi_new/web/` |
 | `cd web && npm run build` | 构建前端生产版本 | `ppp_pi_new/web/` |
-| `python server.py --port 8000 --reload true` | 启动 Presenton 开发服务器 | `ppp_pi_new/presenton-api/` |
 
 ### 数据库
 
@@ -260,11 +208,9 @@ docker compose up --build -d
 ## 架构说明
 
 ```
-浏览器 ──→ Next.js (port 3000) ──→ API Proxy (/api/ppt/*) ──→ Presenton FastAPI (port 8000)
+浏览器 ──→ Next.js (port 3000) ──→ API Routes ──→ LLM (报告生成)
                                  ──→ Prisma ORM ──→ PostgreSQL
 ```
 
 - **认证**：PPP JWT（httpOnly cookie）为唯一鉴权层
-- **API Proxy**：Next.js API Routes 验证 JWT 后转发请求到 Presenton，不传递认证 headers
-- **Presenton**：内部服务，无独立认证，仅接受 localhost 连接
-- **Supervisor**：在 Docker 容器内同时管理 Next.js 和 Presenton 两个进程
+- **报告生成**：逐章节管线（ReportPipelineOrchestrator），每章独立加载数据 + 调用LLM

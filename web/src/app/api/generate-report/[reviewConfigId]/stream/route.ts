@@ -3,7 +3,6 @@ import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
 import { createLLMClientFromEnv } from '@/report/llm-client';
 import { assembleReportData } from '@/report/html-report-data-assembler';
-import { buildHtmlReportPrompt } from '@/report/html-report-prompt-builder';
 import type { ChatMessage } from '@/shared/types';
 
 export const maxDuration = 300; // 5 minutes
