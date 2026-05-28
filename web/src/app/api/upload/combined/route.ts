@@ -115,15 +115,18 @@ function findHeaderRow(rows: unknown[][], maxScan = 5): { headerRow: number; hea
   return { headerRow: best.headerRow, headers: best.headers };
 }
 
-function detectSheetType(headers: unknown[]): 'annotation' | 'juguang' | 'pugongying' | 'unknown' {
+function detectSheetType(headers: unknown[]): 'annotation' | 'juguang' | 'note_base' | 'unknown' {
   const hasNoteId = findColumnIndex(headers, ['note_id', '笔记id', '笔记ID', 'noteid', '笔记链接', '笔记/素材ID']) !== -1;
-  const hasFee = findColumnIndex(headers, ['fee', '消耗', '花费', '费用', '消费']) !== -1;
+  const hasFee = findColumnIndex(headers, ['fee', '消耗', '花费']) !== -1;
   const hasKolName = findColumnIndex(headers, ['kol_nick_name', '博主昵称']) !== -1;
-  const hasImpression = findColumnIndex(headers, ['impression', '曝光量', '展现量']) !== -1;
+  const hasImpression = findColumnIndex(headers, ['impression', '展现量']) !== -1;
+  const hasCooperationForm = findColumnIndex(headers, ['合作形式', '合作方式']) !== -1;
+  const hasContentDirection = findColumnIndex(headers, ['内容方向', '合作方向']) !== -1;
+  const hasKolType = findColumnIndex(headers, ['达人类型', '达人类别']) !== -1;
 
-  if (hasFee) return 'juguang';
-  if (hasKolName && hasImpression) return 'pugongying';
-  if (hasNoteId) return 'annotation';
+  if (hasFee && hasImpression) return 'juguang';
+  if (hasCooperationForm || hasContentDirection || hasKolType) return 'note_base';
+  if (hasKolName && hasNoteId) return 'annotation';
   return 'unknown';
 }
 
@@ -183,28 +186,22 @@ function parseJuguangSheet(rows: unknown[][]): { data: JuguangRow[]; errors: Par
   return { data, errors };
 }
 
-function parsePugongyingSheet(rows: unknown[][]): { data: import('@/shared/types').PugongyingNote[]; errors: ParseErrorDetail[] } {
+function parseNoteBaseSheet(rows: unknown[][]): { data: import('@/shared/types').NoteBaseRecord[]; errors: ParseErrorDetail[] } {
   const headers = rows[0];
   const errors: ParseErrorDetail[] = [];
-  const data: import('@/shared/types').PugongyingNote[] = [];
+  const data: import('@/shared/types').NoteBaseRecord[] = [];
 
+  const noteLinkCol = findColumnIndex(headers, ['笔记链接', '笔记链接【长】']);
   const noteIdCol = findColumnIndex(headers, ['笔记id', '笔记ID', 'note_id', 'noteid']);
-  const kolNameCol = findColumnIndex(headers, ['博主昵称']);
-  const kolFanCol = findColumnIndex(headers, ['博主粉丝量']);
-  const noteTypeCol = findColumnIndex(headers, ['笔记类型', '内容形式']);
-  const noteLinkCol = findColumnIndex(headers, ['笔记链接']);
-  const spuNameCol = findColumnIndex(headers, ['spu名称', 'spu_name']);
-  const impCol = findColumnIndex(headers, ['曝光量']);
-  const readCol = findColumnIndex(headers, ['阅读量']);
-  const likeCol = findColumnIndex(headers, ['点赞量', '点赞']);
-  const favCol = findColumnIndex(headers, ['收藏量', '收藏']);
-  const cmtCol = findColumnIndex(headers, ['评论量', '评论']);
-  const shareCol = findColumnIndex(headers, ['分享量', '分享']);
-  const followCol = findColumnIndex(headers, ['关注量', '关注']);
-  const kolPriceCol = findColumnIndex(headers, ['博主报价']);
-  const serviceFeeCol = findColumnIndex(headers, ['服务费金额']);
-  const heatImpCol = findColumnIndex(headers, ['加热曝光量']);
-  const heatReadCol = findColumnIndex(headers, ['加热阅读量']);
+  const cooperationFormCol = findColumnIndex(headers, ['合作形式', '合作方式']);
+  const isRegisteredCol = findColumnIndex(headers, ['是否报备']);
+  const contentDirectionCol = findColumnIndex(headers, ['内容方向', '合作方向']);
+  const kolTypeCol = findColumnIndex(headers, ['达人类型', '达人类别']);
+  const spuNameCol = findColumnIndex(headers, ['对应SPU', '对应spu', 'SPU', 'spu名称', '对应SPU（若有）']);
+  const contentCostCol = findColumnIndex(headers, ['内容实际消耗金额', '内容实际消耗', '内容消耗']);
+  const contentSettlementCol = findColumnIndex(headers, ['内容实际结算金额', '内容实际结算', '内容结算']);
+  const adSpendCol = findColumnIndex(headers, ['投流实际消耗', '投流消耗']);
+  const totalCostCol = findColumnIndex(headers, ['总费用', '总计费用']);
 
   if (noteIdCol === -1) return { data, errors: [{ sheet: '', row: 1, column: 'A', reason: '缺少必填列: 笔记id' }] };
 
@@ -214,62 +211,21 @@ function parsePugongyingSheet(rows: unknown[][]): { data: import('@/shared/types
     const noteId = parseString(row[noteIdCol]);
     if (!noteId || noteId === '-') continue;
 
-    const imp = parseNumber(row[impCol]);
-    const read = parseNumber(row[readCol]);
-    const like = parseNumber(row[likeCol]);
-    const fav = parseNumber(row[favCol]);
-    const cmt = parseNumber(row[cmtCol]);
-    const share = parseNumber(row[shareCol]);
-    const follow = parseNumber(row[followCol]);
-    const engage = like + fav + cmt + share + follow;
-    const kolPrice = parseNumber(row[kolPriceCol]);
-    const serviceFee = parseNumber(row[serviceFeeCol]);
+    const isRegisteredRaw = parseString(row[isRegisteredCol]);
+    const isRegistered = isRegisteredRaw === '是' || isRegisteredRaw === 'true' || isRegisteredRaw === '1';
 
     data.push({
       noteId,
-      brandUserName: '',
-      spuName: parseString(row[spuNameCol]) || '',
-      kolNickName: parseString(row[kolNameCol]) || '',
-      kolId: '',
-      kolFanNum: parseNumber(row[kolFanCol]),
-      noteType: (parseString(row[noteTypeCol]) || '').includes('视频') ? 'video' : 'image',
-      noteLink: parseString(row[noteLinkCol]) || '',
-      impNum: imp,
-      readNum: read,
-      engageNum: engage,
-      likeNum: like,
-      favNum: fav,
-      cmtNum: cmt,
-      shareNum: share,
-      followNum: follow,
-      kolPrice,
-      serviceFee,
-      totalPlatformPrice: kolPrice + serviceFee,
-      heatImpNum: parseNumber(row[heatImpCol]),
-      heatReadNum: parseNumber(row[heatReadCol]),
-      isUnderwater: false,
-      underwaterPrice: 0,
-      // 0521 新字段 — Excel 不提供，填默认值
-      notePublishTime: null,
-      cooperateType: null,
-      duration: 0,
-      originImpNum: 0,
-      originReadNum: 0,
-      promotionImpNum: 0,
-      promotionReadNum: 0,
-      readUv: 0,
-      engageRate: null,
-      readCost: 0,
-      engageCost: 0,
-      avgViewTime: null,
-      videoPlay5sRate: null,
-      picRead3sRate: null,
-      finishRate: null,
-      cp: 0,
-      cpRate: null,
-      cpcp: 0,
-      orderId: null,
-      effect: null,
+      noteLink: parseString(row[noteLinkCol]) || undefined,
+      cooperationForm: parseString(row[cooperationFormCol]) || undefined,
+      isRegistered,
+      contentDirection: parseString(row[contentDirectionCol]) || undefined,
+      kolType: parseString(row[kolTypeCol]) || undefined,
+      spuName: parseString(row[spuNameCol]) || undefined,
+      contentCost: parseNumber(row[contentCostCol]),
+      contentSettlement: parseNumber(row[contentSettlementCol]),
+      adSpend: parseNumber(row[adSpendCol]),
+      totalCost: parseNumber(row[totalCostCol]),
     });
   }
   return { data, errors };
@@ -322,7 +278,7 @@ export async function POST(request: Request) {
     const allErrors: ParseErrorDetail[] = [];
     const annotations: import('@/shared/types').BusinessAnnotation[] = [];
     let juguangData: JuguangRow[] = [];
-    const pugongyingNotes: import('@/shared/types').PugongyingNote[] = [];
+    const noteBaseRecords: import('@/shared/types').NoteBaseRecord[] = [];
     const parser = new SpreadsheetParserImpl();
     const sheetResults: Array<{ name: string; type: string; headerCount: number; firstHeaders: string; rowCount: number }> = [];
 
@@ -365,9 +321,9 @@ export async function POST(request: Request) {
         for (const e of result.errors) {
           allErrors.push({ ...e, sheet: e.sheet || sheetName });
         }
-      } else if (type === 'pugongying') {
-        const result = parsePugongyingSheet([headers, ...dataRows]);
-        pugongyingNotes.push(...result.data);
+      } else if (type === 'note_base') {
+        const result = parseNoteBaseSheet([headers, ...dataRows]);
+        noteBaseRecords.push(...result.data);
         for (const e of result.errors) {
           allErrors.push({ ...e, sheet: e.sheet || sheetName });
         }
@@ -385,6 +341,7 @@ export async function POST(request: Request) {
       detection: sheetResults,
       annotationsCount: annotations.length,
       juguangCount: juguangData.length,
+      noteBaseCount: noteBaseRecords.length,
     };
     await fs.writeFile(dumpPath, JSON.stringify(dumpData, null, 2)).catch(() => {});
     console.log(`[合并上传] 调试数据已写入 ${dumpPath}`);
@@ -392,7 +349,7 @@ export async function POST(request: Request) {
     const persistenceService = new PrismaDataPersistenceService();
     let annotationPersisted = false;
     let juguangPersisted = false;
-    let pugongyingPersisted = false;
+    let noteBasePersisted = false;
 
     if (annotations.length > 0) {
       try {
@@ -412,16 +369,16 @@ export async function POST(request: Request) {
       }
     }
 
-    if (pugongyingNotes.length > 0) {
+    if (noteBaseRecords.length > 0) {
       try {
-        await persistenceService.savePugongyingNotes(projectId, pugongyingNotes);
-        pugongyingPersisted = true;
+        await persistenceService.saveNoteBaseData(projectId, noteBaseRecords);
+        noteBasePersisted = true;
       } catch (error) {
-        allErrors.push({ sheet: '', row: 0, column: 'A', reason: `笔记数据保存失败: ${error instanceof Error ? error.message : String(error)}` });
+        allErrors.push({ sheet: '', row: 0, column: 'A', reason: `笔记底表保存失败: ${error instanceof Error ? error.message : String(error)}` });
       }
     }
 
-    if (annotationPersisted || juguangPersisted || pugongyingPersisted) {
+    if (annotationPersisted || juguangPersisted || noteBasePersisted) {
       await transitionStatus(projectId, 'first_upload').catch(() => {});
     }
 
@@ -429,10 +386,10 @@ export async function POST(request: Request) {
       success: true,
       annotationsCount: annotations.length,
       juguangCount: juguangData.length,
-      pugongyingCount: pugongyingNotes.length,
+      noteBaseCount: noteBaseRecords.length,
       annotationPersisted,
       juguangPersisted,
-      pugongyingPersisted,
+      noteBasePersisted,
       errors: allErrors,
       sheets: sheetResults,
     });

@@ -145,6 +145,23 @@ export interface PugongyingNote {
 }
 
 /**
+ * 笔记底表数据（业务底表Excel导入，记录运营标注与费用，蒲公英API不提供这些字段）
+ */
+export interface NoteBaseRecord {
+  noteId: string;                 // 笔记id
+  noteLink?: string;              // 笔记链接【长】
+  cooperationForm?: string;       // 合作形式
+  isRegistered: boolean;          // 是否报备
+  contentDirection?: string;      // 内容方向
+  kolType?: string;               // 达人类型
+  spuName?: string;               // 对应SPU（若有）
+  contentCost: number;            // 内容实际消耗金额
+  contentSettlement: number;      // 内容实际结算金额
+  adSpend: number;                // 投流实际消耗
+  totalCost: number;              // 总费用
+}
+
+/**
  * 聚光数据（金额已转换为元）
  */
 export interface JuguangNote {
