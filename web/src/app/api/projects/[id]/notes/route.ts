@@ -5,8 +5,12 @@ import { getSession } from '@/lib/auth';
 /**
  * GET /api/projects/[id]/notes
  *
- * Returns notes (source data) for a project.
- * Used by the proofreading platform for source data comparison.
+ * Returns notes (source data) for a project with pagination.
+ * Query params:
+ *   - page: page number (1-indexed, default 1)
+ *   - pageSize: items per page (default 10, max 100)
+ *
+ * Returns { notes, total, page, pageSize, updatedAt, updatedBy }
  */
 export async function GET(
   request: NextRequest,
@@ -23,10 +27,15 @@ export async function GET(
 
     const { id } = await params;
 
+    // Parse pagination params
+    const searchParams = request.nextUrl.searchParams;
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
+    const pageSize = Math.min(100, Math.max(1, parseInt(searchParams.get('pageSize') || '10', 10)));
+
     // Check project exists
     const project = await prisma.project.findUnique({
       where: { id },
-      select: { id: true, createdBy: true, participants: true },
+      select: { id: true, createdBy: true, participants: true, noteCount: true, updatedAt: true },
     });
 
     if (!project) {
@@ -49,6 +58,12 @@ export async function GET(
       }
     }
 
+    // Get total count
+    const total = await prisma.note.count({
+      where: { projectId: id },
+    });
+
+    // Fetch paginated notes
     const notes = await prisma.note.findMany({
       where: { projectId: id },
       select: {
@@ -68,13 +83,36 @@ export async function GET(
         shareNum: true,
         followNum: true,
         kolPrice: true,
+        serviceFee: true,
         totalPlatformPrice: true,
+        isUnderwater: true,
+        underwaterPrice: true,
+        heatImpNum: true,
+        heatReadNum: true,
+        createdAt: true,
+        components: true,
       },
-      orderBy: { createdAt: 'desc' },
-      take: 200, // Limit for performance
+      orderBy: { createdAt: 'asc' },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
     });
 
-    return NextResponse.json({ notes });
+    // Get the latest note's createdAt as the data update time
+    const latestNote = total > 0
+      ? await prisma.note.findFirst({
+          where: { projectId: id },
+          orderBy: { createdAt: 'desc' },
+          select: { createdAt: true },
+        })
+      : null;
+
+    return NextResponse.json({
+      notes,
+      total,
+      page,
+      pageSize,
+      updatedAt: latestNote?.createdAt ?? null,
+    });
   } catch (error) {
     console.error('GET /api/projects/[id]/notes error:', error);
     return NextResponse.json(

@@ -34,3 +34,113 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* ─── Report Editor Content Styles ─────────────────────────────────────────── */
+.report-editor-content {
+  font-size: 14px;
+  line-height: 1.7;
+  color: #1e293b;
+  min-height: 400px;
+  outline: none;
+}
+.report-editor-content:focus {
+  outline: none;
+}
+.report-editor-content [contenteditable]:focus {
+  outline: 2px solid #bfdbfe;
+  border-radius: 2px;
+}
+.report-editor-content h2 {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1e40af;
+  margin: 24px 0 12px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #e2e8f0;
+}
+.report-editor-content h2.chapter-title {
+  border-left: 4px solid #1e40af;
+  border-bottom: none;
+  padding-left: 12px;
+}
+.report-editor-content h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #334155;
+  margin: 16px 0 8px;
+}
+.report-editor-content p {
+  margin: 8px 0;
+}
+.report-editor-content ul,
+.report-editor-content ol {
+  margin: 8px 0 8px 24px;
+}
+.report-editor-content li {
+  margin: 4px 0;
+}
+.report-editor-content .report-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12px 0;
+  font-size: 13px;
+}
+.report-editor-content .report-table th,
+.report-editor-content .report-table td {
+  border: 1px solid #e2e8f0;
+  padding: 8px 12px;
+  text-align: left;
+}
+.report-editor-content .report-table th {
+  background: #f1f5f9;
+  font-weight: 600;
+  color: #475569;
+  white-space: nowrap;
+}
+.report-editor-content .report-table tr:nth-child(even) {
+  background: #f8fafc;
+}
+.report-editor-content .report-table td:last-child {
+  text-align: right;
+}
+.report-editor-content table:not(.report-table) {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12px 0;
+  font-size: 13px;
+}
+.report-editor-content table:not(.report-table) th,
+.report-editor-content table:not(.report-table) td {
+  border: 1px solid #e2e8f0;
+  padding: 8px 12px;
+  text-align: left;
+}
+.report-editor-content table:not(.report-table) th {
+  background: #f1f5f9;
+  font-weight: 600;
+}
+.report-editor-content .highlight {
+  color: #1e40af;
+  font-weight: 600;
+}
+.report-editor-content .text-green {
+  color: #16a34a;
+  font-weight: 600;
+}
+.report-editor-content .text-red {
+  color: #dc2626;
+  font-weight: 600;
+}
+.report-editor-content strong {
+  font-weight: 600;
+}
+.report-editor-content .chart-placeholder {
+  background: #f1f5f9;
+  border: 1px dashed #cbd5e1;
+  border-radius: 6px;
+  padding: 24px;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 13px;
+  margin: 12px 0;
+}

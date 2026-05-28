@@ -211,12 +211,8 @@ function NewReviewPageContent() {
         });
       }
 
-      // Trigger report generation (non-blocking, runs in background)
-      fetch(`/api/generate-report/${review.id}`, { method: 'POST' }).catch((err) => {
-        console.error('Report generation trigger failed:', err);
-      });
-
-      router.push(`/review/${review.id}`);
+      // Redirect directly to proofread page - report generation starts via SSE stream there
+      router.push(`/review/${review.id}/proofread`);
     },
     onError: (err: Error) => {
       setSubmitError(err.message);

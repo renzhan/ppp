@@ -7,6 +7,7 @@ import { Loader2, X, ChevronDown } from 'lucide-react';
 import { PageHeader } from '@/components/layout/page-header';
 import { CascadeSelector, CascadeSelectorValue } from '@/components/form/cascade-selector';
 import { NoteBaseUploader } from '@/components/form/note-base-uploader';
+import { NoteBaseTable } from '@/components/form/note-base-table';
 
 interface User {
   id: string;
@@ -301,9 +302,12 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
               onUploadSuccess={() => {
                 queryClient.invalidateQueries({ queryKey: ['project', projectId] });
                 queryClient.invalidateQueries({ queryKey: ['projects'] });
+                queryClient.invalidateQueries({ queryKey: ['project-notes', projectId] });
               }}
               onUploadError={() => {}}
             />
+            {/* 笔记记录表格 */}
+            <NoteBaseTable projectId={projectId} />
           </div>
 
           {/* Submit */}

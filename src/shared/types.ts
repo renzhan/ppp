@@ -36,6 +36,7 @@ export enum ExportFormat {
   JSON = 'json',
   PDF = 'pdf',
   PPTX = 'pptx',
+  HTML = 'html',
 }
 
 // ---- Configuration Interfaces ----
@@ -142,6 +143,23 @@ export interface PugongyingNote {
   cpcp: number;                   // 消费意向单价（元）— API原单位分
   orderId?: string | null;        // 订单id
   effect?: string | null;         // 是否为优效模式 — true为优效
+}
+
+/**
+ * 笔记底表数据（业务底表Excel导入，记录运营标注与费用，蒲公英API不提供这些字段）
+ */
+export interface NoteBaseRecord {
+  noteId: string;                 // 笔记id
+  noteLink?: string;              // 笔记链接【长】
+  cooperationForm?: string;       // 合作形式
+  isRegistered: boolean;          // 是否报备
+  contentDirection?: string;      // 内容方向
+  kolType?: string;               // 达人类型
+  spuName?: string;               // 对应SPU（若有）
+  contentCost: number;            // 内容实际消耗金额
+  contentSettlement: number;      // 内容实际结算金额
+  adSpend: number;                // 投流实际消耗
+  totalCost: number;              // 总费用
 }
 
 /**

@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { ReportPipelineOrchestrator } from '@/pipeline/orchestrator';
-import { createChapterDataLoaderRegistry } from '@/pipeline/loaders/index';
-import { PromptTemplateLoader } from '@/pipeline/template-loader';
 import { createLLMClientFromEnv } from '@/report/llm-client';
-import path from 'path';
+import { generateHtmlReport } from '@/report/html-report-generator';
 
 /**
  * POST /api/generate-report/[reviewConfigId]
- * Triggers full 10-chapter report generation via the pipeline orchestrator.
+ *
+ * 触发复盘报告生成 — 直接通过 LLM 生成完整可编辑 HTML 页面。
+ * 生成的 HTML 包含 ECharts 图表、数据表格、导出PDF/DOCX按钮、内容可编辑。
  */
 export async function POST(
   request: NextRequest,
@@ -43,42 +42,52 @@ export async function POST(
       );
     }
 
-    // Initialize pipeline components
-    const loaderRegistry = createChapterDataLoaderRegistry(prisma as any);
-    const templatesDir = path.resolve(process.cwd(), '..', 'src', 'prompts', 'chapters');
-    const templateLoader = new PromptTemplateLoader(templatesDir);
-    const llmClient = createLLMClientFromEnv();
-
     // Mark status as generating
     await prisma.reviewConfig.update({
       where: { id: reviewConfigId },
       data: { status: 'generating' },
     });
 
-    const orchestrator = new ReportPipelineOrchestrator(
-      loaderRegistry,
-      templateLoader,
+    console.log('[generate-report] calling generateHtmlReport...');
+
+    // Generate HTML report via LLM
+    const llmClient = createLLMClientFromEnv();
+    const result = await generateHtmlReport(project.id, {
       llmClient,
-      prisma as any,
-    );
-
-    console.log('[generate-report] calling orchestrator.generateFullReport...');
-
-    // Invoke full report generation
-    const result = await orchestrator.generateFullReport({
-      projectId: project.id,
-      reviewConfigId,
+      editable: true,
+      exportButtons: true,
+      timeout: 120000,
     });
 
-    console.log('[generate-report] report generated successfully, versionId:', result.versionId);
+    console.log('[generate-report] HTML report generated, length:', result.html.length);
+
+    // Save HTML content to ReviewConfig.reportContent
+    await prisma.reviewConfig.update({
+      where: { id: reviewConfigId },
+      data: {
+        reportContent: { type: 'html', html: result.html, generatedAt: result.generatedAt },
+        status: 'completed',
+      },
+    });
 
     return NextResponse.json({
       success: true,
       versionId: result.versionId,
-      versionNumber: result.versionNumber,
+      generatedAt: result.generatedAt,
+      htmlLength: result.html.length,
     });
   } catch (error) {
     console.error('POST /api/generate-report/[reviewConfigId] error:', error);
+
+    // Try to mark status as error
+    try {
+      const resolvedParams = await params;
+      await prisma.reviewConfig.update({
+        where: { id: resolvedParams.reviewConfigId },
+        data: { status: 'draft' },
+      });
+    } catch { /* ignore */ }
+
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
