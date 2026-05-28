@@ -267,6 +267,7 @@ export interface BrandData {
   aipsCompareStartRatio?: number;  // AIPS本品变化率(%)
   tiTransNum?: number;             // TI人群变化数
   tiCompareStartRatio?: number;    // TI本品变化率(%)
+  brandRank?: number;              // 品牌行业排名
 }
 
 /**

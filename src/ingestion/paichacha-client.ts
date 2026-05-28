@@ -22,8 +22,8 @@ export interface IPaichachaClient {
   fetchPugongyingData(noteIds: string[]): Promise<PugongyingNote[]>;
   /** 获取聚光笔记层级离线报表（brandName + 日期范围） */
   fetchJuguangData(brandName: string, startDate: string, endDate: string): Promise<JuguangNote[]>;
-  /** 获取灵犀数据（brandName + keyword，Phase 1 写死） */
-  fetchLingxiData(brandName: string, keyword: string): Promise<LingxiData>;
+  /** 获取灵犀数据（brandName + keyword + taxonomyNames） */
+  fetchLingxiData(brandName: string, keyword: string, taxonomyNames?: string): Promise<LingxiData>;
   /** 获取评论数据（全量评论，用于舆情分析） */
   fetchCommentData(noteIds: string[]): Promise<CommentData[]>;
   /** 获取千瓜数据（品牌数据卡片 + 爆文发布时间分布） */
@@ -98,9 +98,9 @@ export class PaichachaClient implements IPaichachaClient {
 
   // ── Lingxi ──
 
-  async fetchLingxiData(brandName: string, keyword: string): Promise<LingxiData> {
+  async fetchLingxiData(brandName: string, keyword: string, taxonomyNames?: string): Promise<LingxiData> {
     if (!this.lingxiClient) throw new Error('Lingxi client not configured');
-    return this.lingxiClient.fetchLingxiData(brandName, keyword);
+    return this.lingxiClient.fetchLingxiData(brandName, keyword, taxonomyNames);
   }
 
   // ── Comments ──

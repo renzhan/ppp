@@ -54,11 +54,11 @@ export class LingxiClient {
 
   // ── 统一入口 ──
 
-  async fetchLingxiData(brandName: string, keyword: string): Promise<LingxiData> {
+  async fetchLingxiData(brandName: string, keyword: string, taxonomyNames?: string): Promise<LingxiData> {
     const endDate = daysAgo(1);
     const startDate = oneMonthAgoPlusOne(endDate);
 
-    const brand = await this.fetchBrandData(brandName, startDate, endDate);
+    const brand = await this.fetchBrandData(brandName, startDate, endDate, taxonomyNames);
     const kw = await this.fetchKeywordData(brandName, keyword, startDate, endDate);
 
     return { brand, keyword: [kw] };
@@ -66,12 +66,24 @@ export class LingxiClient {
 
   // ── asset_analyse + move_analyse → 品牌数据 ──
 
-  async fetchBrandData(brandName: string, startDate: string, endDate: string): Promise<BrandData> {
-    const res = await this.callTask('asset_analyse', brandName, {});
+  async fetchBrandData(brandName: string, startDate: string, endDate: string, taxonomyNames?: string): Promise<BrandData> {
+    const res = await this.callTask('asset_analyse', brandName, { endDate });
     const captured = res.data?.captured ?? [];
 
     const aips = extractAips(captured);
     const ti = extractTi(captured);
+
+    // 品牌行业排名（需要 taxonomyNames）
+    let brandRank: number | undefined;
+    if (taxonomyNames) {
+      try {
+        const rankRes = await this.callTask('asset_analyse', brandName, { endDate, taxonomyNames });
+        const rankCaptured = rankRes.data?.captured ?? [];
+        brandRank = extractBrandRank(rankCaptured);
+      } catch (e) {
+        console.error(`[lingxi] brand rank 失败: ${(e as Error).message}`);
+      }
+    }
 
     // 人流流转数据
     let moveData: Partial<BrandData> = {};
@@ -87,6 +99,7 @@ export class LingxiClient {
       aips,
       ti,
       period: getPeriod(),
+      brandRank,
       ...moveData,
     };
   }
@@ -229,6 +242,26 @@ function extractMoveAnalyseData(captured: CapturedItem[], startDate: string, end
     tiTransNum: Number(tiItem?.tableResult?.[0]?.tiTransNum ?? 0),
     tiCompareStartRatio: Number(tiItem?.tableResult?.[0]?.compareStartRatio ?? 0),
   };
+}
+
+/** get/product → 本品牌行业排名（extraInfo.selfRank 或 tableResult 中 isSelf="true" 的 scaleRank） */
+function extractBrandRank(captured: CapturedItem[]): number | undefined {
+  const hit = captured.find(c => c.url.includes('get/product'));
+  if (!hit) return undefined;
+  const data = hit.data?.data;
+  // 优先取 extraInfo.selfRank（可能为 "未上榜"）
+  const selfRank = data?.extraInfo?.selfRank;
+  if (selfRank != null && selfRank !== '未上榜') {
+    const r = Number(selfRank);
+    if (!Number.isNaN(r) && r > 0) return r;
+  }
+  // 其次从 tableResult 中找 isSelf="true"
+  const selfItem = data?.tableResult?.find((r: any) => r.isSelf === 'true');
+  if (selfItem?.scaleRank != null) {
+    const r = Number(selfItem.scaleRank);
+    if (!Number.isNaN(r)) return r;
+  }
+  return undefined;
 }
 
 /** asset/overall → list[] → name="TI 深度兴趣人群数" → userNum */

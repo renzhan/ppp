@@ -108,6 +108,7 @@ export class DataIngestionService {
       lingxiData = await this.paichachaClient.fetchLingxiData(
         '爷爷不泡茶',    // brand_name
         '酸奶',          // keyword
+        '纯茶',          // taxonomyNames → 用于获取品牌行业排名
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
