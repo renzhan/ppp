@@ -6,6 +6,24 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { Plus, Trash2, Upload, FileText, AlertCircle, Search } from 'lucide-react';
 import { Loading } from '@/components/ui/loading';
 
+// ─── Utilities ───────────────────────────────────────────────────────────────
+
+/**
+ * Generate a UUID-like ID compatible with non-secure contexts (HTTP).
+ * crypto.randomUUID() is only available in Secure Contexts (HTTPS/localhost).
+ */
+function generateId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  // Fallback for non-secure contexts (HTTP)
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 interface Project {
@@ -60,15 +78,15 @@ interface KpiTargets {
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const DEFAULT_INFLUENCER_TIERS: InfluencerTier[] = [
-  { id: crypto.randomUUID(), name: '头部', fanRangeMin: 1000000, fanRangeMax: 99999999 },
-  { id: crypto.randomUUID(), name: '腰部', fanRangeMin: 100000, fanRangeMax: 999999 },
-  { id: crypto.randomUUID(), name: '尾部', fanRangeMin: 10000, fanRangeMax: 99999 },
+  { id: generateId(), name: '头部', fanRangeMin: 1000000, fanRangeMax: 99999999 },
+  { id: generateId(), name: '腰部', fanRangeMin: 100000, fanRangeMax: 999999 },
+  { id: generateId(), name: '尾部', fanRangeMin: 10000, fanRangeMax: 99999 },
 ];
 
 const DEFAULT_LAUNCH_PHASES: LaunchPhase[] = [
-  { id: crypto.randomUUID(), name: '预热期', startDate: '', endDate: '' },
-  { id: crypto.randomUUID(), name: '爆发期', startDate: '', endDate: '' },
-  { id: crypto.randomUUID(), name: '持续期', startDate: '', endDate: '' },
+  { id: generateId(), name: '预热期', startDate: '', endDate: '' },
+  { id: generateId(), name: '爆发期', startDate: '', endDate: '' },
+  { id: generateId(), name: '持续期', startDate: '', endDate: '' },
 ];
 
 const REPORT_MODULES = [
@@ -252,7 +270,7 @@ function NewReviewPageContent() {
 
   const handleAddTier = () => {
     setInfluencerTiers([...influencerTiers, {
-      id: crypto.randomUUID(),
+      id: generateId(),
       name: '',
       fanRangeMin: 0,
       fanRangeMax: 0,
@@ -271,7 +289,7 @@ function NewReviewPageContent() {
 
   const handleAddPhase = () => {
     setLaunchPhases([...launchPhases, {
-      id: crypto.randomUUID(),
+      id: generateId(),
       name: '',
       startDate: '',
       endDate: '',
