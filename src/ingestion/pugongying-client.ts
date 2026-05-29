@@ -6,6 +6,8 @@
  */
 
 import type { PugongyingNote, CommentData } from '../shared/types.js';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 
 // ── Config ──
 
@@ -178,11 +180,25 @@ export class PugongyingClient {
   async fetchPugongyingData(noteIds: string[]): Promise<PugongyingNote[]> {
     if (noteIds.length === 0) return [];
 
-    // 批量拉笔记详情（cmtNum 由 API 直接返回）
+    // 批量拉笔记详情
     const allNotes: PugongyingNote[] = [];
     for (const batch of chunkArray(noteIds, BATCH_SIZE)) {
       const rawNotes = await this.fetchNoteBatch(batch);
       allNotes.push(...rawNotes.map(mapToNote));
+    }
+
+    // 采集媒体（封面图+视频），失败不影响笔记数据
+    try {
+      const media = await this.fetchNoteMedia(noteIds);
+      for (const note of allNotes) {
+        const m = media[note.noteId];
+        if (m) {
+          note.coverImages = m.coverImages;
+          note.videoPath = m.videoPath;
+        }
+      }
+    } catch (e) {
+      console.error(`[pugongying] 媒体采集失败: ${(e as Error).message}`);
     }
 
     return allNotes;
@@ -206,6 +222,69 @@ export class PugongyingClient {
       if (json.code !== 0) throw new Error(`API 错误: code=${json.code} message=${json.message}`);
       if (!Array.isArray(json.data)) throw new Error('API 返回 data 不是数组');
       return json.data as RawPugongyingNote[];
+    });
+  }
+
+  // ── Note Media ──
+
+  /** 批量采集笔记媒体（封面图+视频），返回 noteId → { coverImages, videoPath } */
+  async fetchNoteMedia(noteIds: string[]): Promise<Record<string, { coverImages: string[]; videoPath: string | null }>> {
+    const result: Record<string, { coverImages: string[]; videoPath: string | null }> = {};
+    if (noteIds.length === 0) return result;
+
+    const raw = await withRetry(async () => {
+      const url = `${this.config.commentBaseUrl}/api/note-media/batch-collect`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-API-Key': this.config.apiKey },
+        body: JSON.stringify({ note_ids: noteIds }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json() as { code: number; msg?: string; data?: { results?: Array<{ note_id: string; status: string; data?: any }> } };
+      if (json.code !== 0) throw new Error(`媒体采集失败: ${json.msg}`);
+      return json;
+    });
+
+    const results = raw.data?.results ?? [];
+    for (const r of results) {
+      if (!r.data) continue;
+      const noteId = r.note_id;
+      const dir = path.resolve('web/public/note-media', noteId);
+      fs.mkdirSync(dir, { recursive: true });
+
+      const coverImages: string[] = [];
+      for (const img of r.data.images ?? []) {
+        try {
+          const filePath = await this.downloadFile(img.download_url, dir, `image_${img.index}.jpg`);
+          coverImages.push(filePath);
+        } catch (e) {
+          console.error(`[pugongying] 封面下载失败 ${noteId}/image_${img.index}:`, (e as Error).message);
+        }
+      }
+
+      let videoPath: string | null = null;
+      if (r.data.video_url) {
+        try {
+          videoPath = await this.downloadFile(r.data.video_url, dir, 'video.mp4');
+        } catch (e) {
+          console.error(`[pugongying] 视频下载失败 ${noteId}:`, (e as Error).message);
+        }
+      }
+
+      result[noteId] = { coverImages, videoPath };
+    }
+
+    return result;
+  }
+
+  private async downloadFile(url: string, dir: string, fileName: string): Promise<string> {
+    return withRetry(async () => {
+      const res = await fetch(url, { headers: { 'X-API-Key': this.config.apiKey } });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const buf = Buffer.from(await res.arrayBuffer());
+      const filePath = path.join(dir, fileName);
+      fs.writeFileSync(filePath, buf);
+      return `/note-media/${path.basename(dir)}/${fileName}`;
     });
   }
 

@@ -123,6 +123,8 @@ export interface PugongyingNote {
   isUnderwater: boolean;          // 是否水下合作 — 来自业务标注
   underwaterPrice: number;        // 水下报价（元）— 来自业务标注
   components?: ComponentData[];   // 组件数据（评论区/正文/底栏/互动）
+  coverImages?: string[] | null;  // 封面图相对路径数组
+  videoPath?: string | null;      // 视频文件相对路径
   notePublishTime?: Date | null;  // 笔记发布日期
   cooperateType?: string | null;  // 笔记来源 — 0定制/1共创/2招募/3新芽/30用户授权
   duration?: number | null;       // 视频笔记总时长（秒）

@@ -103,6 +103,8 @@ model Note {
   isUnderwater      Boolean  @default(false) @map("is_underwater")
   underwaterPrice   Decimal  @default(0) @map("underwater_price") @db.Decimal(12, 2)
   components        Json?
+  coverImages       Json?    @map("cover_images")
+  videoPath         String?  @map("video_path")
   notePublishTime   DateTime? @map("note_publish_time") @db.Timestamptz()
   cooperateType     String?  @map("cooperate_type") @db.VarChar(50)
   duration          Int?     @default(0)
