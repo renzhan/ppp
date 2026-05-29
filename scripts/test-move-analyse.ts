@@ -18,8 +18,12 @@ async function main() {
     apiKey: process.env.LINGXI_API_KEY || '',
   });
 
-  console.log('拉取灵犀数据（含 taxonomyNames=纯茶）...');
-  const data = await client.fetchLingxiData('爷爷不泡茶', '酸奶', '纯茶');
+  console.log('拉取灵犀数据（含投前）...');
+  const endDate = new Date(); endDate.setDate(endDate.getDate()-1);
+  const startDate = new Date(endDate); startDate.setMonth(startDate.getMonth()-1); startDate.setDate(startDate.getDate()+1);
+  const data = await client.fetchLingxiData('爷爷不泡茶', '酸奶',
+    startDate.toISOString().slice(0,10), endDate.toISOString().slice(0,10),
+    ['方便速食'], '2026-03-30', '2026-04-30');
 
   console.log('\nbrand:', JSON.stringify(data.brand, null, 2));
   console.log('keyword:', JSON.stringify(data.keyword, null, 2));

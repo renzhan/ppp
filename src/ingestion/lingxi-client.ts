@@ -54,11 +54,8 @@ export class LingxiClient {
 
   // ── 统一入口 ──
 
-  async fetchLingxiData(brandName: string, keyword: string, taxonomyNames?: string): Promise<LingxiData> {
-    const endDate = daysAgo(1);
-    const startDate = oneMonthAgoPlusOne(endDate);
-
-    const brand = await this.fetchBrandData(brandName, startDate, endDate, taxonomyNames);
+  async fetchLingxiData(brandName: string, keyword: string, startDate: string, endDate: string, taxonomyNames?: string | string[], preStartDate?: string, preEndDate?: string): Promise<LingxiData> {
+    const brand = await this.fetchBrandData(brandName, startDate, endDate, taxonomyNames, preStartDate, preEndDate);
     const kw = await this.fetchKeywordData(brandName, keyword, startDate, endDate);
 
     return { brand, keyword: [kw] };
@@ -66,7 +63,7 @@ export class LingxiClient {
 
   // ── asset_analyse + move_analyse → 品牌数据 ──
 
-  async fetchBrandData(brandName: string, startDate: string, endDate: string, taxonomyNames?: string): Promise<BrandData> {
+  async fetchBrandData(brandName: string, startDate: string, endDate: string, taxonomyNames?: string | string[], preStartDate?: string, preEndDate?: string): Promise<BrandData> {
     const res = await this.callTask('asset_analyse', brandName, { endDate });
     const captured = res.data?.captured ?? [];
 
@@ -85,6 +82,35 @@ export class LingxiClient {
       }
     }
 
+    // 品牌排名/渗透率数据（需要 taxonomyNames）
+    let rankData: Partial<BrandData> = {};
+    if (taxonomyNames) {
+      try {
+        const rankRes = await this.callTask('brand_rank', brandName, {
+          startTime: startDate, endTime: endDate, taxonomyNames,
+        });
+        const rankCaptured = rankRes.data?.captured ?? [];
+        rankData = extractBrandRankData(rankCaptured, 'post');
+      } catch (e) {
+        console.error(`[lingxi] brand_rank 失败: ${(e as Error).message}`);
+      }
+
+      // 投前搜索量
+      if (preStartDate && preEndDate) {
+        try {
+          const preRes = await this.callTask('brand_rank', brandName, {
+            startTime: preStartDate, endTime: preEndDate, taxonomyNames,
+          });
+          const preCaptured = preRes.data?.captured ?? [];
+          const preData = extractBrandRankData(preCaptured, 'pre');
+          rankData.preSearchVolume = preData.preSearchVolume;
+          rankData.preSearchRank = preData.preSearchRank;
+        } catch (e) {
+          console.error(`[lingxi] brand_rank 投前失败: ${(e as Error).message}`);
+        }
+      }
+    }
+
     // 人流流转数据
     let moveData: Partial<BrandData> = {};
     try {
@@ -100,6 +126,7 @@ export class LingxiClient {
       ti,
       period: getPeriod(),
       brandRank,
+      ...rankData,
       ...moveData,
     };
   }
@@ -262,6 +289,37 @@ function extractBrandRank(captured: CapturedItem[]): number | undefined {
     if (!Number.isNaN(r)) return r;
   }
   return undefined;
+}
+
+/** brand_rank → 提取渗透率/搜索量及其排名，prefix='post'|'pre' 决定映射到投后还是投前字段 */
+function extractBrandRankData(captured: CapturedItem[], prefix: 'post' | 'pre' = 'post'): Partial<BrandData> {
+  const getValue = (dimensionIndex: string) => {
+    const item = captured.find(c => {
+      if (!c.url.includes('track/v2/industry/brand/rank')) return false;
+      const body = (c as any).request_body;
+      return typeof body === 'string' &&
+        body.includes(`"dimensionIndex": "${dimensionIndex}"`) &&
+        body.includes('"brandDimensionType": "1"');
+    });
+    const bl = item?.data?.data?.brandList?.[0];
+    if (!bl) return { value: undefined, rank: undefined };
+    const rank = bl.detailData?.find((d: any) => d.name === '行业排名')?.value;
+    return { value: Number(bl.value ?? 0), rank: Number(rank ?? 0) };
+  };
+
+  const read = getValue('readPenetrationRate');
+  const searchImp = getValue('searchImpPenetrationRate');
+  const searchVol = getValue('searchNum');
+
+  const searchKey: 'postSearchVolume' | 'preSearchVolume' = prefix === 'post' ? 'postSearchVolume' : 'preSearchVolume';
+  const rankKey: 'postSearchRank' | 'preSearchRank' = prefix === 'post' ? 'postSearchRank' : 'preSearchRank';
+
+  return {
+    readPenetrationRate: prefix === 'post' ? read.value : undefined,
+    searchImpPenetrationRate: prefix === 'post' ? searchImp.value : undefined,
+    [searchKey]: searchVol.value,
+    [rankKey]: searchVol.rank,
+  };
 }
 
 /** asset/overall → list[] → name="TI 深度兴趣人群数" → userNum */

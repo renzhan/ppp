@@ -78,6 +78,20 @@ export class DataIngestionService {
    * @returns Result containing fetched data and any errors encountered
    */
   async ingestFromAPI(projectId: string, noteIds: string[]): Promise<APIIngestionResult> {
+
+      
+    // ---- 测试项目配置（后续由前端项目配置替换）----
+    const TEST_PROJECT = {
+      brandName: '爷爷不泡茶',
+      keyword: '酸奶',
+      taxonomyNames: ['方便速食'],
+      juguangBrandName: '奈雪的茶-派芽1',
+      // start=项目开始日期, end=项目结束日期, campaignStart=投放开始日期
+      dateRange: { start: '2026-04-01', end: '2026-05-27' },
+      campaignStart: '2026-04-27',
+      qianguaDays: 30,
+    };
+
     const errors: string[] = [];
     let pugongyingNotes: PugongyingNote[] = [];
     let juguangNotes: JuguangNote[] = [];
@@ -90,12 +104,12 @@ export class DataIngestionService {
       errors.push(`Failed to fetch pugongying data: ${message}`);
     }
 
-    // Fetch juguang data（参数后续由前端传入，当前写死联调用）
+    // Fetch juguang data
     try {
       juguangNotes = await this.paichachaClient.fetchJuguangData(
-        '奈雪的茶-派芽1',  // brand_name → 内部自动匹配 advertiser_id (7761854, keyword 数据丰富)
-        '2026-04-01',       // start_date
-        '2026-04-30',       // end_date
+        TEST_PROJECT.juguangBrandName,
+        TEST_PROJECT.dateRange.start,
+        TEST_PROJECT.dateRange.end,
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -105,10 +119,23 @@ export class DataIngestionService {
     // Fetch lingxi data（参数后续由前端传入，当前写死联调用）
     let lingxiData: LingxiData | undefined;
     try {
+      // 投后到今天，投前 = 投放前等长时段
+      const cs = new Date(TEST_PROJECT.campaignStart);
+      const today = new Date(); today.setHours(0,0,0,0);
+      const duration = Math.ceil((today.getTime() - cs.getTime()) / 86400000);
+      const preEnd = new Date(cs); preEnd.setDate(preEnd.getDate() - 1);
+      const preStart = new Date(preEnd); preStart.setDate(preStart.getDate() - duration);
+      const preStartDate = preStart.toISOString().slice(0, 10);
+      const preEndDate   = preEnd.toISOString().slice(0, 10);
+      const postEndDate = today.toISOString().slice(0,10);
       lingxiData = await this.paichachaClient.fetchLingxiData(
-        '爷爷不泡茶',    // brand_name
-        '酸奶',          // keyword
-        '纯茶',          // taxonomyNames → 用于获取品牌行业排名
+        TEST_PROJECT.brandName,
+        TEST_PROJECT.keyword,
+        TEST_PROJECT.campaignStart,  // 投后 start = 投放开始
+        postEndDate,                  // 投后 end   = 今天
+        TEST_PROJECT.taxonomyNames,
+        preStartDate,
+        preEndDate,
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -119,7 +146,9 @@ export class DataIngestionService {
     let qianguaStats: QianguaStatsData | undefined;
     let qianguaHotNotePublish: QianguaHotNotePublishData | undefined;
     try {
-      const qianguaData = await this.paichachaClient.fetchQianguaData('爷爷不泡茶');
+      const qianguaData = await this.paichachaClient.fetchQianguaData(
+        TEST_PROJECT.brandName, TEST_PROJECT.qianguaDays,
+      );
       qianguaStats = qianguaData.stats;
       qianguaHotNotePublish = qianguaData.hotNotePublish;
     } catch (error) {

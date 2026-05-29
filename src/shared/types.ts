@@ -271,6 +271,12 @@ export interface BrandData {
   tiTransNum?: number;             // TI人群变化数
   tiCompareStartRatio?: number;    // TI本品变化率(%)
   brandRank?: number;              // 品牌行业排名
+  readPenetrationRate?: number;    // 阅读渗透率(%)
+  searchImpPenetrationRate?: number;  // 搜后曝光渗透率(%)
+  postSearchVolume?: number;       // 搜索量（投后）
+  postSearchRank?: number;         // 搜索量行业排名（投后）
+  preSearchVolume?: number;        // 搜索量（投前）
+  preSearchRank?: number;          // 搜索量行业排名（投前）
 }
 
 /**

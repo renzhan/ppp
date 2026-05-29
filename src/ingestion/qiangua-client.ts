@@ -41,9 +41,9 @@ interface HotNotePublishResponse {
 export class QianguaClient {
   constructor(private config: QianguaClientConfig) {}
 
-  async fetchQianguaData(brandName: string): Promise<{ stats: QianguaStatsData; hotNotePublish: QianguaHotNotePublishData }> {
+  async fetchQianguaData(brandName: string, days = 30): Promise<{ stats: QianguaStatsData; hotNotePublish: QianguaHotNotePublishData }> {
     const [stats, hotNotePublish] = await Promise.all([
-      this.fetchStatsCompare(brandName),
+      this.fetchStatsCompare(brandName, days),
       this.fetchHotNotePublishDistribution(brandName),
     ]);
     return { stats, hotNotePublish };
@@ -51,10 +51,10 @@ export class QianguaClient {
 
   // ── stats_compare ──
 
-  private async fetchStatsCompare(brandName: string): Promise<QianguaStatsData> {
+  private async fetchStatsCompare(brandName: string, days: number): Promise<QianguaStatsData> {
     const json = await this.callApi<StatsCompareResponse>('/api/qian_gua/stats_compare', {
       brand_name: brandName,
-      params: { days: 30, brandsource: 0, notefeature: 0, hasgoods: false },
+      params: { days, brandsource: 0, notefeature: 0, hasgoods: false },
     });
     const d = json.data ?? {};
     return {
