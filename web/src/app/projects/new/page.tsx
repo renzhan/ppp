@@ -50,6 +50,8 @@ export default function NewProjectPage() {
   const [showParticipantDropdown, setShowParticipantDropdown] = useState(false);
   const [createdProjectId, setCreatedProjectId] = useState<string | null>(null);
   const [pendingNoteFile, setPendingNoteFile] = useState<File | null>(null);
+  const [noteUploadStatus, setNoteUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
+  const [noteUploadMessage, setNoteUploadMessage] = useState<string>('');
   const suggestionsRef = useRef<HTMLDivElement>(null);
   const participantRef = useRef<HTMLDivElement>(null);
 
@@ -164,12 +166,28 @@ export default function NewProjectPage() {
       setCreatedProjectId(project.id);
       // Auto-upload pending note file if selected
       if (pendingNoteFile) {
-        const formData = new FormData();
-        formData.append('file', pendingNoteFile);
-        await fetch(`/api/upload/note-base/${project.id}`, {
-          method: 'POST',
-          body: formData,
-        });
+        setNoteUploadStatus('uploading');
+        try {
+          const formData = new FormData();
+          formData.append('file', pendingNoteFile);
+          const res = await fetch(`/api/upload/note-base/${project.id}`, {
+            method: 'POST',
+            body: formData,
+          });
+          if (res.ok) {
+            const result = await res.json();
+            const count = result.count ?? result.imported ?? 0;
+            setNoteUploadStatus('success');
+            setNoteUploadMessage(`笔记底表解析成功，共导入 ${count} 条记录`);
+          } else {
+            const err = await res.json().catch(() => ({ error: '解析失败' }));
+            setNoteUploadStatus('error');
+            setNoteUploadMessage(err.error || '笔记底表解析失败');
+          }
+        } catch (err) {
+          setNoteUploadStatus('error');
+          setNoteUploadMessage('笔记底表上传失败，请稍后在项目编辑页重新上传');
+        }
       }
     },
   });
@@ -385,9 +403,27 @@ export default function NewProjectPage() {
           <div className="space-y-2">
             <label className="block text-sm font-medium text-slate-900">笔记底表（可选）</label>
             <p className="text-xs text-slate-500">
-              可选上传，创建项目后将自动关联。也可后续通过编辑项目上传。
+              可选上传，创建项目后将自动解析。也可后续通过编辑项目上传。
             </p>
-            {createdProjectId ? (
+            {createdProjectId && pendingNoteFile ? (
+              // 已创建项目且有待上传文件 - 显示解析状态
+              <div className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3">
+                <p className="text-sm text-slate-700 font-medium">{pendingNoteFile.name}</p>
+                {noteUploadStatus === 'uploading' && (
+                  <p className="mt-1 flex items-center gap-2 text-xs text-blue-600">
+                    <Loader2 size={12} className="animate-spin" />
+                    正在解析笔记底表...
+                  </p>
+                )}
+                {noteUploadStatus === 'success' && (
+                  <p className="mt-1 text-xs text-emerald-600">✓ {noteUploadMessage}</p>
+                )}
+                {noteUploadStatus === 'error' && (
+                  <p className="mt-1 text-xs text-amber-600">⚠ {noteUploadMessage}</p>
+                )}
+              </div>
+            ) : createdProjectId && !pendingNoteFile ? (
+              // 已创建项目但没有待上传文件 - 显示上传组件
               <NoteBaseUploader
                 projectId={createdProjectId}
                 onUploadSuccess={() => {}}
@@ -442,7 +478,7 @@ export default function NewProjectPage() {
           {createdProjectId ? (
             <div className="space-y-4 pt-4">
               <div className="rounded-lg bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-700">
-                项目创建成功！你可以上传笔记底表，或直接返回项目列表。
+                项目创建成功！
               </div>
               <div className="flex items-center justify-end gap-3">
                 <button

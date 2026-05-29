@@ -5,6 +5,3 @@ export { assembleReport, REPORT_MODULE_ORDER, fillPlaceholders } from './assembl
 export { parsePlanDocument, generateOptimizationSuggestions, saveEditedSuggestions } from './ai-service.js';
 export { exportReport } from './exporter.js';
 export { generateReport, type GenerateReportOptions } from './pipeline.js';
-
-// HTML Report Data Assembly (used by stream route for chapter-by-chapter generation)
-export { assembleReportData, type HtmlReportData } from './html-report-data-assembler.js';
