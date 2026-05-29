@@ -5,23 +5,20 @@ import { BaseChapterDataLoader, ChapterDataContext } from './types';
  * Chapter 7 (投流分析) Data Loader
  *
  * 数据来源：
- * - juguang_data: 聚光数据（fee, impression, click, interaction, ti_user_num, i_user_num, 回搜相关）
+ * - juguang_data: 聚光数据（fee, impression, click, interaction, ti_user_num, i_user_num, 回搜相关, placement, targets_detail, keyword）
  * - notes: 蒲公英数据（用于笔记维度投流分析）
  * - note_base: 笔记底表（content_direction, kol_type）
  * - review_configs: 大盘均值（用于对比）
  *
- * 当前实现的子模块：
+ * 子模块：
  * - 投流总览（总消耗/总曝光/总点击/总互动/CPM/CPC/CPE/CTR/TI/CPTI）
  * - 按笔记维度的投流分析（每篇笔记的投流数据）
  * - 回搜数据（搜索组件点击、搜后阅读）
  * - 新增种草人群成本（I人群/TI人群/CPI/CPTI）
  * - 大盘对比
- *
- * 暂未实现（数据库缺少分组字段）：
- * - 按广告类型分析（信息流/视频流/搜索）
- * - 按人群定向分析
- * - 按关键词分析
- * - 按阶段分析
+ * - 按广告类型分析（信息流/视频流/搜索）— GROUP BY placement
+ * - 按人群定向分析 — GROUP BY targets_detail
+ * - 按关键词分析（搜索主题名称）— GROUP BY keyword
  */
 export class TrafficAnalysisDataLoader extends BaseChapterDataLoader {
   chapterNumber = 7;
@@ -30,6 +27,7 @@ export class TrafficAnalysisDataLoader extends BaseChapterDataLoader {
   requiredFields = [
     'traffic_overview', 'traffic_by_note', 'search_data',
     'audience_growth', 'benchmark_comparison',
+    'ad_type_analysis', 'targeting_analysis', 'keyword_analysis',
   ];
 
   constructor(prisma: InstanceType<typeof PrismaClient>) {
@@ -66,6 +64,9 @@ export class TrafficAnalysisDataLoader extends BaseChapterDataLoader {
 
     interface JuguangRecord {
       noteId: string | null;
+      placement: string | null;
+      targetsDetail: string | null;
+      keyword: string | null;
       fee: any;
       impression: number;
       click: number;
@@ -87,6 +88,9 @@ export class TrafficAnalysisDataLoader extends BaseChapterDataLoader {
         where: { projectId },
         select: {
           noteId: true,
+          placement: true,
+          targetsDetail: true,
+          keyword: true,
           fee: true,
           impression: true,
           click: true,
@@ -216,7 +220,7 @@ export class TrafficAnalysisDataLoader extends BaseChapterDataLoader {
       }
 
       // 按note_id聚合聚光数据
-      const byNote = new Map<string, { fee: number; impression: number; click: number; interaction: number; tiUserNum: number }>();
+      const byNote = new Map<string, { fee: number; impression: number; click: number; interaction: number; tiUserNum: number; iUserNum: number }>();
       for (const j of juguangRecords) {
         if (!j.noteId) continue;
         const existing = byNote.get(j.noteId);
@@ -226,6 +230,7 @@ export class TrafficAnalysisDataLoader extends BaseChapterDataLoader {
           existing.click += j.click;
           existing.interaction += j.interaction;
           existing.tiUserNum += j.tiUserNum;
+          existing.iUserNum += j.iUserNum;
         } else {
           byNote.set(j.noteId, {
             fee: Number(j.fee),
@@ -233,6 +238,7 @@ export class TrafficAnalysisDataLoader extends BaseChapterDataLoader {
             click: j.click,
             interaction: j.interaction,
             tiUserNum: j.tiUserNum,
+            iUserNum: j.iUserNum,
           });
         }
       }
@@ -260,11 +266,113 @@ export class TrafficAnalysisDataLoader extends BaseChapterDataLoader {
       variables['traffic_by_note'] = '数据加载失败';
     }
 
-    // ── 7. 待扩展标记 ──
-    variables['ad_type_analysis'] = '（待扩展：需要聚光数据增加广告类型字段后实现）';
-    variables['targeting_analysis'] = '（待扩展：需要聚光数据增加人群定向字段后实现）';
-    variables['keyword_analysis'] = '（待扩展：需要聚光数据增加关键词字段后实现）';
+    // ── 7. 按广告类型（投放位置）分析 ──
+    variables['ad_type_analysis'] = this.buildGroupAnalysis(juguangRecords, 'placement', '广告类型');
+
+    // ── 8. 按人群定向分析 ──
+    variables['targeting_analysis'] = this.buildGroupAnalysis(juguangRecords, 'targetsDetail', '精准定向');
+
+    // ── 9. 按关键词（搜索主题名称）分析 ──
+    variables['keyword_analysis'] = this.buildGroupAnalysis(juguangRecords, 'keyword', '关键词');
 
     return this.buildContext(variables);
+  }
+
+  /**
+   * 通用分组聚合分析方法。
+   * 按指定字段 GROUP BY，计算每组的消耗/曝光/点击/互动/CPM/CPC/CPE/CTR/I人群/CPTI 等指标。
+   * 输出 Markdown 表格。
+   *
+   * 对应图片中的数据规范：
+   * - 投放位置（广告类型）：GROUP BY 广告类型（分组维度） → placement 字段
+   * - 人群定向分析：GROUP BY 精准定向（分组维度） → targets_detail 字段
+   * - 关键词定向分析：GROUP BY 关键词（分组维度） → keyword 字段
+   *
+   * 每组计算指标：
+   * - 消耗: SUM(fee)
+   * - 展现量: SUM(impression)
+   * - 点击量: SUM(click)
+   * - 互动量: SUM(interaction)
+   * - CTR: SUM(click)/SUM(impression)*100
+   * - CPM: SUM(fee)/SUM(impression)*1000
+   * - CPC: SUM(fee)/SUM(click)
+   * - CPE: SUM(fee)/SUM(interaction)
+   * - 新增种草人群: SUM(i_user_num)
+   * - 新增种草人群成本: SUM(fee)/SUM(i_user_num)
+   * - 新增深度种草人群: SUM(ti_user_num)
+   * - 新增深度种草人群成本: SUM(fee)/SUM(ti_user_num)
+   */
+  private buildGroupAnalysis(
+    records: Array<{
+      placement: string | null;
+      targetsDetail: string | null;
+      keyword: string | null;
+      fee: any;
+      impression: number;
+      click: number;
+      interaction: number;
+      iUserNum: number;
+      tiUserNum: number;
+    }>,
+    groupField: 'placement' | 'targetsDetail' | 'keyword',
+    groupLabel: string,
+  ): string {
+    // 按分组字段聚合
+    const groups = new Map<string, {
+      fee: number;
+      impression: number;
+      click: number;
+      interaction: number;
+      iUserNum: number;
+      tiUserNum: number;
+    }>();
+
+    for (const record of records) {
+      const key = record[groupField];
+      if (!key) continue; // 跳过没有该字段的记录
+
+      const existing = groups.get(key);
+      if (existing) {
+        existing.fee += Number(record.fee);
+        existing.impression += record.impression;
+        existing.click += record.click;
+        existing.interaction += record.interaction;
+        existing.iUserNum += record.iUserNum;
+        existing.tiUserNum += record.tiUserNum;
+      } else {
+        groups.set(key, {
+          fee: Number(record.fee),
+          impression: record.impression,
+          click: record.click,
+          interaction: record.interaction,
+          iUserNum: record.iUserNum,
+          tiUserNum: record.tiUserNum,
+        });
+      }
+    }
+
+    if (groups.size === 0) {
+      return `暂无${groupLabel}维度数据`;
+    }
+
+    // 按消耗降序排列
+    const sorted = Array.from(groups.entries()).sort((a, b) => b[1].fee - a[1].fee);
+
+    // 构建 Markdown 表格
+    const header = `| ${groupLabel} | 消耗 | 展现量 | 点击量 | 互动量 | CPM | CPC | CPE | CTR | 新增种草人群 | 新增种草人群成本 | 新增深度种草人群 | 新增深度种草人群成本 |`;
+    const separator = '|---|---|---|---|---|---|---|---|---|---|---|---|---|';
+
+    const rows = sorted.map(([name, data]) => {
+      const grpCpm = data.impression > 0 ? ((data.fee / data.impression) * 1000).toFixed(2) : '-';
+      const grpCpc = data.click > 0 ? (data.fee / data.click).toFixed(2) : '-';
+      const grpCpe = data.interaction > 0 ? (data.fee / data.interaction).toFixed(2) : '-';
+      const grpCtr = data.impression > 0 ? ((data.click / data.impression) * 100).toFixed(2) + '%' : '-';
+      const grpIUserCost = data.iUserNum > 0 ? (data.fee / data.iUserNum).toFixed(2) : '-';
+      const grpTiUserCost = data.tiUserNum > 0 ? (data.fee / data.tiUserNum).toFixed(2) : '-';
+
+      return `| ${name} | ${data.fee.toFixed(0)} | ${data.impression} | ${data.click} | ${data.interaction} | ${grpCpm} | ${grpCpc} | ${grpCpe} | ${grpCtr} | ${data.iUserNum} | ${grpIUserCost} | ${data.tiUserNum} | ${grpTiUserCost} |`;
+    });
+
+    return [header, separator, ...rows].join('\n');
   }
 }

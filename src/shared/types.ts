@@ -169,6 +169,9 @@ export interface NoteBaseRecord {
  */
 export interface JuguangNote {
   noteId?: string;                // 笔记id
+  placement?: string;             // 广告类型/投放位置：信息流、视频流、搜索
+  targetsDetail?: string;         // 精准定向/人群定向名称
+  keyword?: string;               // 关键词/搜索主题名称
   fee: number;                    // 消费（元）— 推广消费金额
   impression: number;             // 展现量 — 推广展现量
   click: number;                  // 点击量 — 推广点击量，视频流中「观看视频5s」记做一次点击

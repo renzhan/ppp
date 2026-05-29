@@ -198,6 +198,9 @@ export class PrismaDataPersistenceService implements DataPersistenceService {
         data: data.map((record) => ({
           projectId,
           noteId: record.noteId ?? null,
+          placement: record.placement ?? null,
+          targetsDetail: record.targetsDetail ?? null,
+          keyword: record.keyword ?? null,
           fee: record.fee,
           impression: record.impression,
           click: record.click,
