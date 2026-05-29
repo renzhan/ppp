@@ -284,7 +284,7 @@ export async function POST(
       });
 
       return noteCount;
-    });
+    }, { timeout: 30000 });
 
     return NextResponse.json({
       success: true,
