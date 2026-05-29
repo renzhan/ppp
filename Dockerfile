@@ -73,7 +73,7 @@ ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
 RUN npm run build
 
 # ============================================================
-# Stage 4: Production image (Node.js + Python + Supervisor)
+# Stage 4: Production image
 # ============================================================
 FROM node:22-bookworm-slim AS runner
 

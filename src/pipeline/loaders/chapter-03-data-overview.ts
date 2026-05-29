@@ -62,8 +62,7 @@ export class DataOverviewDataLoader extends BaseChapterDataLoader {
           benchmark: true,
           engagementMetric: true,
           viralMetric: true,
-          contentCostCaliber: true,
-          trafficCostCaliber: true,
+          modules: true,
         },
         orderBy: { createdAt: 'desc' },
       });
@@ -75,11 +74,13 @@ export class DataOverviewDataLoader extends BaseChapterDataLoader {
         if (reviewConfig.viralMetric) {
           viralMetric = reviewConfig.viralMetric as string;
         }
-        if ((reviewConfig as any).contentCostCaliber) {
-          contentCostCaliber = (reviewConfig as any).contentCostCaliber;
+        // contentCostCaliber / trafficCostCaliber stored in modules JSON
+        const modules = reviewConfig.modules as Record<string, unknown> | null;
+        if (modules?.contentCostCaliber) {
+          contentCostCaliber = modules.contentCostCaliber as string;
         }
-        if ((reviewConfig as any).trafficCostCaliber) {
-          trafficCostCaliber = (reviewConfig as any).trafficCostCaliber;
+        if (modules?.trafficCostCaliber) {
+          trafficCostCaliber = modules.trafficCostCaliber as string;
         }
         if (reviewConfig.kpiTargets && typeof reviewConfig.kpiTargets === 'object') {
           kpi = reviewConfig.kpiTargets as Record<string, number>;

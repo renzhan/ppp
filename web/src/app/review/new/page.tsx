@@ -336,15 +336,13 @@ function NewReviewPageContent() {
       kpiTargets: parsedKpi,
       engagementMetric,
       viralMetric,
-      modules,
+      modules: { ...modules, contentCostCaliber, trafficCostCaliber },
       launchPhases,
       hasUnofficialCooperation,
       executionPeriod: executionPeriodStart && executionPeriodEnd
         ? { start: executionPeriodStart, end: executionPeriodEnd }
         : null,
       historicalAcquisitionCost: historicalAcquisitionCost ? parseFloat(historicalAcquisitionCost) : null,
-      contentCostCaliber,
-      trafficCostCaliber,
     });
   };
 
