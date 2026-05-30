@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, Suspense } from 'react';
+import { useState, useEffect, useMemo, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Plus, Trash2, Upload, FileText, AlertCircle, Search } from 'lucide-react';
@@ -221,6 +221,18 @@ function NewReviewPageContent() {
   const selectedProject = useMemo(() => {
     return projects?.find((p) => p.id === selectedProjectId) ?? null;
   }, [projects, selectedProjectId]);
+
+  // Auto-fill cascade filters when page loads with preselected project
+  useEffect(() => {
+    if (preselectedProjectId && projects?.length) {
+      const project = projects.find((p) => p.id === preselectedProjectId);
+      if (project) {
+        setFilterCategory(project.category || '');
+        setFilterBrand(project.brand || '');
+        setFilterBusinessLine(project.businessLine || '');
+      }
+    }
+  }, [preselectedProjectId, projects]);
 
   // ─── Mutations ───────────────────────────────────────────────────────────
   const createReview = useMutation({
