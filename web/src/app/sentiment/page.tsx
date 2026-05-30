@@ -75,7 +75,7 @@ const SENTIMENT_COLORS: Record<string, string> = {
 
 const SENTIMENT_LABELS: Record<string, string> = {
   positive: '正向',
-  neutral: '中�?,
+  neutral: '中性',
   negative: '负向',
 };
 
@@ -89,7 +89,7 @@ const PAGE_SIZE = 10;
 
 export default function SentimentPage() {
   return (
-    <Suspense fallback={<Loading size="lg" text="加载�?.." className="py-20" />}>
+    <Suspense fallback={<Loading size="lg" text="加载中..." className="py-20" />}>
       <SentimentPageContent />
     </Suspense>
   );
@@ -115,7 +115,7 @@ function SentimentPageContent() {
     queryKey: ['tree-structure'],
     queryFn: async () => {
       const response = await fetch('/api/tree-structure');
-      if (!response.ok) throw new Error('获取树结构失�?);
+      if (!response.ok) throw new Error('获取树结构失败');
       return response.json();
     },
     staleTime: 60_000,
@@ -255,7 +255,7 @@ function SentimentPageContent() {
       console.log('[SentimentPage] trend 数据为空, sentimentData.trend =', sentimentData?.trend);
       return [];
     }
-    console.log('[SentimentPage] trend 原始数据条数:', sentimentData.trend.length, '�?�?', sentimentData.trend.slice(0, 3));
+    console.log('[SentimentPage] trend 原始数据条数:', sentimentData.trend.length, '前3条:', sentimentData.trend.slice(0, 3));
     const result = sentimentData.trend
       .filter((item) => item.periodStart)
       .sort((a, b) => (a.periodStart! > b.periodStart! ? 1 : -1))
@@ -269,7 +269,7 @@ function SentimentPageContent() {
           negative: Number(content.negative ?? 0),
         };
       });
-    console.log('[SentimentPage] trend 处理�?', result.length, '�? �?�?', result.slice(0, 3));
+    console.log('[SentimentPage] trend 处理后:', result.length, '条, 前3条:', result.slice(0, 3));
     return result;
   }, [sentimentData]);
 
@@ -326,7 +326,7 @@ function SentimentPageContent() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-gray-900">舆情系统</h1>
-          <p className="mt-1 text-sm text-gray-500">查看项目评论分析、情感分布和关键词统计�?/p>
+          <p className="mt-1 text-sm text-gray-500">查看项目评论分析、情感分布和关键词统计。</p>
         </div>
         {activeProjectId && (
           <div className="flex items-center gap-2">
@@ -337,7 +337,7 @@ function SentimentPageContent() {
               className="inline-flex h-10 items-center gap-2 rounded-lg bg-brand px-5 text-sm font-medium text-white transition hover:bg-brand-600 disabled:opacity-50"
             >
               <Download size={16} />
-              {exportMutation.isPending ? '导出�?..' : '导出'}
+              {exportMutation.isPending ? '导出中...' : '导出'}
             </button>
             <button
               type="button"
@@ -382,14 +382,14 @@ function SentimentPageContent() {
             </select>
           </div>
           <div className="min-w-[140px]">
-            <label className="mb-1 block text-xs font-medium text-gray-600">业务�?/label>
+            <label className="mb-1 block text-xs font-medium text-gray-600">业务线</label>
             <select
               value={filters.businessLine}
               onChange={(e) => handleBusinessLineChange(e.target.value)}
               disabled={!filters.brand}
               className="h-9 w-full rounded-md border border-gray-200 px-3 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20 disabled:cursor-not-allowed disabled:bg-gray-50"
             >
-              <option value="">全部业务�?/option>
+              <option value="">全部业务线</option>
               {businessLineOptions.map((node) => (
                 <option key={node.id} value={node.id}>{node.label}</option>
               ))}
@@ -429,7 +429,7 @@ function SentimentPageContent() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b bg-gray-50 text-left">
-                    <th className="whitespace-nowrap px-3 py-2 font-medium text-gray-600">文件�?/th>
+                    <th className="whitespace-nowrap px-3 py-2 font-medium text-gray-600">文件名</th>
                     <th className="whitespace-nowrap px-3 py-2 font-medium text-gray-600">导出时间</th>
                     <th className="whitespace-nowrap px-3 py-2 font-medium text-gray-600">操作</th>
                   </tr>
@@ -465,7 +465,7 @@ function SentimentPageContent() {
       {!activeProjectId ? (
         <div className="rounded-lg border bg-white px-6 py-16 text-center">
           <MessageCircle size={48} className="mx-auto mb-4 text-gray-300" />
-          <p className="text-sm text-gray-500">请选择项目并点�?查看舆情"按钮查看舆情数据</p>
+          <p className="text-sm text-gray-500">请选择项目并点击"查看舆情"按钮查看舆情数据</p>
         </div>
       ) : isSentimentLoading ? (
         <Loading size="lg" text="正在加载舆情数据..." className="py-20" />
@@ -512,7 +512,7 @@ function SentimentPageContent() {
 
             {/* Comment Trend - Bar Chart */}
             <div className="rounded-lg border bg-white p-4">
-              <h3 className="mb-3 text-sm font-medium text-gray-900">评论数变化趋�?/h3>
+              <h3 className="mb-3 text-sm font-medium text-gray-900">评论数变化趋势</h3>
               {trendChartData.length > 0 ? (
                 <ResponsiveContainer width="100%" height={280}>
                   <BarChart data={trendChartData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
@@ -520,7 +520,7 @@ function SentimentPageContent() {
                     <XAxis dataKey="date" tick={{ fontSize: 11 }} angle={-30} textAnchor="end" height={50} />
                     <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
                     <Tooltip />
-                    <Bar dataKey="count" name="评论�? fill="#F5A623" radius={[2, 2, 0, 0]} />
+                    <Bar dataKey="count" name="评论数" fill="#F5A623" radius={[2, 2, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
@@ -531,7 +531,7 @@ function SentimentPageContent() {
 
           {/* Row 2: Keywords */}
           <div className="rounded-lg border bg-white p-4">
-            <h3 className="mb-3 text-sm font-medium text-gray-900">关键词高频分布统�?/h3>
+            <h3 className="mb-3 text-sm font-medium text-gray-900">关键词高频分布统计</h3>
             {keywordsData.length > 0 ? (
               <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
                 {/* Word Cloud */}
@@ -544,12 +544,12 @@ function SentimentPageContent() {
 
                 {/* Keyword Frequency Table with frequency rate */}
                 <div>
-                  <h4 className="mb-2 text-xs font-medium text-gray-600">高频词指�?/h4>
+                  <h4 className="mb-2 text-xs font-medium text-gray-600">高频词指数</h4>
                   <div className="max-h-[320px] overflow-y-auto">
                     <table className="w-full text-sm">
                       <thead className="sticky top-0">
                         <tr className="border-b bg-gray-50 text-left">
-                          <th className="px-3 py-2 font-medium text-gray-600">关键�?/th>
+                          <th className="px-3 py-2 font-medium text-gray-600">关键词</th>
                           <th className="px-3 py-2 font-medium text-gray-600">数量</th>
                           <th className="px-3 py-2 font-medium text-gray-600">频率</th>
                         </tr>
@@ -570,7 +570,7 @@ function SentimentPageContent() {
                 </div>
               </div>
             ) : (
-              <p className="py-8 text-center text-sm text-gray-400">暂无关键词数�?/p>
+              <p className="py-8 text-center text-sm text-gray-400">暂无关键词数据</p>
             )}
           </div>
 
@@ -640,7 +640,7 @@ function SentimentPageContent() {
                 {totalPages > 1 && (
                   <div className="mt-4 flex items-center justify-between border-t pt-3">
                     <span className="text-xs text-gray-500">
-                      �?{filteredComments.length} 条，每页 {PAGE_SIZE} �?
+                      共 {filteredComments.length} 条，每页 {PAGE_SIZE} 条
                     </span>
                     <div className="flex items-center gap-1">
                       <button

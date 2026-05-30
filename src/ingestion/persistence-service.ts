@@ -216,8 +216,6 @@ export class PrismaDataPersistenceService implements DataPersistenceService {
           acp: record.acp,
           cpm: record.cpm,
           cpi: record.cpi,
-          placement: record.placement ?? null,
-          keyword: record.keyword ?? null,
           targetDetail: record.targetDetail ?? null,
         })),
       });

@@ -52,8 +52,6 @@ interface RawJuguangNote {
   acp?: string;
   cpm?: string;
   cpi?: string;
-  placement?: string;
-  keyword?: string;
   target_detail?: string;
 }
 
@@ -211,8 +209,6 @@ function mapToJuguangNote(raw: RawJuguangNote): JuguangNote {
     acp: parseNum(raw.acp),
     cpm: parseNum(raw.cpm),
     cpi: parseNum(raw.cpi),
-    placement: raw.placement || undefined,
-    keyword: raw.keyword || undefined,
     targetDetail: raw.target_detail || undefined,
   };
 }
