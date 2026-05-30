@@ -46,30 +46,31 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 px-4">
-      {/* Tech-feel background decorations */}
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -left-40 -top-40 h-80 w-80 rounded-full bg-blue-500/10 blur-3xl" />
-        <div className="absolute -bottom-40 -right-40 h-80 w-80 rounded-full bg-indigo-500/10 blur-3xl" />
-        <div className="absolute left-1/2 top-1/4 h-64 w-64 -translate-x-1/2 rounded-full bg-cyan-500/5 blur-3xl" />
-      </div>
+    <div className="flex min-h-screen flex-col md:flex-row">
+      {/* Left Panel - Brand showcase (55% width on desktop, full width on mobile) */}
+      <div
+        className="order-2 md:order-1 w-full md:w-[55%] min-h-[200px] md:min-h-screen relative"
+        style={{
+          backgroundImage: 'url(/images/login-bg.png)',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+        }}
+      />
 
-      {/* Main card */}
-      <div className="relative z-10 w-full max-w-md">
-        <div className="rounded-2xl border border-white/10 bg-white/5 px-8 py-10 shadow-2xl backdrop-blur-xl">
-          {/* Brand header */}
-          <div className="mb-8 text-center">
-            <h1 className="text-3xl font-bold tracking-wide text-white">
-              派盘盘
-            </h1>
-            <p className="mt-2 text-sm text-blue-200/80">
-              数字营销AI 交付与资产沉淀平台
-            </p>
+
+      {/* Right Panel - Login form (45% width on desktop, full width on mobile, appears first on mobile) */}
+      <div className="order-1 md:order-2 w-full md:w-[45%] bg-white flex items-center justify-center px-6 py-12">
+        <div className="w-full max-w-sm">
+          {/* Form header */}
+          <div className="mb-8">
+            <h2 className="text-2xl font-bold text-gray-900">欢迎登录</h2>
+            <p className="mt-2 text-sm text-gray-500">你的小盘 盯着每一盘</p>
           </div>
 
           {/* Error message */}
           {error && (
-            <div className="mb-4 rounded-lg bg-red-500/10 border border-red-500/20 px-4 py-3 text-sm text-red-300">
+            <div className="mb-4 rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-600">
               {error}
             </div>
           )}
@@ -80,7 +81,7 @@ export default function LoginPage() {
             <div>
               <label
                 htmlFor="username"
-                className="mb-1.5 block text-sm font-medium text-slate-300"
+                className="mb-1.5 block text-sm font-medium text-gray-700"
               >
                 用户名
               </label>
@@ -90,7 +91,7 @@ export default function LoginPage() {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="请输入用户名"
-                className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-slate-400 transition-colors focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-400/20"
+                className="w-full rounded-sm border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 placeholder-gray-400 transition-colors focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
                 autoComplete="username"
                 required
               />
@@ -100,7 +101,7 @@ export default function LoginPage() {
             <div>
               <label
                 htmlFor="password"
-                className="mb-1.5 block text-sm font-medium text-slate-300"
+                className="mb-1.5 block text-sm font-medium text-gray-700"
               >
                 密码
               </label>
@@ -111,14 +112,14 @@ export default function LoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="请输入密码"
-                  className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 pr-10 text-sm text-white placeholder-slate-400 transition-colors focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-400/20"
+                  className="w-full rounded-sm border border-gray-300 bg-white px-3 py-2.5 pr-10 text-sm text-gray-900 placeholder-gray-400 transition-colors focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
                   autoComplete="current-password"
                   required
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                   aria-label={showPassword ? '隐藏密码' : '显示密码'}
                 >
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -134,18 +135,18 @@ export default function LoginPage() {
                   type="checkbox"
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
-                  className="h-4 w-4 rounded border-slate-500 bg-white/5 text-blue-500 focus:ring-blue-400/50"
+                  className="h-4 w-4 rounded border-gray-300 bg-white text-brand focus:ring-brand/50"
                 />
                 <label
                   htmlFor="rememberMe"
-                  className="ml-2 text-sm text-slate-300"
+                  className="ml-2 text-sm text-gray-600"
                 >
                   自动登录
                 </label>
               </div>
               <Link
                 href="/change-password"
-                className="text-sm text-blue-300 hover:text-blue-200 transition-colors"
+                className="text-sm text-brand hover:underline transition-colors"
               >
                 修改密码
               </Link>
@@ -155,26 +156,26 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition-all hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-400/50 disabled:cursor-not-allowed disabled:opacity-60"
+              className="w-full rounded-md bg-brand h-[44px] px-4 text-sm font-medium text-white transition-all hover:bg-brand-600 focus:outline-none focus:ring-2 focus:ring-brand/50 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {loading ? '登录中...' : '登 录'}
             </button>
           </form>
-        </div>
-      </div>
 
-      {/* Footer */}
-      <div className="relative z-10 mt-8 text-center">
-        <div className="flex items-center justify-center gap-4 text-sm text-slate-400">
-          <a href="#" className="hover:text-slate-200 transition-colors">帮助</a>
-          <span className="text-slate-600">|</span>
-          <a href="#" className="hover:text-slate-200 transition-colors">隐私</a>
-          <span className="text-slate-600">|</span>
-          <a href="#" className="hover:text-slate-200 transition-colors">条款</a>
+          {/* Footer */}
+          <div className="mt-8 text-center">
+            <div className="flex items-center justify-center gap-4 text-sm text-gray-500">
+              <a href="#" className="hover:text-gray-700 transition-colors">帮助</a>
+              <span className="text-gray-300">|</span>
+              <a href="#" className="hover:text-gray-700 transition-colors">隐私</a>
+              <span className="text-gray-300">|</span>
+              <a href="#" className="hover:text-gray-700 transition-colors">条款</a>
+            </div>
+            <p className="mt-2 text-xs text-gray-400">
+              copyright © 2026 派芽技术部出品
+            </p>
+          </div>
         </div>
-        <p className="mt-2 text-xs text-slate-500">
-          copyright © 2026 派芽技术部出品
-        </p>
       </div>
     </div>
   );

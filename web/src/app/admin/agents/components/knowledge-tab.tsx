@@ -383,7 +383,7 @@ function FileUploadZone({ workspaces, onUploadSuccess }: FileUploadZoneProps) {
         <select
           value={selectedWorkspaceId}
           onChange={(e) => setSelectedWorkspaceId(e.target.value)}
-          className="rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          className="rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
         >
           <option value="">公共 (所有工作区可见)</option>
           {workspaces.map((ws) => (
@@ -402,7 +402,7 @@ function FileUploadZone({ workspaces, onUploadSuccess }: FileUploadZoneProps) {
         onClick={handleClick}
         className={`relative cursor-pointer rounded-lg border-2 border-dashed p-8 text-center transition-colors ${
           isDragging
-            ? 'border-blue-400 bg-blue-50'
+            ? 'border-brand bg-brand-50'
             : 'border-gray-300 bg-white hover:border-gray-400 hover:bg-gray-50'
         }`}
       >
@@ -416,7 +416,7 @@ function FileUploadZone({ workspaces, onUploadSuccess }: FileUploadZoneProps) {
 
         {uploadStatus === 'uploading' ? (
           <div className="flex flex-col items-center">
-            <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+            <Loader2 className="h-8 w-8 animate-spin text-brand" />
             <p className="mt-2 text-sm text-gray-600">上传中...</p>
           </div>
         ) : uploadStatus === 'success' ? (

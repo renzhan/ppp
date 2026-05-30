@@ -100,7 +100,7 @@ export default function ProjectDetailPage() {
 
       <section className="rounded-lg border bg-white shadow-sm">
         <div className="border-b px-6 py-5">
-          <h2 className="text-xl font-semibold text-slate-900">项目详情</h2>
+          <h2 className="text-xl font-semibold text-gray-900">项目详情</h2>
         </div>
         <div className="grid gap-8 px-6 py-6 lg:grid-cols-2">
           <div className="space-y-4">
@@ -114,14 +114,14 @@ export default function ProjectDetailPage() {
             <DetailRow label="主题" value={project.projectName} />
             <DetailRow label="状态" value={statusLabel} />
             <div className="space-y-3">
-              <span className="text-sm text-slate-500">传播周期</span>
+              <span className="text-sm text-gray-500">传播周期</span>
               <div className="space-y-3">
                 {LAUNCH_PHASES.map((phase) => (
                   <div key={phase.key} className="flex flex-wrap items-center gap-3">
                     <span className={`inline-flex rounded-md px-2.5 py-1 text-xs font-medium ${phase.accentClass}`}>
                       {phase.label}
                     </span>
-                    <span className="text-sm font-medium text-slate-800">
+                    <span className="text-sm font-medium text-gray-800">
                       {formatDateRange(
                         launchPhases[phase.key].startDate,
                         launchPhases[phase.key].endDate
@@ -141,7 +141,7 @@ export default function ProjectDetailPage() {
 
       <section className="rounded-lg border bg-white shadow-sm">
         <div className="border-b px-6 py-5">
-          <h2 className="text-xl font-semibold text-slate-900">项目进度</h2>
+          <h2 className="text-xl font-semibold text-gray-900">项目进度</h2>
         </div>
         <div className="space-y-6 px-6 py-6">
           <div className="grid gap-4 xl:grid-cols-4">
@@ -149,21 +149,21 @@ export default function ProjectDetailPage() {
               const active = index === currentStep;
               const done = index < currentStep;
               return (
-                <div key={step.key} className="flex items-start gap-3 rounded-lg border border-slate-100 bg-slate-50 p-4">
+                <div key={step.key} className="flex items-start gap-3 rounded-lg border border-gray-100 bg-gray-50 p-4">
                   <div
                     className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
                       done
                         ? 'bg-emerald-100 text-emerald-600'
                         : active
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-slate-200 text-slate-500'
+                          ? 'bg-brand text-white'
+                          : 'bg-gray-200 text-gray-500'
                     }`}
                   >
                     {done ? <CheckCircle2 size={16} /> : active ? index + 1 : <Circle size={16} />}
                   </div>
                   <div>
-                    <p className="text-base font-semibold text-slate-900">{step.label}</p>
-                    <p className="mt-1 text-sm text-slate-500">{step.description}</p>
+                    <p className="text-base font-semibold text-gray-900">{step.label}</p>
+                    <p className="mt-1 text-sm text-gray-500">{step.description}</p>
                   </div>
                 </div>
               );
@@ -177,8 +177,8 @@ export default function ProjectDetailPage() {
                 href={action.href}
                 className={`inline-flex h-11 items-center gap-2 rounded-lg px-4 text-sm font-medium transition ${
                   action.variant === 'primary'
-                    ? 'bg-blue-600 text-white hover:bg-blue-700'
-                    : 'border border-slate-200 text-slate-700 hover:bg-slate-50'
+                    ? 'bg-brand text-white hover:bg-brand-600'
+                    : 'border border-gray-200 text-gray-700 hover:bg-gray-50'
                 }`}
               >
                 <action.icon size={16} />
@@ -189,18 +189,18 @@ export default function ProjectDetailPage() {
         </div>
       </section>
 
-      <section className="rounded-lg border bg-white shadow-sm">
+      <section className="bg-white rounded-lg border border-gray-200">
         <div className="flex items-center justify-between border-b px-6 py-5">
           <div className="flex items-center gap-3">
-            <FileBarChart size={20} className="text-slate-500" />
+            <FileBarChart size={20} className="text-gray-500" />
             <div>
-              <h2 className="text-xl font-semibold text-slate-900">复盘报告管理</h2>
-              <p className="mt-1 text-sm text-slate-500">{project.reportVersions.length} 个版本</p>
+              <h2 className="text-xl font-semibold text-gray-900">复盘报告管理</h2>
+              <p className="mt-1 text-sm text-gray-500">{project.reportVersions.length} 个版本</p>
             </div>
           </div>
           <Link
             href={`/projects/${project.id}/generate`}
-            className="inline-flex h-10 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-medium text-white transition hover:bg-blue-700"
+            className="inline-flex h-10 items-center gap-2 rounded-lg bg-brand px-4 text-sm font-medium text-white transition hover:bg-brand-600"
           >
             <Sparkles size={16} />
             新建报告
@@ -209,29 +209,29 @@ export default function ProjectDetailPage() {
 
         <div className="overflow-x-auto">
           <table className="w-full min-w-[720px] text-left text-sm">
-            <thead className="border-b bg-slate-50">
+            <thead className="border-b bg-gray-50">
               <tr>
-                <th className="px-6 py-3 font-medium text-slate-600">版本</th>
-                <th className="px-6 py-3 font-medium text-slate-600">生成时间</th>
-                <th className="px-6 py-3 font-medium text-slate-600">状态</th>
-                <th className="px-6 py-3 font-medium text-slate-600">操作</th>
+                <th className="px-4 py-3 text-sm font-medium text-gray-600">版本</th>
+                <th className="px-4 py-3 text-sm font-medium text-gray-600">生成时间</th>
+                <th className="px-4 py-3 text-sm font-medium text-gray-600">状态</th>
+                <th className="px-4 py-3 text-sm font-medium text-gray-600">操作</th>
               </tr>
             </thead>
             <tbody className="divide-y">
               {project.reportVersions.length ? (
                 project.reportVersions.map((version) => (
-                  <tr key={version.id}>
-                    <td className="px-6 py-4 font-medium text-slate-900">V{version.versionNumber}.0</td>
-                    <td className="px-6 py-4 text-slate-600">{formatDateRange(version.generatedAt, version.generatedAt)}</td>
-                    <td className="px-6 py-4">
-                      <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
+                  <tr key={version.id} className="bg-white text-sm text-gray-900 border-b hover:bg-gray-50">
+                    <td className="px-4 py-3 font-medium">V{version.versionNumber}.0</td>
+                    <td className="px-4 py-3 text-gray-600">{formatDateRange(version.generatedAt, version.generatedAt)}</td>
+                    <td className="px-4 py-3">
+                      <span className="inline-flex rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700">
                         {version.status}
                       </span>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-3">
                       <Link
                         href={`/projects/${project.id}/review/${version.id}`}
-                        className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 transition hover:text-blue-700"
+                        className="inline-flex items-center gap-1 text-sm font-medium text-brand transition hover:underline"
                       >
                         进入审校
                         <ArrowRight size={14} />
@@ -241,7 +241,7 @@ export default function ProjectDetailPage() {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={4} className="px-6 py-10 text-center text-slate-500">
+                  <td colSpan={4} className="px-4 py-10 text-center text-gray-500">
                     还没有生成报告版本
                   </td>
                 </tr>
@@ -257,8 +257,8 @@ export default function ProjectDetailPage() {
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex flex-wrap items-center gap-3">
-      <span className="text-sm text-slate-500">{label}：</span>
-      <span className="text-lg font-medium text-slate-900">{value}</span>
+      <span className="text-sm text-gray-500">{label}：</span>
+      <span className="text-lg font-medium text-gray-900">{value}</span>
     </div>
   );
 }

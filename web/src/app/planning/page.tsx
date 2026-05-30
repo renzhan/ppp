@@ -10,7 +10,7 @@ export default function PlanningPage() {
           <Lightbulb size={40} className="text-amber-500" />
         </div>
         <h1 className="text-2xl font-bold tracking-tight text-gray-900">策划系统即将上线</h1>
-        <p className="mt-3 max-w-md text-sm text-slate-500">
+        <p className="mt-3 max-w-md text-sm text-gray-500">
           策划系统正在开发中，将支持营销策划方案的创建、管理和协作。敬请期待。
         </p>
       </div>

@@ -113,7 +113,7 @@ export default function AdminUsersPage() {
           </button>
           <button
             onClick={() => setShowAddModal(true)}
-            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+            className="inline-flex items-center gap-2 rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-600"
           >
             <Plus size={16} />
             添加用户
@@ -135,91 +135,93 @@ export default function AdminUsersPage() {
       )}
 
       {/* Table */}
-      <div className="overflow-hidden rounded-lg border bg-white shadow-sm">
-        <table className="w-full text-left text-sm">
-          <thead className="border-b bg-gray-50">
-            <tr>
-              <th className="px-4 py-3 font-medium text-gray-600">用户名</th>
-              <th className="px-4 py-3 font-medium text-gray-600">显示名称</th>
-              <th className="px-4 py-3 font-medium text-gray-600">角色</th>
-              <th className="px-4 py-3 font-medium text-gray-600">状态</th>
-              <th className="px-4 py-3 font-medium text-gray-600">最后登录</th>
-              <th className="px-4 py-3 font-medium text-gray-600">操作</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {users.map((user) => (
-              <tr key={user.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3 font-medium text-gray-900">
-                  {user.username}
-                </td>
-                <td className="px-4 py-3 text-gray-600">
-                  {user.displayName || '-'}
-                </td>
-                <td className="px-4 py-3">
-                  <span
-                    className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                      user.role === 'admin'
-                        ? 'bg-purple-100 text-purple-700'
-                        : 'bg-blue-100 text-blue-700'
-                    }`}
-                  >
-                    {user.role === 'admin' ? '管理员' : user.role}
-                  </span>
-                </td>
-                <td className="px-4 py-3">
-                  <span
-                    className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                      user.isActive
-                        ? 'bg-green-100 text-green-700'
-                        : 'bg-red-100 text-red-700'
-                    }`}
-                  >
-                    {user.isActive ? '正常' : '已禁用'}
-                  </span>
-                </td>
-                <td className="px-4 py-3 text-gray-500">
-                  {user.lastLoginAt
-                    ? new Date(user.lastLoginAt).toLocaleString('zh-CN')
-                    : '从未登录'}
-                </td>
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => {
-                        setSelectedUser(user);
-                        setShowEditModal(true);
-                      }}
-                      className="rounded p-1.5 text-gray-500 hover:bg-gray-100 hover:text-blue-600"
-                      title="编辑"
-                    >
-                      <Edit2 size={15} />
-                    </button>
-                    <button
-                      onClick={() => {
-                        setSelectedUser(user);
-                        setShowResetModal(true);
-                      }}
-                      className="rounded p-1.5 text-gray-500 hover:bg-gray-100 hover:text-orange-600"
-                      title="重置密码"
-                    >
-                      <KeyRound size={15} />
-                    </button>
-                    <button
-                      onClick={() => handleToggleActive(user)}
-                      className={`rounded p-1.5 text-gray-500 hover:bg-gray-100 ${
-                        user.isActive ? 'hover:text-red-600' : 'hover:text-green-600'
-                      }`}
-                      title={user.isActive ? '禁用' : '启用'}
-                    >
-                      {user.isActive ? <UserX size={15} /> : <UserCheck size={15} />}
-                    </button>
-                  </div>
-                </td>
+      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead className="border-b bg-gray-50">
+              <tr>
+                <th className="px-4 py-3 text-sm font-medium text-gray-600">用户名</th>
+                <th className="px-4 py-3 text-sm font-medium text-gray-600">显示名称</th>
+                <th className="px-4 py-3 text-sm font-medium text-gray-600">角色</th>
+                <th className="px-4 py-3 text-sm font-medium text-gray-600">状态</th>
+                <th className="px-4 py-3 text-sm font-medium text-gray-600">最后登录</th>
+                <th className="px-4 py-3 text-sm font-medium text-gray-600">操作</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y">
+              {users.map((user) => (
+                <tr key={user.id} className="bg-white text-sm text-gray-900 border-b hover:bg-gray-50">
+                  <td className="px-4 py-3 font-medium">
+                    {user.username}
+                  </td>
+                  <td className="px-4 py-3 text-gray-600">
+                    {user.displayName || '-'}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                        user.role === 'admin'
+                          ? 'bg-purple-100 text-purple-700'
+                          : 'bg-brand-100 text-brand-700'
+                      }`}
+                    >
+                      {user.role === 'admin' ? '管理员' : user.role}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                        user.isActive
+                          ? 'bg-green-100 text-green-700'
+                          : 'bg-red-100 text-red-700'
+                      }`}
+                    >
+                      {user.isActive ? '正常' : '已禁用'}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-gray-500">
+                    {user.lastLoginAt
+                      ? new Date(user.lastLoginAt).toLocaleString('zh-CN')
+                      : '从未登录'}
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => {
+                          setSelectedUser(user);
+                          setShowEditModal(true);
+                        }}
+                        className="rounded p-1.5 text-gray-500 hover:bg-gray-100 hover:text-brand"
+                        title="编辑"
+                      >
+                        <Edit2 size={15} />
+                      </button>
+                      <button
+                        onClick={() => {
+                          setSelectedUser(user);
+                          setShowResetModal(true);
+                        }}
+                        className="rounded p-1.5 text-gray-500 hover:bg-gray-100 hover:text-orange-600"
+                        title="重置密码"
+                      >
+                        <KeyRound size={15} />
+                      </button>
+                      <button
+                        onClick={() => handleToggleActive(user)}
+                        className={`rounded p-1.5 text-gray-500 hover:bg-gray-100 ${
+                          user.isActive ? 'hover:text-red-600' : 'hover:text-green-600'
+                        }`}
+                        title={user.isActive ? '禁用' : '启用'}
+                      >
+                        {user.isActive ? <UserX size={15} /> : <UserCheck size={15} />}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
         {users.length === 0 && (
           <div className="py-12 text-center text-gray-500">暂无用户</div>
         )}
@@ -375,7 +377,7 @@ function AddUserModal({
             type="text"
             value={form.username}
             onChange={(e) => setForm({ ...form, username: e.target.value })}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
             required
           />
         </div>
@@ -387,7 +389,7 @@ function AddUserModal({
             type="text"
             value={form.displayName}
             onChange={(e) => setForm({ ...form, displayName: e.target.value })}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
           />
         </div>
         <div>
@@ -397,7 +399,7 @@ function AddUserModal({
           <select
             value={form.role}
             onChange={(e) => setForm({ ...form, role: e.target.value })}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
           >
             <option value="组长">组长</option>
             <option value="AD">AD</option>
@@ -416,7 +418,7 @@ function AddUserModal({
             value={form.password}
             onChange={(e) => setForm({ ...form, password: e.target.value })}
             placeholder="至少6位"
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
             required
             minLength={6}
           />
@@ -432,7 +434,7 @@ function AddUserModal({
           <button
             type="submit"
             disabled={loading}
-            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+            className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-60"
           >
             {loading ? '创建中...' : '创建'}
           </button>
@@ -499,7 +501,7 @@ function EditUserModal({
             type="text"
             value={form.displayName}
             onChange={(e) => setForm({ ...form, displayName: e.target.value })}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
           />
         </div>
         <div>
@@ -509,7 +511,7 @@ function EditUserModal({
           <select
             value={form.role}
             onChange={(e) => setForm({ ...form, role: e.target.value })}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
           >
             <option value="组长">组长</option>
             <option value="AD">AD</option>
@@ -530,7 +532,7 @@ function EditUserModal({
           <button
             type="submit"
             disabled={loading}
-            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+            className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-60"
           >
             {loading ? '保存中...' : '保存'}
           </button>
@@ -598,7 +600,7 @@ function ResetPasswordModal({
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="至少6位"
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
             required
             minLength={6}
           />
@@ -614,7 +616,7 @@ function ResetPasswordModal({
           <button
             type="submit"
             disabled={loading}
-            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+            className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-60"
           >
             {loading ? '重置中...' : '确认重置'}
           </button>
@@ -701,14 +703,14 @@ function ImportModal({
         </div>
       )}
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-700">
+        <div className="rounded-lg bg-brand-50 px-3 py-2 text-xs text-brand-700">
           <p>Excel文件(.xlsx)需包含列：用户名、显示名、角色</p>
           <p className="mt-1">有效角色值：组长、AD、AM、投手、执行</p>
           <p className="mt-1">系统将为每个用户自动生成初始密码，首次登录需修改密码。</p>
           <a
             href="/api/admin/import/users/template"
             download
-            className="mt-2 inline-flex items-center gap-1 text-blue-600 underline hover:text-blue-800"
+            className="mt-2 inline-flex items-center gap-1 text-brand underline hover:text-brand-600"
           >
             下载导入模板
           </a>
@@ -725,7 +727,7 @@ function ImportModal({
               setError('');
               setImportErrors([]);
             }}
-            className="w-full text-sm text-gray-500 file:mr-4 file:rounded-lg file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-blue-700 hover:file:bg-blue-100"
+            className="w-full text-sm text-gray-500 file:mr-4 file:rounded-lg file:border-0 file:bg-brand-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-brand-700 hover:file:bg-brand-100"
           />
         </div>
         <div className="flex justify-end gap-3 pt-2">
@@ -739,7 +741,7 @@ function ImportModal({
           <button
             type="submit"
             disabled={loading}
-            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+            className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-60"
           >
             {loading ? '导入中...' : '开始导入'}
           </button>

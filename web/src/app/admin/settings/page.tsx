@@ -16,7 +16,7 @@ export default function AdminSettingsPage() {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-gray-900">系统设置</h1>
-        <p className="mt-1 text-sm text-slate-500">管理项目底表导入和个人密码修改。</p>
+        <p className="mt-1 text-sm text-gray-500">管理项目底表导入和个人密码修改。</p>
       </div>
 
       {/* Project Base Table Import Section */}
@@ -110,10 +110,10 @@ function ProjectBaseImportSection() {
   return (
     <section className="rounded-lg border bg-white p-6">
       <div className="mb-4 flex items-center gap-2">
-        <Upload size={20} className="text-blue-600" />
+        <Upload size={20} className="text-brand" />
         <h2 className="text-lg font-semibold text-gray-900">项目底表导入</h2>
       </div>
-      <p className="mb-4 text-sm text-slate-500">
+      <p className="mb-4 text-sm text-gray-500">
         上传 .xlsx 格式的项目底表文件，系统将解析品类、品牌、业务线等字段并生成级联选择器数据源。
       </p>
 
@@ -130,21 +130,21 @@ function ProjectBaseImportSection() {
           flex flex-col items-center justify-center rounded-lg border-2 border-dashed px-6 py-8
           transition-colors cursor-pointer
           ${dragOver
-            ? 'border-blue-500 bg-blue-50'
-            : 'border-slate-300 bg-slate-50 hover:border-slate-400 hover:bg-white'
+            ? 'border-brand bg-brand-50'
+            : 'border-gray-300 bg-gray-50 hover:border-gray-400 hover:bg-white'
           }
           ${uploading ? 'pointer-events-none opacity-60' : ''}
         `}
       >
         {uploading ? (
           <div className="flex flex-col items-center gap-2">
-            <div className="h-6 w-6 animate-spin rounded-full border-2 border-slate-300 border-t-blue-500" />
-            <span className="text-sm text-slate-500">正在上传并解析...</span>
+            <div className="h-6 w-6 animate-spin rounded-full border-2 border-gray-300 border-t-brand" />
+            <span className="text-sm text-gray-500">正在上传并解析...</span>
           </div>
         ) : (
           <>
             <svg
-              className="mb-2 h-10 w-10 text-slate-400"
+              className="mb-2 h-10 w-10 text-gray-400"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -157,10 +157,10 @@ function ProjectBaseImportSection() {
                 d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
               />
             </svg>
-            <p className="text-sm text-slate-600">
-              拖拽文件到此处，或 <span className="font-medium text-blue-600">点击选择文件</span>
+            <p className="text-sm text-gray-600">
+              拖拽文件到此处，或 <span className="font-medium text-brand">点击选择文件</span>
             </p>
-            <p className="mt-1 text-xs text-slate-400">仅支持 .xlsx 格式</p>
+            <p className="mt-1 text-xs text-gray-400">仅支持 .xlsx 格式</p>
           </>
         )}
       </div>
@@ -266,10 +266,10 @@ function PasswordChangeSection() {
   return (
     <section className="rounded-lg border bg-white p-6">
       <div className="mb-4 flex items-center gap-2">
-        <Lock size={20} className="text-blue-600" />
+        <Lock size={20} className="text-brand" />
         <h2 className="text-lg font-semibold text-gray-900">密码修改</h2>
       </div>
-      <p className="mb-4 text-sm text-slate-500">
+      <p className="mb-4 text-sm text-gray-500">
         修改您的登录密码。修改成功后需要重新登录。
       </p>
 
@@ -300,14 +300,14 @@ function PasswordChangeSection() {
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
               placeholder="请输入当前密码"
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 pr-10 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 pr-10 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
               required
               autoComplete="current-password"
             />
             <button
               type="button"
               onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
               aria-label={showCurrentPassword ? '隐藏密码' : '显示密码'}
             >
               {showCurrentPassword ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -327,7 +327,7 @@ function PasswordChangeSection() {
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               placeholder="请输入新密码（至少6位）"
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 pr-10 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 pr-10 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
               required
               minLength={6}
               autoComplete="new-password"
@@ -335,7 +335,7 @@ function PasswordChangeSection() {
             <button
               type="button"
               onClick={() => setShowNewPassword(!showNewPassword)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
               aria-label={showNewPassword ? '隐藏密码' : '显示密码'}
             >
               {showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -354,7 +354,7 @@ function PasswordChangeSection() {
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             placeholder="请再次输入新密码"
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
             required
             minLength={6}
             autoComplete="new-password"
@@ -366,7 +366,7 @@ function PasswordChangeSection() {
           <button
             type="submit"
             disabled={loading}
-            className="inline-flex items-center rounded-lg bg-blue-600 px-5 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex items-center rounded-lg bg-brand px-5 py-2 text-sm font-medium text-white transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {loading ? '修改中...' : '确认修改'}
           </button>

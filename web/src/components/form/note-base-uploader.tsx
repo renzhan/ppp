@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback } from 'react';
+import { CheckCircle2, XCircle } from 'lucide-react';
 
 export interface NoteBaseUploaderProps {
   projectId?: string;
@@ -118,24 +119,27 @@ export function NoteBaseUploader({ projectId, onUploadSuccess, onUploadError }: 
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         className={`
-          flex flex-col items-center justify-center rounded-md border-2 border-dashed px-4 py-6
+          flex flex-col items-center justify-center rounded-lg border-2 border-dashed px-4 py-6
           transition-colors cursor-pointer
           ${dragOver
-            ? 'border-blue-500 bg-blue-50'
-            : 'border-slate-300 bg-white hover:border-slate-400 hover:bg-slate-50'
+            ? 'border-brand bg-[#FFF8E1]'
+            : 'border-gray-300 bg-white hover:border-gray-400 hover:bg-gray-50'
           }
           ${uploading ? 'pointer-events-none opacity-60' : ''}
         `}
       >
         {uploading ? (
-          <div className="flex flex-col items-center gap-2">
-            <div className="h-6 w-6 animate-spin rounded-full border-2 border-slate-300 border-t-blue-500" />
-            <span className="text-sm text-slate-500">正在上传并解析...</span>
+          <div className="flex w-full flex-col items-center gap-2 px-4">
+            <div className="h-6 w-6 animate-spin rounded-full border-2 border-gray-300 border-t-brand" />
+            <span className="text-sm text-gray-500">正在上传并解析...</span>
+            <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-gray-200">
+              <div className="h-full animate-pulse rounded-full bg-brand" style={{ width: '60%' }} />
+            </div>
           </div>
         ) : (
           <>
             <svg
-              className="mb-2 h-8 w-8 text-slate-400"
+              className="mb-2 h-8 w-8 text-gray-400"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -148,10 +152,10 @@ export function NoteBaseUploader({ projectId, onUploadSuccess, onUploadError }: 
                 d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
               />
             </svg>
-            <p className="text-sm text-slate-600">
-              拖拽文件到此处，或 <span className="font-medium text-blue-600">点击选择文件</span>
+            <p className="text-sm text-gray-600">
+              拖拽文件到此处，或 <span className="font-medium text-brand">点击选择文件</span>
             </p>
-            <p className="mt-1 text-xs text-slate-400">仅支持 .xlsx 格式</p>
+            <p className="mt-1 text-xs text-gray-400">仅支持 .xlsx 格式</p>
           </>
         )}
       </div>
@@ -167,7 +171,7 @@ export function NoteBaseUploader({ projectId, onUploadSuccess, onUploadError }: 
 
       {result && (
         <div
-          className={`rounded-md px-3 py-2 text-sm ${
+          className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm ${
             result.type === 'success'
               ? 'bg-green-50 text-green-700'
               : 'bg-red-50 text-red-700'
@@ -175,10 +179,17 @@ export function NoteBaseUploader({ projectId, onUploadSuccess, onUploadError }: 
           role="status"
           aria-live="polite"
         >
-          {result.type === 'success'
-            ? `上传成功，共 ${result.count} 条笔记`
-            : result.message
-          }
+          {result.type === 'success' ? (
+            <CheckCircle2 size={16} className="shrink-0 text-green-500" />
+          ) : (
+            <XCircle size={16} className="shrink-0 text-red-500" />
+          )}
+          <span>
+            {result.type === 'success'
+              ? `上传成功，共 ${result.count} 条笔记`
+              : result.message
+            }
+          </span>
         </div>
       )}
     </div>

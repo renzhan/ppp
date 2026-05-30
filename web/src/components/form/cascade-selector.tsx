@@ -83,13 +83,13 @@ export function CascadeSelector({ treeData, value, onChange, disabled }: Cascade
   };
 
   const selectClass =
-    'block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500';
+    'block w-full rounded-sm border border-gray-300 bg-white px-3 h-10 text-sm text-gray-900 placeholder:text-gray-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20 disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-gray-50';
 
   if (loading) {
     return (
       <div className="grid grid-cols-3 gap-3">
         {[1, 2, 3].map((i) => (
-          <div key={i} className="h-9 animate-pulse rounded-md bg-slate-200" />
+          <div key={i} className="h-10 animate-pulse rounded-sm bg-gray-200" />
         ))}
       </div>
     );
@@ -99,7 +99,7 @@ export function CascadeSelector({ treeData, value, onChange, disabled }: Cascade
     <div className="grid grid-cols-3 gap-3">
       {/* 品类 */}
       <div>
-        <label className="mb-1 block text-xs font-medium text-slate-600">品类</label>
+        <label className="mb-1 block text-sm font-medium text-gray-700">品类</label>
         <select
           className={selectClass}
           value={value.category}
@@ -117,7 +117,7 @@ export function CascadeSelector({ treeData, value, onChange, disabled }: Cascade
 
       {/* 品牌 */}
       <div>
-        <label className="mb-1 block text-xs font-medium text-slate-600">品牌</label>
+        <label className="mb-1 block text-sm font-medium text-gray-700">品牌</label>
         <select
           className={selectClass}
           value={value.brand}
@@ -139,7 +139,7 @@ export function CascadeSelector({ treeData, value, onChange, disabled }: Cascade
 
       {/* 业务线 */}
       <div>
-        <label className="mb-1 block text-xs font-medium text-slate-600">业务线</label>
+        <label className="mb-1 block text-sm font-medium text-gray-700">业务线</label>
         <select
           className={selectClass}
           value={value.businessLine}

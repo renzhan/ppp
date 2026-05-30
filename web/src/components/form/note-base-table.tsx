@@ -139,9 +139,9 @@ export function NoteBaseTable({ projectId }: NoteBaseTableProps) {
     <div className="mt-4 space-y-3">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="text-sm text-slate-600">
+        <div className="text-sm text-gray-600">
           <span className="font-medium">总计</span>
-          <span className="ml-4 text-slate-500">
+          <span className="ml-4 text-gray-500">
             笔记数据共计{total}条
             {updatedAt && `，数据更新时间${formatDate(updatedAt)}`}
           </span>
@@ -149,7 +149,7 @@ export function NoteBaseTable({ projectId }: NoteBaseTableProps) {
         <button
           type="button"
           onClick={handleExport}
-          className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50"
+          className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600 transition hover:bg-gray-50"
         >
           <Download size={14} />
           导出现有数据
@@ -157,22 +157,22 @@ export function NoteBaseTable({ projectId }: NoteBaseTableProps) {
       </div>
 
       {/* Table */}
-      <div className="overflow-x-auto rounded-lg border border-slate-200">
+      <div className="overflow-x-auto bg-white rounded-lg border border-gray-200">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-slate-200 bg-slate-50">
-              <th className="whitespace-nowrap px-4 py-2.5 text-left font-medium text-slate-600">序号</th>
-              <th className="whitespace-nowrap px-4 py-2.5 text-left font-medium text-slate-600">笔记链接</th>
-              <th className="whitespace-nowrap px-4 py-2.5 text-left font-medium text-slate-600">笔记id</th>
-              <th className="whitespace-nowrap px-4 py-2.5 text-left font-medium text-slate-600">博主名称</th>
-              <th className="whitespace-nowrap px-4 py-2.5 text-left font-medium text-slate-600">内容方向</th>
-              <th className="whitespace-nowrap px-4 py-2.5 text-right font-medium text-slate-600">总消耗</th>
+            <tr className="border-b bg-gray-50">
+              <th className="whitespace-nowrap px-4 py-3 text-left text-sm font-medium text-gray-600">序号</th>
+              <th className="whitespace-nowrap px-4 py-3 text-left text-sm font-medium text-gray-600">笔记链接</th>
+              <th className="whitespace-nowrap px-4 py-3 text-left text-sm font-medium text-gray-600">笔记id</th>
+              <th className="whitespace-nowrap px-4 py-3 text-left text-sm font-medium text-gray-600">博主名称</th>
+              <th className="whitespace-nowrap px-4 py-3 text-left text-sm font-medium text-gray-600">内容方向</th>
+              <th className="whitespace-nowrap px-4 py-3 text-right text-sm font-medium text-gray-600">总消耗</th>
             </tr>
           </thead>
           <tbody>
             {isLoading ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-slate-400">
+                <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
                   加载中...
                 </td>
               </tr>
@@ -184,7 +184,7 @@ export function NoteBaseTable({ projectId }: NoteBaseTableProps) {
               </tr>
             ) : notes.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-slate-400">
+                <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
                   暂无数据
                 </td>
               </tr>
@@ -192,36 +192,36 @@ export function NoteBaseTable({ projectId }: NoteBaseTableProps) {
               notes.map((note, idx) => (
                 <tr
                   key={note.id}
-                  className="border-b border-slate-100 transition hover:bg-slate-50 last:border-b-0"
+                  className="bg-white text-sm text-gray-900 border-b hover:bg-gray-50 last:border-b-0"
                 >
-                  <td className="px-4 py-2.5 text-slate-500">
+                  <td className="px-4 py-3 text-gray-500">
                     {(page - 1) * pageSize + idx + 1}
                   </td>
-                  <td className="px-4 py-2.5">
+                  <td className="px-4 py-3">
                     {note.noteLink ? (
                       <a
                         href={note.noteLink}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-blue-600 hover:underline"
+                        className="text-brand hover:underline"
                         title={note.noteLink}
                       >
                         {truncateLink(note.noteLink)}
                       </a>
                     ) : (
-                      <span className="text-slate-400">-</span>
+                      <span className="text-gray-400">-</span>
                     )}
                   </td>
-                  <td className="px-4 py-2.5 font-mono text-xs text-slate-600">
+                  <td className="px-4 py-3 font-mono text-xs text-gray-600">
                     {note.noteId}
                   </td>
-                  <td className="px-4 py-2.5 text-slate-700">
-                    {note.kolNickName || <span className="text-slate-400">-</span>}
+                  <td className="px-4 py-3 text-gray-700">
+                    {note.kolNickName || <span className="text-gray-400">-</span>}
                   </td>
-                  <td className="px-4 py-2.5 text-slate-700">
-                    {getContentDirection(note) || <span className="text-slate-400">-</span>}
+                  <td className="px-4 py-3 text-gray-700">
+                    {getContentDirection(note) || <span className="text-gray-400">-</span>}
                   </td>
-                  <td className="px-4 py-2.5 text-right tabular-nums text-slate-700">
+                  <td className="px-4 py-3 text-right tabular-nums text-gray-700">
                     {Number(note.totalPlatformPrice).toLocaleString('zh-CN', {
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2,
@@ -237,28 +237,31 @@ export function NoteBaseTable({ projectId }: NoteBaseTableProps) {
       {/* Pagination */}
       {total > 0 && (
         <div className="flex items-center justify-between text-sm">
+          <p className="text-sm text-gray-500">
+            共 {total} 条记录，第 {page}/{totalPages} 页
+          </p>
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page <= 1}
-              className="inline-flex h-8 w-8 items-center justify-center rounded border border-slate-200 text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-sm bg-white border border-gray-300 text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
               aria-label="上一页"
             >
               <ChevronLeft size={16} />
             </button>
             {generatePageNumbers(page, totalPages).map((p, i) =>
               p === '...' ? (
-                <span key={`ellipsis-${i}`} className="px-1 text-slate-400">...</span>
+                <span key={`ellipsis-${i}`} className="px-1 text-gray-400">...</span>
               ) : (
                 <button
                   key={p}
                   type="button"
                   onClick={() => setPage(p as number)}
-                  className={`inline-flex h-8 w-8 items-center justify-center rounded border text-sm transition ${
+                  className={`inline-flex h-8 w-8 items-center justify-center rounded-sm text-sm transition ${
                     page === p
-                      ? 'border-blue-500 bg-blue-500 text-white'
-                      : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                      ? 'bg-brand text-white'
+                      : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
                   }`}
                 >
                   {p}
@@ -269,7 +272,7 @@ export function NoteBaseTable({ projectId }: NoteBaseTableProps) {
               type="button"
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page >= totalPages}
-              className="inline-flex h-8 w-8 items-center justify-center rounded border border-slate-200 text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-sm bg-white border border-gray-300 text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
               aria-label="下一页"
             >
               <ChevronRight size={16} />
@@ -282,7 +285,7 @@ export function NoteBaseTable({ projectId }: NoteBaseTableProps) {
                 setPageSize(Number(e.target.value));
                 setPage(1);
               }}
-              className="ml-2 h-8 rounded border border-slate-200 px-2 text-xs text-slate-600 outline-none"
+              className="ml-2 h-8 rounded-sm border border-gray-300 px-2 text-xs text-gray-600 outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
             >
               <option value={10}>10条/页</option>
               <option value={20}>20条/页</option>
@@ -291,12 +294,12 @@ export function NoteBaseTable({ projectId }: NoteBaseTableProps) {
             </select>
 
             {/* Jump to page */}
-            <span className="ml-2 text-xs text-slate-500">跳至</span>
+            <span className="ml-2 text-xs text-gray-500">跳至</span>
             <input
               type="number"
               min={1}
               max={totalPages}
-              className="h-8 w-12 rounded border border-slate-200 px-2 text-center text-xs outline-none"
+              className="h-8 w-12 rounded-sm border border-gray-300 px-2 text-center text-xs outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   const val = parseInt((e.target as HTMLInputElement).value, 10);
@@ -306,7 +309,7 @@ export function NoteBaseTable({ projectId }: NoteBaseTableProps) {
                 }
               }}
             />
-            <span className="text-xs text-slate-500">页</span>
+            <span className="text-xs text-gray-500">页</span>
           </div>
         </div>
       )}

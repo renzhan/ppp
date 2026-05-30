@@ -25,10 +25,21 @@ const navItems = [
   { href: '/admin/settings', label: '系统设置', icon: Settings, adminOnly: true },
 ];
 
-export function Sidebar() {
-  const [collapsed, setCollapsed] = useState(false);
+interface SidebarProps {
+  /** Whether the sidebar is in collapsed (icon-only) mode. Controlled by parent. */
+  collapsed?: boolean;
+  /** Callback to toggle collapse state. Controlled by parent. */
+  onToggleCollapse?: () => void;
+}
+
+export function Sidebar({ collapsed: controlledCollapsed, onToggleCollapse }: SidebarProps) {
+  // Internal state fallback when not controlled by parent
+  const [internalCollapsed, setInternalCollapsed] = useState(false);
   const [userRole, setUserRole] = useState<string | null>(null);
   const pathname = usePathname();
+
+  const collapsed = controlledCollapsed ?? internalCollapsed;
+  const handleToggle = onToggleCollapse ?? (() => setInternalCollapsed(!internalCollapsed));
 
   useEffect(() => {
     fetch('/api/auth/me')
@@ -47,17 +58,20 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        'flex h-screen flex-col bg-slate-900 transition-all duration-200',
-        collapsed ? 'w-16' : 'w-56'
+        'flex h-screen flex-col bg-white border-r border-gray-200 transition-all duration-200',
+        collapsed ? 'w-16' : 'w-[220px]'
       )}
     >
-      <div className="flex h-14 items-center justify-between border-b border-slate-700 px-4">
+      <div className="flex h-14 items-center justify-between border-b border-gray-200 px-4">
         {!collapsed && (
-          <span className="text-sm font-semibold text-white">派盘盘</span>
+          <img src="/images/logo.png" alt="派盘盘" className="h-8 object-contain" />
+        )}
+        {collapsed && (
+          <img src="/images/logo.png" alt="派盘盘" className="h-7 w-7 object-contain object-left" />
         )}
         <button
-          onClick={() => setCollapsed(!collapsed)}
-          className="rounded p-1 text-slate-400 hover:bg-white/5 hover:text-white"
+          onClick={handleToggle}
+          className="rounded p-1 text-gray-400 hover:text-gray-600"
           aria-label={collapsed ? '展开侧边栏' : '收起侧边栏'}
         >
           {collapsed ? <PanelLeft size={18} /> : <PanelLeftClose size={18} />}
@@ -76,28 +90,28 @@ export function Sidebar() {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                  'flex items-center gap-3 px-3 py-2 text-sm font-medium transition-colors',
                   isActive
-                    ? 'bg-white/10 text-white'
-                    : 'text-slate-300 hover:bg-white/5 hover:text-white'
+                    ? 'text-brand border-l-[3px] border-brand bg-brand-50 rounded-r-md'
+                    : 'text-gray-700 hover:bg-gray-50 rounded-md'
                 )}
                 title={collapsed ? item.label : undefined}
               >
-                <Icon size={18} className="shrink-0" />
-                {!collapsed && <span>{item.label}</span>}
+                <Icon size={20} className="shrink-0" />
+                {!collapsed && <span className="text-sm">{item.label}</span>}
               </Link>
             );
           })}
       </nav>
 
       {/* Logout button */}
-      <div className="border-t border-slate-700 px-2 py-3">
+      <div className="border-t border-gray-200 px-2 py-3">
         <button
           onClick={handleLogout}
-          className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-white/5 hover:text-white"
+          className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
           title={collapsed ? '退出登录' : undefined}
         >
-          <LogOut size={18} className="shrink-0" />
+          <LogOut size={20} className="shrink-0" />
           {!collapsed && <span>退出登录</span>}
         </button>
       </div>

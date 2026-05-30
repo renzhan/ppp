@@ -27,7 +27,7 @@ export function ReportChapterNav({
   isGenerating,
 }: ReportChapterNavProps) {
   return (
-    <aside className="w-48 flex-shrink-0 overflow-y-auto border-r bg-slate-50">
+    <aside className="w-48 flex-shrink-0 overflow-y-auto border-r bg-gray-50">
       <nav className="py-4">
         {chapters.map((chapter) => (
           <button
@@ -37,15 +37,15 @@ export function ReportChapterNav({
             className={cn(
               'flex w-full items-center gap-2 px-4 py-2 text-left text-xs transition-colors',
               activeChapterId === chapter.id
-                ? 'border-l-2 border-blue-600 bg-white text-blue-700 font-medium'
-                : 'border-l-2 border-transparent text-slate-600 hover:bg-white hover:text-slate-900'
+                ? 'border-l-2 border-brand bg-white text-brand font-medium'
+                : 'border-l-2 border-transparent text-gray-600 hover:bg-white hover:text-gray-900'
             )}
           >
             <span className={cn(
               'inline-flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full text-[10px] font-medium',
               activeChapterId === chapter.id
-                ? 'bg-blue-600 text-white'
-                : 'bg-slate-200 text-slate-600'
+                ? 'bg-brand text-white'
+                : 'bg-gray-200 text-gray-600'
             )}>
               {chapter.number}
             </span>
@@ -54,7 +54,7 @@ export function ReportChapterNav({
         ))}
 
         {isGenerating && (
-          <div className="flex items-center gap-2 px-4 py-2 text-xs text-blue-600">
+          <div className="flex items-center gap-2 px-4 py-2 text-xs text-brand">
             <Loader2 size={12} className="animate-spin" />
             <span>生成中...</span>
           </div>

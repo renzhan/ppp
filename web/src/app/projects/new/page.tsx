@@ -250,7 +250,7 @@ export default function NewProjectPage() {
         <div className="mx-auto max-w-3xl space-y-8">
           {/* 品类/品牌/业务线 - CascadeSelector */}
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-slate-900">
+            <label className="block text-sm font-medium text-gray-900">
               品类 / 品牌 / 业务线 <span className="text-rose-500">*</span>
             </label>
             <CascadeSelector
@@ -264,7 +264,7 @@ export default function NewProjectPage() {
 
           {/* 项目名称 - with suggestions */}
           <div className="space-y-2" ref={suggestionsRef}>
-            <label className="block text-sm font-medium text-slate-900">
+            <label className="block text-sm font-medium text-gray-900">
               项目名称 <span className="text-rose-500">*</span>
             </label>
             <div className="relative">
@@ -278,10 +278,10 @@ export default function NewProjectPage() {
                 }}
                 onFocus={() => setShowSuggestions(true)}
                 placeholder="输入项目名称或从已导入项目中选择"
-                className="h-11 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                className="h-11 w-full rounded-lg border border-gray-200 px-3 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
               />
               {showSuggestions && filteredSuggestions.length > 0 && (
-                <div className="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg">
+                <div className="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
                   {filteredSuggestions.map((project) => (
                     <button
                       key={project.id}
@@ -290,7 +290,7 @@ export default function NewProjectPage() {
                         setForm((prev) => ({ ...prev, projectName: project.projectName }));
                         setShowSuggestions(false);
                       }}
-                      className="w-full px-3 py-2 text-left text-sm text-slate-700 transition hover:bg-blue-50 hover:text-blue-700"
+                      className="w-full px-3 py-2 text-left text-sm text-gray-700 transition hover:bg-brand-50 hover:text-brand"
                     >
                       {project.projectName}
                     </button>
@@ -303,49 +303,49 @@ export default function NewProjectPage() {
 
           {/* 创建者 - auto-filled, read-only */}
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-slate-900">创建者</label>
+            <label className="block text-sm font-medium text-gray-900">创建者</label>
             <input
               type="text"
               value={currentUser ? (currentUser.displayName || currentUser.username) : '加载中...'}
               readOnly
               disabled
-              className="h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-500 outline-none"
+              className="h-11 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 text-sm text-gray-500 outline-none"
             />
           </div>
 
           {/* 参与者 - multi-select */}
           <div className="space-y-2" ref={participantRef}>
-            <label className="block text-sm font-medium text-slate-900">参与者</label>
+            <label className="block text-sm font-medium text-gray-900">参与者</label>
             <div className="relative">
               <div
                 onClick={() => setShowParticipantDropdown(!showParticipantDropdown)}
-                className="flex min-h-[44px] w-full cursor-pointer flex-wrap items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm transition hover:border-slate-300 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100"
+                className="flex min-h-[44px] w-full cursor-pointer flex-wrap items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-sm transition hover:border-gray-300 focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/20"
               >
                 {form.participants.length === 0 && (
-                  <span className="text-slate-400">点击选择参与者</span>
+                  <span className="text-gray-400">点击选择参与者</span>
                 )}
                 {form.participants.map((userId) => (
                   <span
                     key={userId}
-                    className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700"
+                    className="inline-flex items-center gap-1 rounded-md bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand"
                   >
                     {getDisplayName(userId)}
                     <button
                       type="button"
                       onClick={(e) => { e.stopPropagation(); removeParticipant(userId); }}
-                      className="ml-0.5 rounded-full p-0.5 transition hover:bg-blue-100"
+                      className="ml-0.5 rounded-full p-0.5 transition hover:bg-brand-100"
                     >
                       <X size={12} />
                     </button>
                   </span>
                 ))}
-                <ChevronDown size={16} className="ml-auto text-slate-400" />
+                <ChevronDown size={16} className="ml-auto text-gray-400" />
               </div>
 
               {showParticipantDropdown && (
-                <div className="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg">
+                <div className="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
                   {availableParticipants.length === 0 ? (
-                    <div className="px-3 py-2 text-sm text-slate-400">暂无可选用户</div>
+                    <div className="px-3 py-2 text-sm text-gray-400">暂无可选用户</div>
                   ) : (
                     availableParticipants.map((user) => {
                       const isSelected = form.participants.includes(user.id);
@@ -356,12 +356,12 @@ export default function NewProjectPage() {
                           onClick={() => toggleParticipant(user.id)}
                           className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition ${
                             isSelected
-                              ? 'bg-blue-50 text-blue-700'
-                              : 'text-slate-700 hover:bg-slate-50'
+                              ? 'bg-brand-50 text-brand'
+                              : 'text-gray-700 hover:bg-gray-50'
                           }`}
                         >
                           <span className={`flex h-4 w-4 items-center justify-center rounded border ${
-                            isSelected ? 'border-blue-500 bg-blue-500' : 'border-slate-300'
+                            isSelected ? 'border-brand bg-brand' : 'border-gray-300'
                           }`}>
                             {isSelected && (
                               <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -371,7 +371,7 @@ export default function NewProjectPage() {
                           </span>
                           <span>{user.displayName || user.username}</span>
                           {user.role && user.role !== 'admin' && (
-                            <span className="ml-auto text-xs text-slate-400">{user.role}</span>
+                            <span className="ml-auto text-xs text-gray-400">{user.role}</span>
                           )}
                         </button>
                       );
@@ -384,7 +384,7 @@ export default function NewProjectPage() {
 
           {/* 立项时间 */}
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-slate-900">
+            <label className="block text-sm font-medium text-gray-900">
               立项时间 <span className="text-rose-500">*</span>
             </label>
             <input
@@ -394,23 +394,23 @@ export default function NewProjectPage() {
                 setForm((prev) => ({ ...prev, startDate: e.target.value }));
                 setErrors((prev) => { const n = { ...prev }; delete n.startDate; return n; });
               }}
-              className="h-11 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              className="h-11 w-full rounded-lg border border-gray-200 px-3 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
             />
             {errors.startDate && <p className="text-xs text-rose-500">{errors.startDate}</p>}
           </div>
 
           {/* 笔记底表上传 - optional */}
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-slate-900">笔记底表（可选）</label>
-            <p className="text-xs text-slate-500">
+            <label className="block text-sm font-medium text-gray-900">笔记底表（可选）</label>
+            <p className="text-xs text-gray-500">
               可选上传，创建项目后将自动解析。也可后续通过编辑项目上传。
             </p>
             {createdProjectId && pendingNoteFile ? (
               // 已创建项目且有待上传文件 - 显示解析状态
-              <div className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3">
-                <p className="text-sm text-slate-700 font-medium">{pendingNoteFile.name}</p>
+              <div className="rounded-md border border-gray-200 bg-gray-50 px-4 py-3">
+                <p className="text-sm text-gray-700 font-medium">{pendingNoteFile.name}</p>
                 {noteUploadStatus === 'uploading' && (
-                  <p className="mt-1 flex items-center gap-2 text-xs text-blue-600">
+                  <p className="mt-1 flex items-center gap-2 text-xs text-brand">
                     <Loader2 size={12} className="animate-spin" />
                     正在解析笔记底表...
                   </p>
@@ -431,18 +431,18 @@ export default function NewProjectPage() {
               />
             ) : (
               <div>
-                <label className="flex cursor-pointer flex-col items-center justify-center rounded-md border-2 border-dashed border-slate-300 bg-white px-4 py-6 transition-colors hover:border-slate-400 hover:bg-slate-50">
-                  <svg className="mb-2 h-8 w-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <label className="flex cursor-pointer flex-col items-center justify-center rounded-md border-2 border-dashed border-gray-300 bg-white px-4 py-6 transition-colors hover:border-gray-400 hover:bg-gray-50">
+                  <svg className="mb-2 h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                   </svg>
                   {pendingNoteFile ? (
                     <p className="text-sm text-emerald-600 font-medium">已选择: {pendingNoteFile.name}</p>
                   ) : (
                     <>
-                      <p className="text-sm text-slate-600">
-                        点击选择 <span className="font-medium text-blue-600">.xlsx</span> 笔记底表文件
+                      <p className="text-sm text-gray-600">
+                        点击选择 <span className="font-medium text-brand">.xlsx</span> 笔记底表文件
                       </p>
-                      <p className="mt-1 text-xs text-slate-400">创建项目后将自动上传</p>
+                      <p className="mt-1 text-xs text-gray-400">创建项目后将自动上传</p>
                     </>
                   )}
                   <input
@@ -465,7 +465,7 @@ export default function NewProjectPage() {
                   <button
                     type="button"
                     onClick={() => setPendingNoteFile(null)}
-                    className="mt-2 text-xs text-slate-500 hover:text-rose-500"
+                    className="mt-2 text-xs text-gray-500 hover:text-rose-500"
                   >
                     取消选择
                   </button>
@@ -484,7 +484,7 @@ export default function NewProjectPage() {
                 <button
                   type="button"
                   onClick={() => router.push('/')}
-                  className="inline-flex h-10 items-center gap-2 rounded-lg bg-blue-600 px-5 text-sm font-medium text-white transition hover:bg-blue-700"
+                  className="inline-flex h-10 items-center gap-2 rounded-lg bg-brand px-5 text-sm font-medium text-white transition hover:bg-brand-600"
                 >
                   返回项目列表
                 </button>
@@ -496,7 +496,7 @@ export default function NewProjectPage() {
                 type="button"
                 onClick={handleSubmit}
                 disabled={createProjectMutation.isPending}
-                className="inline-flex h-12 items-center gap-2 rounded-lg bg-blue-600 px-6 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex h-12 items-center gap-2 rounded-lg bg-brand px-6 text-sm font-medium text-white transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {createProjectMutation.isPending ? (
                   <Loader2 size={16} className="animate-spin" />

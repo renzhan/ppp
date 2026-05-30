@@ -40,11 +40,11 @@ export default function ReviewListPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-gray-900">复盘系统</h1>
-          <p className="mt-1 text-sm text-slate-500">管理所有复盘记录，查看复盘报告和进入审校台。</p>
+          <p className="mt-1 text-sm text-gray-500">管理所有复盘记录，查看复盘报告和进入审校台。</p>
         </div>
         <Link
           href="/review/new"
-          className="inline-flex h-10 items-center gap-2 rounded-lg bg-blue-600 px-5 text-sm font-medium text-white transition hover:bg-blue-700"
+          className="inline-flex h-10 items-center gap-2 rounded-md bg-brand px-5 text-sm font-medium text-white transition hover:bg-brand-600"
         >
           <Plus size={16} />
           开始新的复盘
@@ -59,28 +59,28 @@ export default function ReviewListPage() {
           {(error as Error).message || '获取复盘列表失败'}
         </div>
       ) : data?.items.length ? (
-        <div className="overflow-hidden rounded-lg border bg-white">
+        <div className="bg-white rounded-lg border border-gray-200">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b bg-slate-50 text-left">
-                  <th className="whitespace-nowrap px-4 py-3 font-medium text-slate-600">项目名称</th>
-                  <th className="whitespace-nowrap px-4 py-3 font-medium text-slate-600">复盘者</th>
-                  <th className="whitespace-nowrap px-4 py-3 font-medium text-slate-600">更新时间</th>
-                  <th className="whitespace-nowrap px-4 py-3 font-medium text-slate-600">状态</th>
-                  <th className="whitespace-nowrap px-4 py-3 font-medium text-slate-600">操作</th>
+                <tr className="border-b bg-gray-50 text-left">
+                  <th className="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-600">项目名称</th>
+                  <th className="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-600">复盘者</th>
+                  <th className="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-600">更新时间</th>
+                  <th className="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-600">状态</th>
+                  <th className="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-600">操作</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
                 {data.items.map((review) => (
-                  <tr key={review.id} className="transition hover:bg-slate-50">
-                    <td className="max-w-[200px] truncate px-4 py-3 font-medium text-slate-900">
+                  <tr key={review.id} className="bg-white text-sm text-gray-900 border-b transition hover:bg-gray-50">
+                    <td className="max-w-[200px] truncate px-4 py-3 font-medium">
                       {review.projectName}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-slate-700">
+                    <td className="whitespace-nowrap px-4 py-3">
                       {review.createdByDisplayName || '-'}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-slate-700">
+                    <td className="whitespace-nowrap px-4 py-3">
                       {formatDate(review.updatedAt)}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3">
@@ -90,14 +90,14 @@ export default function ReviewListPage() {
                       <div className="flex items-center gap-2">
                         <Link
                           href={`/review/${review.id}`}
-                          className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-blue-600 transition hover:bg-blue-50"
+                          className="inline-flex items-center gap-1 text-xs font-medium text-brand transition hover:underline"
                         >
                           <Pencil size={12} />
                           编辑
                         </Link>
                         <Link
                           href={`/review/${review.id}/proofread`}
-                          className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-emerald-600 transition hover:bg-emerald-50"
+                          className="inline-flex items-center gap-1 text-xs font-medium text-brand transition hover:underline"
                         >
                           <BookOpen size={12} />
                           审校台
@@ -111,7 +111,7 @@ export default function ReviewListPage() {
           </div>
         </div>
       ) : (
-        <div className="rounded-lg border bg-white px-6 py-16 text-center text-sm text-slate-500">
+        <div className="rounded-lg border bg-white px-6 py-16 text-center text-sm text-gray-500">
           暂无复盘记录，点击"开始新的复盘"创建第一个复盘。
         </div>
       )}
@@ -121,12 +121,12 @@ export default function ReviewListPage() {
 
 function StatusBadge({ status }: { status: string }) {
   const config: Record<string, { label: string; className: string }> = {
-    draft: { label: '草稿', className: 'bg-slate-100 text-slate-700' },
+    draft: { label: '草稿', className: 'bg-gray-100 text-gray-700' },
     generating: { label: '生成中', className: 'bg-amber-100 text-amber-700' },
     completed: { label: '已完成', className: 'bg-emerald-100 text-emerald-700' },
   };
 
-  const { label, className } = config[status] ?? { label: status, className: 'bg-slate-100 text-slate-700' };
+  const { label, className } = config[status] ?? { label: status, className: 'bg-gray-100 text-gray-700' };
 
   return (
     <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${className}`}>
