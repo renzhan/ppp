@@ -10,13 +10,13 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
-  LineChart,
-  Line,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
 } from 'recharts';
-import { Search, Download, FileText, MessageCircle } from 'lucide-react';
+import { Search, Download, FileText, MessageCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Loading } from '@/components/ui/loading';
 import { formatDate } from '@/lib/project-meta';
 
@@ -44,7 +44,16 @@ interface SentimentResponse {
   sentimentDistribution: SentimentDataItem[];
   trend: SentimentDataItem[];
   keywords: SentimentDataItem[];
-  negativeComments: SentimentDataItem[];
+  comments: SentimentDataItem[];
+}
+
+interface CommentItem {
+  id: string;
+  content: string;
+  author: string;
+  date: string;
+  sentiment: 'positive' | 'neutral' | 'negative';
+  likes: number;
 }
 
 interface ExportRecord {
@@ -69,6 +78,14 @@ const SENTIMENT_LABELS: Record<string, string> = {
   negative: '负向',
 };
 
+const SENTIMENT_TAB_COLORS: Record<string, string> = {
+  positive: 'text-green-600 border-green-600',
+  neutral: 'text-slate-600 border-slate-600',
+  negative: 'text-red-600 border-red-600',
+};
+
+const PAGE_SIZE = 10;
+
 export default function SentimentPage() {
   return (
     <Suspense fallback={<Loading size="lg" text="加载中..." className="py-20" />}>
@@ -89,6 +106,8 @@ function SentimentPageContent() {
   const [selectedProjectId, setSelectedProjectId] = useState(initialProjectId);
   const [activeProjectId, setActiveProjectId] = useState(initialProjectId);
   const [showExportRecords, setShowExportRecords] = useState(false);
+  const [commentFilter, setCommentFilter] = useState<'all' | 'positive' | 'negative' | 'neutral'>('all');
+  const [commentPage, setCommentPage] = useState(1);
 
   // Fetch tree structure for cascade selectors
   const { data: treeData } = useQuery<TreeNode[]>({
@@ -142,7 +161,22 @@ function SentimentPageContent() {
     queryFn: async () => {
       const response = await fetch(`/api/sentiment/${activeProjectId}`);
       if (!response.ok) throw new Error('获取舆情数据失败');
-      return response.json();
+      const data = await response.json();
+      console.log('[SentimentPage] API 返回数据:', {
+        keys: Object.keys(data),
+        trend: data.trend?.length ?? 'undefined',
+        keywords: data.keywords?.length ?? 'undefined',
+        comments: data.comments?.length ?? 'undefined',
+        negativeComments: data.negativeComments?.length ?? 'undefined',
+        sentimentDistribution: data.sentimentDistribution?.length ?? 'undefined',
+      });
+      if (data.trend?.length > 0) {
+        console.log('[SentimentPage] trend[0]:', data.trend[0]);
+      }
+      if (data.keywords?.length > 0) {
+        console.log('[SentimentPage] keywords[0].dataContent:', data.keywords[0].dataContent);
+      }
+      return data;
     },
     enabled: !!activeProjectId,
   });
@@ -197,10 +231,12 @@ function SentimentPageContent() {
   const handleViewSentiment = () => {
     if (selectedProjectId) {
       setActiveProjectId(selectedProjectId);
+      setCommentFilter('all');
+      setCommentPage(1);
     }
   };
 
-  // Parse sentiment distribution data for pie chart
+  // Parse sentiment distribution data for pie chart (donut style with counts in legend)
   const pieChartData = useMemo(() => {
     if (!sentimentData?.sentimentDistribution?.length) return [];
     const latest = sentimentData.sentimentDistribution[0];
@@ -212,16 +248,28 @@ function SentimentPageContent() {
     }));
   }, [sentimentData]);
 
-  // Parse trend data for line chart
+  // Parse trend data for bar chart
   const trendChartData = useMemo(() => {
-    if (!sentimentData?.trend?.length) return [];
-    return sentimentData.trend.map((item) => {
-      const content = item.dataContent as Record<string, unknown>;
-      return {
-        date: item.periodStart ? formatDate(item.periodStart) : '',
-        ...content,
-      };
-    });
+    if (!sentimentData?.trend?.length) {
+      console.log('[SentimentPage] trend 数据为空, sentimentData.trend =', sentimentData?.trend);
+      return [];
+    }
+    console.log('[SentimentPage] trend 原始数据条数:', sentimentData.trend.length, '前3条:', sentimentData.trend.slice(0, 3));
+    const result = sentimentData.trend
+      .filter((item) => item.periodStart)
+      .sort((a, b) => (a.periodStart! > b.periodStart! ? 1 : -1))
+      .map((item) => {
+        const content = item.dataContent as Record<string, unknown>;
+        return {
+          date: item.periodStart ? formatDate(item.periodStart) : '',
+          count: Number(content.count ?? 0),
+          positive: Number(content.positive ?? 0),
+          neutral: Number(content.neutral ?? 0),
+          negative: Number(content.negative ?? 0),
+        };
+      });
+    console.log('[SentimentPage] trend 处理后:', result.length, '条, 前3条:', result.slice(0, 3));
+    return result;
   }, [sentimentData]);
 
   // Parse keywords data
@@ -232,20 +280,44 @@ function SentimentPageContent() {
     return content.keywords ?? [];
   }, [sentimentData]);
 
-  // Parse negative comments
-  const negativeComments = useMemo(() => {
-    if (!sentimentData?.negativeComments?.length) return [];
-    return sentimentData.negativeComments.map((item) => {
-      const content = item.dataContent as { content?: string; source?: string; author?: string; date?: string };
+  // Total keyword count for frequency calculation
+  const totalKeywordCount = useMemo(() => {
+    return keywordsData.reduce((sum, kw) => sum + kw.count, 0);
+  }, [keywordsData]);
+
+  // Parse all comments
+  const allComments = useMemo((): CommentItem[] => {
+    if (!sentimentData?.comments?.length) return [];
+    return sentimentData.comments.map((item) => {
+      const content = item.dataContent as {
+        content?: string;
+        author?: string;
+        date?: string;
+        sentiment?: string;
+        likes?: number;
+      };
       return {
         id: item.id,
         content: content.content ?? '',
-        source: content.source ?? '',
-        author: content.author ?? '',
+        author: content.author ?? '匿名用户',
         date: content.date ?? '',
+        sentiment: (content.sentiment as CommentItem['sentiment']) ?? 'neutral',
+        likes: content.likes ?? 0,
       };
     });
   }, [sentimentData]);
+
+  // Filtered and paginated comments
+  const filteredComments = useMemo(() => {
+    if (commentFilter === 'all') return allComments;
+    return allComments.filter((c) => c.sentiment === commentFilter);
+  }, [allComments, commentFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredComments.length / PAGE_SIZE));
+  const paginatedComments = useMemo(() => {
+    const start = (commentPage - 1) * PAGE_SIZE;
+    return filteredComments.slice(start, start + PAGE_SIZE);
+  }, [filteredComments, commentPage]);
 
   return (
     <div className="space-y-6">
@@ -281,7 +353,6 @@ function SentimentPageContent() {
       {/* Filter Bar */}
       <div className="rounded-lg border bg-white p-4">
         <div className="flex flex-wrap items-end gap-3">
-          {/* Category */}
           <div className="min-w-[140px]">
             <label className="mb-1 block text-xs font-medium text-slate-600">品类</label>
             <select
@@ -295,8 +366,6 @@ function SentimentPageContent() {
               ))}
             </select>
           </div>
-
-          {/* Brand */}
           <div className="min-w-[140px]">
             <label className="mb-1 block text-xs font-medium text-slate-600">品牌</label>
             <select
@@ -311,8 +380,6 @@ function SentimentPageContent() {
               ))}
             </select>
           </div>
-
-          {/* Business Line */}
           <div className="min-w-[140px]">
             <label className="mb-1 block text-xs font-medium text-slate-600">业务线</label>
             <select
@@ -327,8 +394,6 @@ function SentimentPageContent() {
               ))}
             </select>
           </div>
-
-          {/* Project Name */}
           <div className="min-w-[180px]">
             <label className="mb-1 block text-xs font-medium text-slate-600">项目名称</label>
             <select
@@ -342,8 +407,6 @@ function SentimentPageContent() {
               ))}
             </select>
           </div>
-
-          {/* View Sentiment Button */}
           <button
             type="button"
             onClick={handleViewSentiment}
@@ -374,19 +437,10 @@ function SentimentPageContent() {
                   {exportRecordsData.records.map((record) => (
                     <tr key={record.id} className="hover:bg-slate-50">
                       <td className="px-3 py-2 text-slate-700">{record.fileName}</td>
-                      <td className="whitespace-nowrap px-3 py-2 text-slate-700">
-                        {formatDate(record.createdAt)}
-                      </td>
+                      <td className="whitespace-nowrap px-3 py-2 text-slate-700">{formatDate(record.createdAt)}</td>
                       <td className="px-3 py-2">
                         {record.fileUrl && (
-                          <a
-                            href={record.fileUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-xs font-medium text-blue-600 hover:underline"
-                          >
-                            下载
-                          </a>
+                          <a href={record.fileUrl} target="_blank" rel="noopener noreferrer" className="text-xs font-medium text-blue-600 hover:underline">下载</a>
                         )}
                       </td>
                     </tr>
@@ -400,7 +454,6 @@ function SentimentPageContent() {
         </div>
       )}
 
-      {/* Export Error */}
       {exportMutation.isError && (
         <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-600">
           {(exportMutation.error as Error).message || '导出失败'}
@@ -421,91 +474,84 @@ function SentimentPageContent() {
         </div>
       ) : (
         <div className="space-y-6">
-          {/* Charts Row */}
+          {/* Row 1: Pie Chart + Bar Chart */}
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            {/* Sentiment Distribution Pie Chart */}
+            {/* Sentiment Distribution - Donut Chart */}
             <div className="rounded-lg border bg-white p-4">
               <h3 className="mb-3 text-sm font-medium text-slate-900">情感倾向分布</h3>
               {pieChartData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={300}>
+                <ResponsiveContainer width="100%" height={280}>
                   <PieChart>
                     <Pie
                       data={pieChartData}
                       cx="50%"
                       cy="50%"
+                      innerRadius={60}
                       outerRadius={100}
                       dataKey="value"
                       nameKey="name"
-                      label={({ name, percent }) =>
-                        `${name} ${((percent ?? 0) * 100).toFixed(1)}%`
-                      }
                     >
                       {pieChartData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
                     </Pie>
                     <Tooltip formatter={(value) => [Number(value).toLocaleString(), '数量']} />
-                    <Legend />
+                    <Legend
+                      formatter={(value, entry) => {
+                        const item = pieChartData.find((d) => d.name === value);
+                        return `${value} ${item?.value ?? 0}`;
+                      }}
+                    />
                   </PieChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="flex h-[300px] items-center justify-center text-sm text-slate-400">
-                  暂无情感分布数据
-                </div>
+                <div className="flex h-[280px] items-center justify-center text-sm text-slate-400">暂无情感分布数据</div>
               )}
             </div>
 
-            {/* Comment Trend Line Chart */}
+            {/* Comment Trend - Bar Chart */}
             <div className="rounded-lg border bg-white p-4">
               <h3 className="mb-3 text-sm font-medium text-slate-900">评论数变化趋势</h3>
               {trendChartData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={trendChartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-                    <YAxis tick={{ fontSize: 12 }} />
+                <ResponsiveContainer width="100%" height={280}>
+                  <BarChart data={trendChartData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="date" tick={{ fontSize: 11 }} angle={-30} textAnchor="end" height={50} />
+                    <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
                     <Tooltip />
-                    <Legend />
-                    <Line
-                      type="monotone"
-                      dataKey="count"
-                      name="评论数"
-                      stroke="#8b5cf6"
-                      strokeWidth={2}
-                      dot={{ r: 3 }}
-                      activeDot={{ r: 5 }}
-                    />
-                  </LineChart>
+                    <Bar dataKey="count" name="评论数" fill="#8b5cf6" radius={[2, 2, 0, 0]} />
+                  </BarChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="flex h-[300px] items-center justify-center text-sm text-slate-400">
-                  暂无趋势数据
-                </div>
+                <div className="flex h-[280px] items-center justify-center text-sm text-slate-400">暂无趋势数据</div>
               )}
             </div>
           </div>
 
-          {/* Keywords Section */}
+          {/* Row 2: Keywords */}
           <div className="rounded-lg border bg-white p-4">
-            <h3 className="mb-3 text-sm font-medium text-slate-900">关键词高频分布</h3>
+            <h3 className="mb-3 text-sm font-medium text-slate-900">关键词高频分布统计</h3>
             {keywordsData.length > 0 ? (
               <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                {/* Tag Cloud */}
+                {/* Word Cloud */}
                 <div>
                   <h4 className="mb-2 text-xs font-medium text-slate-600">关键词云</h4>
-                  <div className="flex flex-wrap gap-2 rounded-md border border-slate-100 bg-slate-50 p-4">
+                  <div className="flex min-h-[200px] flex-wrap items-center justify-center gap-x-3 gap-y-2 rounded-md border border-slate-100 bg-slate-50 p-6">
                     {keywordsData.map((kw, idx) => {
-                      const maxCount = Math.max(...keywordsData.map((k) => k.count));
-                      const minSize = 12;
-                      const maxSize = 28;
-                      const size = maxCount > 0
-                        ? minSize + ((kw.count / maxCount) * (maxSize - minSize))
-                        : minSize;
+                      const maxCount = keywordsData[0]?.count || 1;
+                      const ratio = kw.count / maxCount;
+                      // 更大的字体差异：14px ~ 42px
+                      const size = 14 + ratio * 28;
+                      // 颜色深浅：频次越高颜色越深
+                      const opacity = 0.4 + ratio * 0.6;
                       return (
                         <span
                           key={idx}
-                          className="inline-block text-violet-700"
-                          style={{ fontSize: `${size}px` }}
+                          className="inline-block font-medium"
+                          style={{
+                            fontSize: `${size}px`,
+                            color: `rgba(79, 70, 229, ${opacity})`,
+                          }}
                         >
                           {kw.word}
                         </span>
@@ -514,24 +560,26 @@ function SentimentPageContent() {
                   </div>
                 </div>
 
-                {/* Keyword Frequency Table */}
+                {/* Keyword Frequency Table with frequency rate */}
                 <div>
-                  <h4 className="mb-2 text-xs font-medium text-slate-600">关键词频次</h4>
-                  <div className="max-h-[300px] overflow-y-auto">
+                  <h4 className="mb-2 text-xs font-medium text-slate-600">高频词指数</h4>
+                  <div className="max-h-[320px] overflow-y-auto">
                     <table className="w-full text-sm">
-                      <thead>
+                      <thead className="sticky top-0">
                         <tr className="border-b bg-slate-50 text-left">
-                          <th className="px-3 py-2 font-medium text-slate-600">排名</th>
                           <th className="px-3 py-2 font-medium text-slate-600">关键词</th>
-                          <th className="px-3 py-2 font-medium text-slate-600">频次</th>
+                          <th className="px-3 py-2 font-medium text-slate-600">数量</th>
+                          <th className="px-3 py-2 font-medium text-slate-600">频率</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y">
                         {keywordsData.map((kw, idx) => (
                           <tr key={idx} className="hover:bg-slate-50">
-                            <td className="px-3 py-2 text-slate-500">{idx + 1}</td>
                             <td className="px-3 py-2 text-slate-900">{kw.word}</td>
                             <td className="px-3 py-2 text-slate-700">{kw.count}</td>
+                            <td className="px-3 py-2 text-slate-500">
+                              {totalKeywordCount > 0 ? ((kw.count / totalKeywordCount) * 100).toFixed(2) + '%' : '-'}
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -544,27 +592,123 @@ function SentimentPageContent() {
             )}
           </div>
 
-          {/* Negative Comments List */}
+          {/* Row 3: Comments List with tabs and pagination */}
           <div className="rounded-lg border bg-white p-4">
-            <h3 className="mb-3 text-sm font-medium text-slate-900">负向评论列表</h3>
-            {negativeComments.length > 0 ? (
-              <div className="space-y-3">
-                {negativeComments.map((comment) => (
-                  <div
-                    key={comment.id}
-                    className="rounded-md border border-rose-100 bg-rose-50/50 p-3"
+            <h3 className="mb-3 text-sm font-medium text-slate-900">评论文本</h3>
+
+            {/* Tabs */}
+            <div className="mb-4 flex gap-1 border-b border-slate-200">
+              {(['all', 'positive', 'negative', 'neutral'] as const).map((tab) => {
+                const label = tab === 'all' ? '全部' : SENTIMENT_LABELS[tab];
+                const count = tab === 'all'
+                  ? allComments.length
+                  : allComments.filter((c) => c.sentiment === tab).length;
+                const isActive = commentFilter === tab;
+                return (
+                  <button
+                    key={tab}
+                    type="button"
+                    onClick={() => { setCommentFilter(tab); setCommentPage(1); }}
+                    className={`px-4 py-2 text-sm font-medium transition border-b-2 -mb-px ${
+                      isActive
+                        ? (tab === 'all' ? 'text-blue-600 border-blue-600' : SENTIMENT_TAB_COLORS[tab])
+                        : 'text-slate-500 border-transparent hover:text-slate-700'
+                    }`}
                   >
-                    <p className="text-sm text-slate-800">{comment.content}</p>
-                    <div className="mt-2 flex items-center gap-3 text-xs text-slate-500">
-                      {comment.source && <span>来源: {comment.source}</span>}
-                      {comment.author && <span>作者: {comment.author}</span>}
-                      {comment.date && <span>时间: {comment.date}</span>}
+                    {label} ({count})
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Comments Table */}
+            {paginatedComments.length > 0 ? (
+              <>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b bg-slate-50 text-left">
+                        <th className="whitespace-nowrap px-3 py-2 font-medium text-slate-600">时间</th>
+                        <th className="px-3 py-2 font-medium text-slate-600">描述</th>
+                        <th className="whitespace-nowrap px-3 py-2 font-medium text-slate-600">情感倾向</th>
+                        <th className="whitespace-nowrap px-3 py-2 text-right font-medium text-slate-600">评论点赞数量</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {paginatedComments.map((comment) => (
+                        <tr key={comment.id} className="hover:bg-slate-50">
+                          <td className="whitespace-nowrap px-3 py-3 text-sm text-blue-600">{comment.date || '-'}</td>
+                          <td className="max-w-[400px] px-3 py-3 text-sm text-slate-800">{comment.content}</td>
+                          <td className="whitespace-nowrap px-3 py-3">
+                            <span
+                              className="text-sm"
+                              style={{ color: SENTIMENT_COLORS[comment.sentiment] }}
+                            >
+                              {SENTIMENT_LABELS[comment.sentiment]}
+                            </span>
+                          </td>
+                          <td className="whitespace-nowrap px-3 py-3 text-right text-sm text-slate-700">{comment.likes}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div className="mt-4 flex items-center justify-between border-t pt-3">
+                    <span className="text-xs text-slate-500">
+                      共 {filteredComments.length} 条，每页 {PAGE_SIZE} 条
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setCommentPage((p) => Math.max(1, p - 1))}
+                        disabled={commentPage <= 1}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded border text-slate-600 transition hover:bg-slate-50 disabled:opacity-30"
+                      >
+                        <ChevronLeft size={14} />
+                      </button>
+                      {Array.from({ length: Math.min(7, totalPages) }, (_, i) => {
+                        let page: number;
+                        if (totalPages <= 7) {
+                          page = i + 1;
+                        } else if (commentPage <= 4) {
+                          page = i + 1;
+                        } else if (commentPage >= totalPages - 3) {
+                          page = totalPages - 6 + i;
+                        } else {
+                          page = commentPage - 3 + i;
+                        }
+                        return (
+                          <button
+                            key={page}
+                            type="button"
+                            onClick={() => setCommentPage(page)}
+                            className={`inline-flex h-8 w-8 items-center justify-center rounded text-sm transition ${
+                              page === commentPage
+                                ? 'bg-blue-600 text-white'
+                                : 'border text-slate-600 hover:bg-slate-50'
+                            }`}
+                          >
+                            {page}
+                          </button>
+                        );
+                      })}
+                      <button
+                        type="button"
+                        onClick={() => setCommentPage((p) => Math.min(totalPages, p + 1))}
+                        disabled={commentPage >= totalPages}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded border text-slate-600 transition hover:bg-slate-50 disabled:opacity-30"
+                      >
+                        <ChevronRight size={14} />
+                      </button>
                     </div>
                   </div>
-                ))}
-              </div>
+                )}
+              </>
             ) : (
-              <p className="py-8 text-center text-sm text-slate-400">暂无负向评论数据</p>
+              <p className="py-8 text-center text-sm text-slate-400">暂无评论数据</p>
             )}
           </div>
         </div>

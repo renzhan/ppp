@@ -34,7 +34,7 @@ interface AdvertiserListResponse {
 /** 聚光笔记报表 API 返回的原始记录（值均为 string） */
 interface RawJuguangNote {
   note_id?: string;
-  placement?: string;             // 广告类型：信息流、视频流、搜索
+  placement?: string;             // 广告类型：1-信息流、2-搜索、4-全站智投、7-视频流
   targets_detail?: string;        // 精准定向名称
   keyword?: string;               // 关键词/搜索主题名称
   fee?: string;

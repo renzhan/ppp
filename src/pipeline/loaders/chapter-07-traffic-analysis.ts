@@ -2,6 +2,17 @@ import { PrismaClient } from '../../../generated/prisma';
 import { BaseChapterDataLoader, ChapterDataContext } from './types';
 
 /**
+ * 聚光 placement 字段编码 → 中文名称映射
+ * 1: 信息流, 2: 搜索, 4: 全站智投, 7: 视频流
+ */
+const PLACEMENT_LABELS: Record<string, string> = {
+  '1': '信息流',
+  '2': '搜索',
+  '4': '全站智投',
+  '7': '视频流',
+};
+
+/**
  * Chapter 7 (投流分析) Data Loader
  *
  * 数据来源：
@@ -16,7 +27,7 @@ import { BaseChapterDataLoader, ChapterDataContext } from './types';
  * - 回搜数据（搜索组件点击、搜后阅读）
  * - 新增种草人群成本（I人群/TI人群/CPI/CPTI）
  * - 大盘对比
- * - 按广告类型分析（信息流/视频流/搜索）— GROUP BY placement
+ * - 按广告类型分析（信息流/搜索/全站智投/视频流）— GROUP BY placement
  * - 按人群定向分析 — GROUP BY targets_detail
  * - 按关键词分析（搜索主题名称）— GROUP BY keyword
  */
@@ -363,6 +374,10 @@ export class TrafficAnalysisDataLoader extends BaseChapterDataLoader {
     const separator = '|---|---|---|---|---|---|---|---|---|---|---|---|---|';
 
     const rows = sorted.map(([name, data]) => {
+      // placement 字段存的是数字编码，需要转成中文名称
+      const displayName = groupField === 'placement'
+        ? (PLACEMENT_LABELS[name] || name)
+        : name;
       const grpCpm = data.impression > 0 ? ((data.fee / data.impression) * 1000).toFixed(2) : '-';
       const grpCpc = data.click > 0 ? (data.fee / data.click).toFixed(2) : '-';
       const grpCpe = data.interaction > 0 ? (data.fee / data.interaction).toFixed(2) : '-';
@@ -370,7 +385,7 @@ export class TrafficAnalysisDataLoader extends BaseChapterDataLoader {
       const grpIUserCost = data.iUserNum > 0 ? (data.fee / data.iUserNum).toFixed(2) : '-';
       const grpTiUserCost = data.tiUserNum > 0 ? (data.fee / data.tiUserNum).toFixed(2) : '-';
 
-      return `| ${name} | ${data.fee.toFixed(0)} | ${data.impression} | ${data.click} | ${data.interaction} | ${grpCpm} | ${grpCpc} | ${grpCpe} | ${grpCtr} | ${data.iUserNum} | ${grpIUserCost} | ${data.tiUserNum} | ${grpTiUserCost} |`;
+      return `| ${displayName} | ${data.fee.toFixed(0)} | ${data.impression} | ${data.click} | ${data.interaction} | ${grpCpm} | ${grpCpc} | ${grpCpe} | ${grpCtr} | ${data.iUserNum} | ${grpIUserCost} | ${data.tiUserNum} | ${grpTiUserCost} |`;
     });
 
     return [header, separator, ...rows].join('\n');

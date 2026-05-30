@@ -8,7 +8,7 @@ import { getSession } from '@/lib/auth';
  * - sentiment_distribution: 情感倾向分布（正向/中性/负向）
  * - trend: 评论数变化趋势
  * - keywords: 关键词高频分布
- * - negative_comments: 负向评论列表
+ * - comments: 所有评论（带情感标签）
  *
  * Validates: Requirements 17.2, 17.3, 18.1, 18.2, 18.3, 18.4
  */
@@ -59,12 +59,14 @@ export async function GET(
       orderBy: { createdAt: 'desc' },
     });
 
+    console.log(`[GET /api/sentiment/${projectId}] 查询到 ${sentimentData.length} 条 sentimentData 记录`);
+
     // Group by dataType
     const grouped: Record<string, unknown[]> = {
       sentiment_distribution: [],
       trend: [],
       keywords: [],
-      negative_comments: [],
+      comments: [],
     };
 
     for (const item of sentimentData) {
@@ -76,7 +78,18 @@ export async function GET(
           periodEnd: item.periodEnd,
           createdAt: item.createdAt,
         });
+      } else {
+        console.log(`[GET /api/sentiment/${projectId}] 未知 dataType: "${item.dataType}"`);
       }
+    }
+
+    console.log(`[GET /api/sentiment/${projectId}] 分组结果: distribution=${grouped.sentiment_distribution.length}, trend=${grouped.trend.length}, keywords=${grouped.keywords.length}, comments=${grouped.comments.length}`);
+
+    // 打印趋势数据的前3条用于调试
+    if (grouped.trend.length > 0) {
+      console.log(`[GET /api/sentiment/${projectId}] trend 前3条:`, JSON.stringify(grouped.trend.slice(0, 3)));
+    } else {
+      console.log(`[GET /api/sentiment/${projectId}] ⚠️ trend 为空！检查 sentiment_data 表中是否有 dataType='trend' 的记录`);
     }
 
     return NextResponse.json({
@@ -84,7 +97,7 @@ export async function GET(
       sentimentDistribution: grouped.sentiment_distribution,
       trend: grouped.trend,
       keywords: grouped.keywords,
-      negativeComments: grouped.negative_comments,
+      comments: grouped.comments,
     });
   } catch (error) {
     console.error('GET /api/sentiment/[projectId] error:', error);

@@ -5,7 +5,7 @@ set -e
 # docker-compose env_file only injects vars into the process environment,
 # but the app uses dotenv to read from the filesystem at /app/.env.
 echo "Writing environment to /app/.env for child processes..."
-env | grep -E '^(DATABASE_URL|LLM_|QWEN_|JWT_|PAICHACHA_|ENCRYPTION_KEY|NODE_ENV|APP_DATA_DIRECTORY)' | while IFS= read -r line; do
+env | grep -E '^(DATABASE_URL|LLM_|QWEN_|JWT_|PAICHACHA_|ENCRYPTION_KEY|NODE_ENV|APP_DATA_DIRECTORY|PUGONGYING_|JUGUANG_|LINGXI_|QIANGUA_|CRON_SECRET|APP_BASE_URL|SENTIMENT_CRON_|DISABLE_SENTIMENT_CRON)' | while IFS= read -r line; do
   echo "$line"
 done > /app/.env
 
