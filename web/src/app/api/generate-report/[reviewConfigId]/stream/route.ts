@@ -9,6 +9,9 @@ import path from 'path';
 
 export const maxDuration = 300; // 5 minutes
 
+/** Maximum number of chapters to generate concurrently (configurable via env) */
+const MAX_CONCURRENT_CHAPTERS = parseInt(process.env.REPORT_MAX_CONCURRENCY || '5', 10);
+
 /**
  * 章节定义 - id 用于前端去重/追加
  */
@@ -118,8 +121,23 @@ export async function GET(
 
         const completedChapters: Array<{ id: string; title: string; number: number; content: string }> = [];
 
-        // Generate each chapter sequentially
-        for (const chapterDef of CHAPTER_DEFS) {
+        // Generate chapters in parallel with concurrency limit
+        // Results are sent in chapter order (flushReady sends as soon as consecutive chapters are ready)
+        const chapterResults = new Array<{ id: string; title: string; number: number; content: string } | null>(CHAPTER_DEFS.length).fill(null);
+        let nextToSend = 0;
+
+        const flushReady = () => {
+          while (nextToSend < chapterResults.length && chapterResults[nextToSend] !== null) {
+            const result = chapterResults[nextToSend]!;
+            completedChapters.push(result);
+            send({ type: 'chapter', chapter: result });
+            nextToSend++;
+          }
+        };
+
+        // Process a single chapter
+        const processChapter = async (index: number) => {
+          const chapterDef = CHAPTER_DEFS[index];
           try {
             // 1. Load template (prompt + metadata)
             const template = templateLoader.loadTemplate(chapterDef.number);
@@ -166,28 +184,38 @@ export async function GET(
               }
             }
 
-            const chapterResult = {
+            chapterResults[index] = {
               id: chapterDef.id,
               title,
               number: chapterDef.number,
               content,
             };
-
-            completedChapters.push(chapterResult);
-            send({ type: 'chapter', chapter: chapterResult });
           } catch (err) {
             const errorMsg = err instanceof Error ? err.message : '生成失败';
             const template = templateLoader.loadTemplate(chapterDef.number);
-            const fallbackChapter = {
+            chapterResults[index] = {
               id: chapterDef.id,
               title: template.metadata.chapter_name,
               number: chapterDef.number,
               content: `<p class="text-gray-400">章节生成失败：${errorMsg}</p>`,
             };
-            completedChapters.push(fallbackChapter);
-            send({ type: 'chapter', chapter: fallbackChapter });
+          }
+          flushReady();
+        };
+
+        // Run chapters with sliding window concurrency (always keep MAX_CONCURRENT_CHAPTERS in flight)
+        const executing = new Set<Promise<void>>();
+        for (let i = 0; i < CHAPTER_DEFS.length; i++) {
+          const p = processChapter(i).then(() => { executing.delete(p); });
+          executing.add(p);
+          if (executing.size >= MAX_CONCURRENT_CHAPTERS) {
+            await Promise.race(executing);
           }
         }
+        await Promise.all(executing);
+
+        // Flush any remaining chapters
+        flushReady();
 
         // Save to database
         await prisma.reviewConfig.update({

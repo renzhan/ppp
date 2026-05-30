@@ -61,12 +61,20 @@ export default function ProofreadPage({ params }: { params: { id: string } }) {
   const exportRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const hasStartedRef = useRef(false);
+  const mainRef = useRef<HTMLDivElement>(null);
 
   // Derive active chapter content for chart rendering
   const activeChapterContent = chapters.find((c) => c.id === activeChapterId)?.content || '';
 
   // Chart rendering for the active chapter
   useChartRenderer(contentRef, activeChapterContent);
+
+  // Scroll to top when switching chapters
+  useEffect(() => {
+    if (mainRef.current) {
+      mainRef.current.scrollTop = 0;
+    }
+  }, [activeChapterId]);
 
   // ─── Fetch Review ────────────────────────────────────────────────────────
 
@@ -435,7 +443,7 @@ export default function ProofreadPage({ params }: { params: { id: string } }) {
         />
 
         {/* Center: Content editor */}
-        <main className="flex-1 overflow-y-auto bg-white px-8 py-6">
+        <main ref={mainRef} className="flex-1 overflow-y-auto bg-white px-8 py-6">
           {pageStatus === 'generating' && chapters.length === 0 ? (
             <div className="flex h-full flex-col items-center justify-center gap-4">
               <Loader2 size={32} className="animate-spin text-brand" />
