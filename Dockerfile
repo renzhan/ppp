@@ -107,6 +107,7 @@ COPY --from=web-builder /app/web/node_modules ./web/node_modules
 COPY --from=web-builder /app/web/.next ./web/.next
 COPY --from=web-builder /app/web/package.json ./web/package.json
 COPY --from=web-builder /app/web/next.config.mjs ./web/next.config.mjs
+COPY --from=web-builder /app/web/public ./web/public
 
 # --- Source (needed by Next.js transpilePackages at runtime for SSR) ---
 COPY src/ ./src/
