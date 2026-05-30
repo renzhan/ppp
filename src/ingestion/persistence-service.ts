@@ -342,6 +342,7 @@ export class PrismaDataPersistenceService implements DataPersistenceService {
           update: {
             likes: d.likes,
             content: d.content ?? null,
+            commentTime: d.commentTime ?? null,
             isActive: true,
           },
         });

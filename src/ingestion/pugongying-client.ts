@@ -315,7 +315,7 @@ export class PugongyingClient {
               nickname: c.nickname,
               content: c.content,
               likes: Number(c.likes ?? 0),
-              commentTime: c.updateTime,
+              commentTime: c.created_at?.replace('T', ' '),
             });
             for (const r of c.replies ?? []) {
               allComments.push({
@@ -325,7 +325,7 @@ export class PugongyingClient {
                 nickname: r.nickname,
                 content: r.content,
                 likes: Number(r.likes ?? 0),
-                commentTime: r.updateTime,
+                commentTime: r.created_at?.replace('T', ' '),
               });
             }
           }
@@ -355,7 +355,8 @@ interface FullTreeComment {
   nickname?: string;
   content?: string;
   likes?: string;
-  updateTime?: string;
+  update_time?: string;
+  created_at?: string;
   replies?: FullTreeReply[];
 }
 
@@ -364,7 +365,8 @@ interface FullTreeReply {
   nickname?: string;
   content?: string;
   likes?: string;
-  updateTime?: string;
+  update_time?: string;
+  created_at?: string;
 }
 
 // ── Validation ──
