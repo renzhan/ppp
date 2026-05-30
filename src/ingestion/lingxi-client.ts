@@ -54,39 +54,86 @@ export class LingxiClient {
 
   // ── 统一入口 ──
 
-  async fetchLingxiData(brandName: string, keyword: string): Promise<LingxiData> {
-    const data: LingxiData = {};
+  async fetchLingxiData(brandName: string, keyword: string, startDate: string, endDate: string, taxonomyNames?: string | string[], preStartDate?: string, preEndDate?: string): Promise<LingxiData> {
+    const brand = await this.fetchBrandData(brandName, startDate, endDate, taxonomyNames, preStartDate, preEndDate);
+    const kw = await this.fetchKeywordData(brandName, keyword, startDate, endDate);
 
-    const brand = await this.fetchBrandData(brandName);
-    data.brand = brand;
-
-    const kw = await this.fetchKeywordData(brandName, keyword);
-    data.keyword = [kw];
-
-    return data;
+    return { brand, keyword: [kw] };
   }
 
-  // ── asset_analyse → 品牌-AIPS / 品牌-TI ──
+  // ── asset_analyse + move_analyse → 品牌数据 ──
 
-  async fetchBrandData(brandName: string): Promise<BrandData> {
-    const res = await this.callTask('asset_analyse', brandName, {});
+  async fetchBrandData(brandName: string, startDate: string, endDate: string, taxonomyNames?: string | string[], preStartDate?: string, preEndDate?: string): Promise<BrandData> {
+    const res = await this.callTask('asset_analyse', brandName, { endDate });
     const captured = res.data?.captured ?? [];
 
     const aips = extractAips(captured);
     const ti = extractTi(captured);
 
+    // 品牌行业排名（需要 taxonomyNames）
+    let brandRank: number | undefined;
+    if (taxonomyNames) {
+      try {
+        const rankRes = await this.callTask('asset_analyse', brandName, { endDate, taxonomyNames });
+        const rankCaptured = rankRes.data?.captured ?? [];
+        brandRank = extractBrandRank(rankCaptured);
+      } catch (e) {
+        console.error(`[lingxi] brand rank 失败: ${(e as Error).message}`);
+      }
+    }
+
+    // 品牌排名/渗透率数据（需要 taxonomyNames）
+    let rankData: Partial<BrandData> = {};
+    if (taxonomyNames) {
+      try {
+        const rankRes = await this.callTask('brand_rank', brandName, {
+          startTime: startDate, endTime: endDate, taxonomyNames,
+        });
+        const rankCaptured = rankRes.data?.captured ?? [];
+        rankData = extractBrandRankData(rankCaptured, 'post');
+      } catch (e) {
+        console.error(`[lingxi] brand_rank 失败: ${(e as Error).message}`);
+      }
+
+      // 投前搜索量
+      if (preStartDate && preEndDate) {
+        try {
+          const preRes = await this.callTask('brand_rank', brandName, {
+            startTime: preStartDate, endTime: preEndDate, taxonomyNames,
+          });
+          const preCaptured = preRes.data?.captured ?? [];
+          const preData = extractBrandRankData(preCaptured, 'pre');
+          rankData.preSearchVolume = preData.preSearchVolume;
+          rankData.preSearchRank = preData.preSearchRank;
+        } catch (e) {
+          console.error(`[lingxi] brand_rank 投前失败: ${(e as Error).message}`);
+        }
+      }
+    }
+
+    // 人流流转数据
+    let moveData: Partial<BrandData> = {};
+    try {
+      const moveRes = await this.callTask('move_analyse', brandName, { startDate, endDate });
+      const moveCaptured = moveRes.data?.captured ?? [];
+      moveData = extractMoveAnalyseData(moveCaptured, startDate, endDate);
+    } catch (e) {
+      console.error(`[lingxi] move_analyse 失败: ${(e as Error).message}`);
+    }
+
     return {
       aips,
       ti,
       period: getPeriod(),
+      brandRank,
+      ...rankData,
+      ...moveData,
     };
   }
 
   // ── keyword_trend → 月搜索指数 ──
 
-  async fetchKeywordData(brandName: string, keyword: string): Promise<KeywordData> {
-    const endDate = daysAgo(1);
-    const startDate = oneMonthAgoPlusOne(endDate); // endDate 同一天的上个月 +1天
+  async fetchKeywordData(brandName: string, keyword: string, startDate: string, endDate: string): Promise<KeywordData> {
     const res = await this.callTask('keyword_trend', brandName, {
       trendKeyword: keyword,
       startTime: startDate,
@@ -96,11 +143,7 @@ export class LingxiClient {
 
     const searchVolume = extractSum(captured, startDate, endDate);
 
-    return {
-      keyword,
-      searchVolume,
-      period: getPeriod(),
-    };
+    return { keyword, searchVolume, period: getPeriod() };
   }
 
   // ── 截图 ──
@@ -196,6 +239,87 @@ function extractAips(captured: CapturedItem[]): number {
   const hit = captured.find(c => c.url.includes('asset/overall'));
   const item = hit?.data?.data?.list?.find((l: any) => l.name === 'AIPS 人群总数');
   return Number(item?.userNum ?? 0);
+}
+
+/** move_analyse → 提取新增资产总数 / AIPS变化 / TI变化 */
+function extractMoveAnalyseData(captured: CapturedItem[], startDate: string, endDate: string): Partial<BrandData> {
+  // 新增资产总数 — assertTrans/detail/card 不含 pathFrom，校验日期
+  const detail = captured.find(c => {
+    if (!c.url.includes('assertTrans/detail/card') || c.url.includes('pathFrom')) return false;
+    return c.url.includes(`endDate=${endDate}`);
+  });
+  const newUserNum = Number(detail?.data?.data?.card?.find((cd: any) =>
+    cd.tableResult?.[0]?.cardIndexName === '新增资产总数'
+  )?.tableResult?.[0]?.newUserNum ?? 0);
+
+  // AIPS人群变化数/率 & TI人群变化数/率 — assertTrans/card 不含 pathFrom，校验日期
+  const card = captured.find(c => {
+    if (!c.url.includes('assertTrans/card') || c.url.includes('pathFrom')) return false;
+    return c.url.includes(`endDate=${endDate}`);
+  });
+  const items: any[] = card?.data?.data ?? [];
+
+  const allItem = items.find(i => i.tableResult?.[0]?.groupLevel === 'all');
+  const tiItem = items.find(i => i.tableResult?.[0]?.groupLevel === 'TI');
+
+  return {
+    newUserNum,
+    aipsTransNum: Number(allItem?.tableResult?.[0]?.aipsTransNum ?? 0),
+    aipsCompareStartRatio: Number(allItem?.tableResult?.[0]?.compareStartRatio ?? 0),
+    tiTransNum: Number(tiItem?.tableResult?.[0]?.tiTransNum ?? 0),
+    tiCompareStartRatio: Number(tiItem?.tableResult?.[0]?.compareStartRatio ?? 0),
+  };
+}
+
+/** get/product → 本品牌行业排名（extraInfo.selfRank 或 tableResult 中 isSelf="true" 的 scaleRank） */
+function extractBrandRank(captured: CapturedItem[]): number | undefined {
+  const hit = captured.find(c => c.url.includes('get/product'));
+  if (!hit) return undefined;
+  const data = hit.data?.data;
+  // 优先取 extraInfo.selfRank（可能为 "未上榜"）
+  const selfRank = data?.extraInfo?.selfRank;
+  if (selfRank != null && selfRank !== '未上榜') {
+    const r = Number(selfRank);
+    if (!Number.isNaN(r) && r > 0) return r;
+  }
+  // 其次从 tableResult 中找 isSelf="true"
+  const selfItem = data?.tableResult?.find((r: any) => r.isSelf === 'true');
+  if (selfItem?.scaleRank != null) {
+    const r = Number(selfItem.scaleRank);
+    if (!Number.isNaN(r)) return r;
+  }
+  return undefined;
+}
+
+/** brand_rank → 提取渗透率/搜索量及其排名，prefix='post'|'pre' 决定映射到投后还是投前字段 */
+function extractBrandRankData(captured: CapturedItem[], prefix: 'post' | 'pre' = 'post'): Partial<BrandData> {
+  const getValue = (dimensionIndex: string) => {
+    const item = captured.find(c => {
+      if (!c.url.includes('track/v2/industry/brand/rank')) return false;
+      const body = (c as any).request_body;
+      return typeof body === 'string' &&
+        body.includes(`"dimensionIndex": "${dimensionIndex}"`) &&
+        body.includes('"brandDimensionType": "1"');
+    });
+    const bl = item?.data?.data?.brandList?.[0];
+    if (!bl) return { value: undefined, rank: undefined };
+    const rank = bl.detailData?.find((d: any) => d.name === '行业排名')?.value;
+    return { value: Number(bl.value ?? 0), rank: Number(rank ?? 0) };
+  };
+
+  const read = getValue('readPenetrationRate');
+  const searchImp = getValue('searchImpPenetrationRate');
+  const searchVol = getValue('searchNum');
+
+  const searchKey: 'postSearchVolume' | 'preSearchVolume' = prefix === 'post' ? 'postSearchVolume' : 'preSearchVolume';
+  const rankKey: 'postSearchRank' | 'preSearchRank' = prefix === 'post' ? 'postSearchRank' : 'preSearchRank';
+
+  return {
+    readPenetrationRate: prefix === 'post' ? read.value : undefined,
+    searchImpPenetrationRate: prefix === 'post' ? searchImp.value : undefined,
+    [searchKey]: searchVol.value,
+    [rankKey]: searchVol.rank,
+  };
 }
 
 /** asset/overall → list[] → name="TI 深度兴趣人群数" → userNum */

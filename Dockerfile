@@ -100,7 +100,7 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/generated ./generated
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma ./prisma
-COPY package.json ./
+COPY package.json tsconfig.json prisma.config.ts ./
 
 # --- Next.js artifacts ---
 COPY --from=web-builder /app/web/node_modules ./web/node_modules

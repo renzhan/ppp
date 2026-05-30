@@ -169,6 +169,9 @@ export interface NoteBaseRecord {
  */
 export interface JuguangNote {
   noteId?: string;                // 笔记id
+  placement?: string;             // 广告类型/投放位置：1-信息流、2-搜索、4-全站智投、7-视频流
+  targetsDetail?: string;         // 精准定向/人群定向名称
+  keyword?: string;               // 关键词/搜索主题名称
   fee: number;                    // 消费（元）— 推广消费金额
   impression: number;             // 展现量 — 推广展现量
   click: number;                  // 点击量 — 推广点击量，视频流中「观看视频5s」记做一次点击
@@ -184,6 +187,7 @@ export interface JuguangNote {
   acp: number;                    // 平均点击成本（元）— 推广消费/推广点击量
   cpm: number;                    // 平均千次展现费用（元）— 推广消费/推广展现量*1000
   cpi: number;                    // 平均互动成本（元）— 消费/互动量
+  targetDetail?: string | null;    // 精准定向
 }
 
 /**
@@ -258,6 +262,19 @@ export interface BrandData {
   penetrationRate?: number;        // 人群渗透率（%），后续扩展
   monthlySearchVolume?: number;    // 月搜索指数，后续扩展
   period: string;                  // 周期
+  // move_analyse
+  newUserNum?: number;             // 新增资产总数
+  aipsTransNum?: number;           // AIPS人群变化数
+  aipsCompareStartRatio?: number;  // AIPS本品变化率(%)
+  tiTransNum?: number;             // TI人群变化数
+  tiCompareStartRatio?: number;    // TI本品变化率(%)
+  brandRank?: number;              // 品牌行业排名
+  readPenetrationRate?: number;    // 阅读渗透率(%)
+  searchImpPenetrationRate?: number;  // 搜后曝光渗透率(%)
+  postSearchVolume?: number;       // 搜索量（投后）
+  postSearchRank?: number;         // 搜索量行业排名（投后）
+  preSearchVolume?: number;        // 搜索量（投前）
+  preSearchRank?: number;          // 搜索量行业排名（投前）
 }
 
 /**

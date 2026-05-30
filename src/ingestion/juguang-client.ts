@@ -34,6 +34,9 @@ interface AdvertiserListResponse {
 /** 聚光笔记报表 API 返回的原始记录（值均为 string） */
 interface RawJuguangNote {
   note_id?: string;
+  placement?: string;             // 广告类型：1-信息流、2-搜索、4-全站智投、7-视频流
+  targets_detail?: string;        // 精准定向名称
+  keyword?: string;               // 关键词/搜索主题名称
   fee?: string;
   impression?: string;
   click?: string;
@@ -49,6 +52,9 @@ interface RawJuguangNote {
   acp?: string;
   cpm?: string;
   cpi?: string;
+  placement?: string;
+  keyword?: string;
+  target_detail?: string;
 }
 
 interface JuguangPageResponse {
@@ -80,19 +86,42 @@ export class JuguangClient {
     endDate: string,
   ): Promise<JuguangNote[]> {
     const advertiserId = await this.resolveAdvertiserId(brandName);
+
+    // 四种分组维度并发采集
+    const variants: Array<{ splitColumns?: string[] }> = [
+      {},                                      // 基础（无 split）
+      { splitColumns: ['placement'] },         // 广告位拆分
+      { splitColumns: ['keyword'] },           // 关键词拆分
+      // targetDetail 接口未完成，暂时 skip
+    ];
+
+    const results = await Promise.all(
+      variants.map(v =>
+        this.fetchAllPages(advertiserId, startDate, endDate, v.splitColumns)
+          .catch(e => {
+            console.error(`[juguang] split=${v.splitColumns?.join(',') || 'none'} 失败:`, (e as Error).message);
+            return [] as RawJuguangNote[];
+          })
+      )
+    );
+
+    return results.flat().map(mapToJuguangNote);
+  }
+
+  private async fetchAllPages(
+    advertiserId: number, startDate: string, endDate: string, splitColumns?: string[],
+  ): Promise<RawJuguangNote[]> {
     const allRows: RawJuguangNote[] = [];
     let page = 1;
     let hasMore = true;
-
     while (hasMore) {
-      const res = await this.fetchPage(advertiserId, startDate, endDate, page);
+      const res = await this.fetchPage(advertiserId, startDate, endDate, page, splitColumns);
       allRows.push(...(res.data?.data_list ?? []));
       const total = res.data?.total_count ?? 0;
       hasMore = page * PAGE_SIZE < total;
       page++;
     }
-
-    return allRows.map(mapToJuguangNote);
+    return allRows;
   }
 
   /** 根据品牌名称匹配 advertiser_id（取第一个，前端后续支持选择具体广告主） */
@@ -115,22 +144,28 @@ export class JuguangClient {
     startDate: string,
     endDate: string,
     page: number,
+    splitColumns?: string[],
   ): Promise<JuguangPageResponse> {
     return withRetry(async () => {
       const url = `${this.config.baseUrl}/api/v1/juguang/proxy/reports/note`;
+      const body: Record<string, unknown> = {
+        advertiser_id: advertiserId,
+        start_date: startDate,
+        end_date: endDate,
+        page_num: page,
+        page_size: PAGE_SIZE,
+        time_unit: 'SUMMARY',
+      };
+      if (splitColumns?.length) {
+        body.split_columns = splitColumns;
+      }
       const res = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'X-API-Key': this.config.apiKey,
         },
-        body: JSON.stringify({
-          advertiser_id: advertiserId,
-          start_date: startDate,
-          end_date: endDate,
-          page_num: page,
-          page_size: PAGE_SIZE,
-        }),
+        body: JSON.stringify(body),
       });
 
       if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
@@ -158,6 +193,9 @@ function parseNum(val?: string): number {
 function mapToJuguangNote(raw: RawJuguangNote): JuguangNote {
   return {
     noteId: raw.note_id || undefined,
+    placement: raw.placement || undefined,
+    targetsDetail: raw.targets_detail || undefined,
+    keyword: raw.keyword || undefined,
     fee: parseNum(raw.fee),
     impression: parseNum(raw.impression),
     click: parseNum(raw.click),
@@ -173,6 +211,9 @@ function mapToJuguangNote(raw: RawJuguangNote): JuguangNote {
     acp: parseNum(raw.acp),
     cpm: parseNum(raw.cpm),
     cpi: parseNum(raw.cpi),
+    placement: raw.placement || undefined,
+    keyword: raw.keyword || undefined,
+    targetDetail: raw.target_detail || undefined,
   };
 }
 

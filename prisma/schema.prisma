@@ -165,6 +165,9 @@ model JuguangData {
   id                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   projectId             String   @map("project_id") @db.Uuid
   noteId                String?  @map("note_id") @db.VarChar(100)
+  placement             String?  @map("placement") @db.VarChar(50)       // 广告类型/投放位置：1-信息流、2-搜索、4-全站智投、7-视频流
+  targetsDetail         String?  @map("targets_detail") @db.VarChar(200) // 精准定向/人群定向名称
+  keyword               String?  @map("keyword") @db.VarChar(200)        // 关键词/搜索主题名称
   fee                   Decimal  @default(0) @map("fee") @db.Decimal(12, 2)
   impression            Int      @default(0)
   click                 Int      @default(0)
@@ -180,6 +183,9 @@ model JuguangData {
   acp                   Decimal  @default(0) @db.Decimal(12, 2)
   cpm                   Decimal  @default(0) @db.Decimal(12, 2)
   cpi                   Decimal  @default(0) @db.Decimal(12, 2)
+  placement             String?  @db.VarChar(20)
+  keyword               String?  @db.VarChar(200)
+  targetDetail          String?  @map("target_detail") @db.VarChar(100)
   createdAt             DateTime? @default(now()) @map("created_at") @db.Timestamptz()
 
   // Relations

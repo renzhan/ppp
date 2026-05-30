@@ -165,14 +165,14 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 
 /**
- * 构建 Word 导出用的 HTML（不含 ECharts，纯表格）
+ * 构建 Word 导出用的 HTML
+ * 图表占位符会被保留并通过 ECharts 渲染为 canvas，
+ * 然后在导出前转为 base64 图片嵌入 Word。
  */
 export function buildWordExportHtml(chapters: ChapterData[], title: string): string {
-  // Strip chart placeholders for Word export (keep tables only)
   const chaptersHtml = chapters
     .map((c) => {
-      const cleanContent = c.content.replace(/<div class="chart-placeholder"[^>]*>.*?<\/div>/g, '');
-      return `<h1 style="color:#1e40af;border-bottom:1px solid #e2e8f0;padding-bottom:8px;">${c.number}. ${c.title}</h1>${cleanContent}`;
+      return `<h1 style="color:#1e40af;border-bottom:1px solid #e2e8f0;padding-bottom:8px;">${c.number}. ${c.title}</h1>${c.content}`;
     })
     .join('');
 
@@ -189,6 +189,9 @@ h3 { font-size: 12pt; }
 .highlight { color: #1e40af; font-weight: bold; }
 .text-green { color: #16a34a; }
 .text-red { color: #dc2626; }
+.chart-placeholder { display: none; }
+.chart-image { text-align: center; margin: 16px 0; }
+.chart-image img { max-width: 100%; }
 </style>
 </head>
 <body>

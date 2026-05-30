@@ -198,6 +198,9 @@ export class PrismaDataPersistenceService implements DataPersistenceService {
         data: data.map((record) => ({
           projectId,
           noteId: record.noteId ?? null,
+          placement: record.placement ?? null,
+          targetsDetail: record.targetsDetail ?? null,
+          keyword: record.keyword ?? null,
           fee: record.fee,
           impression: record.impression,
           click: record.click,
@@ -213,6 +216,9 @@ export class PrismaDataPersistenceService implements DataPersistenceService {
           acp: record.acp,
           cpm: record.cpm,
           cpi: record.cpi,
+          placement: record.placement ?? null,
+          keyword: record.keyword ?? null,
+          targetDetail: record.targetDetail ?? null,
         })),
       });
     });
@@ -336,6 +342,7 @@ export class PrismaDataPersistenceService implements DataPersistenceService {
           update: {
             likes: d.likes,
             content: d.content ?? null,
+            commentTime: d.commentTime ?? null,
             isActive: true,
           },
         });

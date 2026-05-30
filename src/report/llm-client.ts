@@ -8,6 +8,8 @@ export interface LLMConfig {
   baseURL: string;
   model: string;
   apiKey: string;
+  /** 额外的请求参数（如 Qwen 的 enable_thinking） */
+  extraBody?: Record<string, unknown>;
 }
 
 export type LLMProvider = 'openai' | 'qwen';
@@ -19,12 +21,23 @@ export interface LLMClient {
   chat(messages: ChatMessage[], options?: LLMOptions): Promise<string>;
 }
 
-const DEFAULT_TIMEOUT = 30000; // 30 seconds
+const DEFAULT_TIMEOUT = 60000; // 60 seconds (increased for Qwen models)
 const FALLBACK_MESSAGE = 'AI生成失败，请稍后重试';
+
+/**
+ * Strip <think>...</think> blocks from Qwen3 responses.
+ * Even with enable_thinking=false, some edge cases may still include thinking blocks.
+ */
+function stripThinkingBlocks(text: string): string {
+  return text.replace(/<think>[\s\S]*?<\/think>\s*/g, '').trim();
+}
 
 /**
  * 从环境变量创建 LLMClient，支持 OpenAI / Qwen 切换。
  * Qwen DashScope 使用 OpenAI 兼容接口，复用 OpenAILLMClient。
+ *
+ * 注意：Qwen3 系列模型默认开启"思考模式"（thinking），会大幅增加响应时间。
+ * 这里通过 extra_body 传入 enable_thinking=false 来关闭思考模式，确保生成速度。
  */
 export function createLLMClientFromEnv(): LLMClient {
   const provider = (process.env.LLM_PROVIDER || 'openai') as LLMProvider;
@@ -38,7 +51,16 @@ export function createLLMClientFromEnv(): LLMClient {
       throw new Error('Qwen 配置缺失: 请设置 QWEN_BASE_URL 和 QWEN_MODEL_API_KEY');
     }
 
-    return new OpenAILLMClient({ baseURL, apiKey, model });
+    // Qwen3 系列默认开启 thinking 模式，会导致响应极慢（30-60s 思考 + 生成时间）
+    // 通过 enable_thinking: false 关闭，或通过环境变量 QWEN_ENABLE_THINKING=true 手动开启
+    const enableThinking = process.env.QWEN_ENABLE_THINKING === 'true';
+
+    return new OpenAILLMClient({
+      baseURL,
+      apiKey,
+      model,
+      extraBody: enableThinking ? undefined : { enable_thinking: false },
+    });
   }
 
   // Default: OpenAI
@@ -57,11 +79,12 @@ export function createLLMClientFromEnv(): LLMClient {
  * OpenAI-compatible LLM客户端实现
  * - 失败时重试1次
  * - 两次均失败时返回模板文案
- * - 默认30秒超时（可通过options.timeout配置）
+ * - 默认60秒超时（Qwen模型响应较慢，从30s提升到60s）
  */
 export class OpenAILLMClient implements LLMClient {
   private client: OpenAI;
   private model: string;
+  private extraBody?: Record<string, unknown>;
 
   constructor(config: LLMConfig) {
     this.client = new OpenAI({
@@ -69,6 +92,7 @@ export class OpenAILLMClient implements LLMClient {
       apiKey: config.apiKey,
     });
     this.model = config.model;
+    this.extraBody = config.extraBody;
   }
 
   async chat(messages: ChatMessage[], options?: LLMOptions): Promise<string> {
@@ -99,7 +123,8 @@ export class OpenAILLMClient implements LLMClient {
         messages: messages as any,
         temperature: options?.temperature,
         max_tokens: options?.maxTokens,
-      },
+        ...(this.extraBody || {}),
+      } as any,
       {
         timeout,
       },
@@ -109,6 +134,8 @@ export class OpenAILLMClient implements LLMClient {
     if (content === null || content === undefined || content === '') {
       throw new Error('LLM returned empty response');
     }
-    return content;
+
+    // Strip <think>...</think> blocks if present (Qwen3 thinking mode residual)
+    return stripThinkingBlocks(content);
   }
 }
