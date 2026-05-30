@@ -56,6 +56,7 @@ export default function ProofreadPage({ params }: { params: { id: string } }) {
   const [activeChapterId, setActiveChapterId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
 
   const eventSourceRef = useRef<EventSource | null>(null);
   const exportRef = useRef<HTMLDivElement>(null);
@@ -200,8 +201,8 @@ export default function ProofreadPage({ params }: { params: { id: string } }) {
 
   // ─── Save Report ────────────────────────────────────────────────────────
 
-  const handleSave = async () => {
-    if (!review || chapters.length === 0) return;
+  const handleSave = useCallback(async () => {
+    if (!review || chapters.length === 0 || isSaving) return;
     setIsSaving(true);
     try {
       await fetch(`/api/reviews/${id}/report`, {
@@ -211,12 +212,37 @@ export default function ProofreadPage({ params }: { params: { id: string } }) {
           content: { type: 'chapters', chapters, generatedAt: new Date().toISOString() },
         }),
       });
+      setLastSavedAt(new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }));
     } catch {
       // Silently fail
     } finally {
       setIsSaving(false);
     }
-  };
+  }, [review, chapters, id, isSaving]);
+
+  // ─── Auto-save: debounce 5s after content changes ────────────────────────
+
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const chaptersRef = useRef(chapters);
+  chaptersRef.current = chapters;
+
+  const triggerAutoSave = useCallback(() => {
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+    }
+    autoSaveTimerRef.current = setTimeout(() => {
+      if (chaptersRef.current.length > 0 && pageStatus === 'ready') {
+        handleSave();
+      }
+    }, 5000);
+  }, [handleSave, pageStatus]);
+
+  // Cleanup auto-save timer
+  useEffect(() => {
+    return () => {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    };
+  }, []);
 
   // ─── Export Functions ────────────────────────────────────────────────────
 
@@ -326,7 +352,8 @@ export default function ProofreadPage({ params }: { params: { id: string } }) {
     setChapters((prev) =>
       prev.map((c) => (c.id === chapterId ? { ...c, content: newContent } : c))
     );
-  }, []);
+    triggerAutoSave();
+  }, [triggerAutoSave]);
 
   // ─── Apply AI suggestion ─────────────────────────────────────────────────
 
@@ -335,7 +362,8 @@ export default function ProofreadPage({ params }: { params: { id: string } }) {
     setChapters((prev) =>
       prev.map((c) => (c.id === activeChapterId ? { ...c, content } : c))
     );
-  }, [activeChapterId]);
+    triggerAutoSave();
+  }, [activeChapterId, triggerAutoSave]);
 
   // ─── Loading State ───────────────────────────────────────────────────────
 
@@ -386,8 +414,11 @@ export default function ProofreadPage({ params }: { params: { id: string } }) {
             className="inline-flex h-8 items-center gap-1.5 rounded-md border border-gray-200 px-3 text-xs font-medium text-gray-600 transition hover:bg-gray-50 disabled:opacity-50"
           >
             {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-            保存
+            {isSaving ? '保存中' : '保存'}
           </button>
+          {lastSavedAt && (
+            <span className="text-[10px] text-gray-400">已保存 {lastSavedAt}</span>
+          )}
 
           {/* Export dropdown */}
           <div className="relative" ref={exportRef}>
