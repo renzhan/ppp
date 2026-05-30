@@ -224,3 +224,33 @@
   border-radius: 6px;
   overflow: hidden;
 }
+
+/* ─── Trace Anchor Styles ─────────────────────────────────────────────────── */
+.trace-anchor-btn {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  opacity: 0.3;
+  cursor: pointer;
+  border: none;
+  background: none;
+  font-size: 14px;
+  z-index: 10;
+  transition: opacity 0.2s;
+  line-height: 1;
+  padding: 2px;
+}
+
+.report-editor-content [data-trace-id]:hover .trace-anchor-btn {
+  opacity: 1;
+}
+
+.report-editor-content [data-trace-id]:hover {
+  outline: 1px dashed #93c5fd;
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.report-editor-content [data-trace-id] {
+  position: relative;
+}

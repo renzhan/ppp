@@ -1,5 +1,5 @@
 import { PrismaClient } from '../../../generated/prisma';
-import { BaseChapterDataLoader, ChapterDataContext } from './types';
+import { BaseChapterDataLoader, ChapterDataContext, TraceItem } from './types';
 
 /**
  * Chapter 3 (Data Overview / 数据总览) Data Loader
@@ -356,6 +356,124 @@ export class DataOverviewDataLoader extends BaseChapterDataLoader {
       console.warn(`[DataOverviewDataLoader] Failed to load lingxi_data: ${error}`);
     }
 
-    return this.buildContext(variables);
+    // ── 11. 构建溯源数据 (traceItems) ──
+    const traceItems: TraceItem[] = [];
+
+    // 整体投放数据溯源
+    traceItems.push({
+      traceId: 'ch3_overview_stats',
+      chapterNumber: 3,
+      label: '整体投放数据',
+      sourceTable: 'note_base + notes + juguang_data',
+      sourceQuery: `SELECT COUNT(*) FROM note_base WHERE project_id = '${projectId}';\nSELECT SUM(kol_price), SUM(service_fee) FROM notes WHERE project_id = '${projectId}';\nSELECT SUM(fee) FROM juguang_data WHERE project_id = '${projectId}';`,
+      totalRows: 4,
+      columns: [
+        { key: 'metric', label: '指标', type: 'string' },
+        { key: 'value', label: '数值', type: 'string' },
+        { key: 'source', label: '数据来源', type: 'string' },
+      ],
+      dataRows: [
+        { metric: '总笔记篇数', value: String(noteCount), source: 'note_base COUNT(*)' },
+        { metric: '内容费用', value: contentCost.toFixed(2), source: contentCostCaliber === 'settlement' ? 'note_base.content_settlement' : 'notes.kol_price + service_fee' },
+        { metric: '投流费用', value: trafficCost.toFixed(2), source: trafficCostCaliber === 'settlement' ? 'note_base.ad_spend' : 'juguang_data.fee' },
+        { metric: '总费用', value: totalCost.toFixed(2), source: '内容费用 + 投流费用' },
+      ],
+      calculations: [
+        { metric: '总费用', formula: 'contentCost + trafficCost', inputs: { contentCost, trafficCost }, result: totalCost },
+      ],
+    });
+
+    // KPI达成表溯源
+    const kpiRows: Record<string, unknown>[] = [];
+    for (const [kpiKey, config] of Object.entries(kpiMapping)) {
+      const target = kpi[kpiKey];
+      if (target != null && target > 0) {
+        const completion = config.isCost
+          ? (config.actual > 0 ? (target / config.actual) * 100 : 0)
+          : (config.actual / target) * 100;
+        kpiRows.push({
+          metric: config.varKey.toUpperCase(),
+          target: String(target),
+          actual: config.actual.toFixed(config.isCost ? 2 : 0),
+          completion: completion.toFixed(1) + '%',
+          type: config.isCost ? '成本类' : '量级类',
+        });
+      }
+    }
+    if (kpiRows.length > 0) {
+      traceItems.push({
+        traceId: 'ch3_kpi_table',
+        chapterNumber: 3,
+        label: 'KPI达成数据',
+        sourceTable: 'notes + juguang_data + review_configs.kpi_targets',
+        sourceQuery: `SELECT kpi_targets FROM review_configs WHERE project_id = '${projectId}' ORDER BY created_at DESC LIMIT 1;`,
+        totalRows: kpiRows.length,
+        columns: [
+          { key: 'metric', label: '指标', type: 'string' },
+          { key: 'target', label: 'KPI目标', type: 'string' },
+          { key: 'actual', label: '实际达成', type: 'string' },
+          { key: 'completion', label: '完成率', type: 'string' },
+          { key: 'type', label: '指标类型', type: 'string' },
+        ],
+        dataRows: kpiRows,
+        calculations: [
+          { metric: 'CPM', formula: 'totalCost / totalImpressions * 1000', inputs: { totalCost, totalImpressions }, result: Number(cpm.toFixed(2)) },
+          { metric: 'CPC', formula: 'totalCost / totalReads', inputs: { totalCost, totalReads }, result: Number(cpc.toFixed(2)) },
+          { metric: 'CPE', formula: 'totalCost / totalEngagement', inputs: { totalCost, totalEngagement }, result: Number(cpe.toFixed(2)) },
+          { metric: 'CTR', formula: 'totalReads / totalImpressions * 100', inputs: { totalReads, totalImpressions }, result: Number(ctr.toFixed(2)) },
+        ],
+      });
+    }
+
+    // 自然流vs投流对比溯源
+    traceItems.push({
+      traceId: 'ch3_natural_vs_paid',
+      chapterNumber: 3,
+      label: '自然流vs投流对比',
+      sourceTable: 'notes + juguang_data',
+      sourceQuery: `SELECT SUM(imp_num), SUM(read_num) FROM notes WHERE project_id = '${projectId}';\nSELECT SUM(impression), SUM(click), SUM(interaction) FROM juguang_data WHERE project_id = '${projectId}';`,
+      totalRows: 3,
+      columns: [
+        { key: 'dimension', label: '维度', type: 'string' },
+        { key: 'natural', label: '自然流', type: 'string' },
+        { key: 'paid', label: '投流(聚光)', type: 'string' },
+        { key: 'total', label: '合计', type: 'string' },
+      ],
+      dataRows: [
+        { dimension: '曝光', natural: String(naturalImp), paid: String(jgImpression), total: String(totalImpressions) },
+        { dimension: '阅读/点击', natural: String(naturalRead), paid: String(jgClick), total: String(totalReads) },
+        { dimension: '互动', natural: String(naturalEng), paid: String(jgInteraction), total: String(totalEngagement) },
+      ],
+      calculations: [
+        { metric: '自然曝光', formula: 'MAX(0, notes.SUM(imp_num) - juguang.SUM(impression))', inputs: { 'notes.imp_num': totalImpressions, 'juguang.impression': jgImpression }, result: naturalImp },
+      ],
+    });
+
+    // 大盘对比溯源
+    if (Object.keys(benchmark).length > 0) {
+      const benchmarkRows: Record<string, unknown>[] = [];
+      if (benchmark.ctr) benchmarkRows.push({ metric: 'CTR', actual: ctr.toFixed(2) + '%', benchmark: benchmark.ctr + '%', diff: ((ctr - benchmark.ctr) / benchmark.ctr * 100).toFixed(1) + '%' });
+      if (benchmark.cpm) benchmarkRows.push({ metric: 'CPM', actual: cpm.toFixed(2), benchmark: String(benchmark.cpm), diff: ((1 - cpm / benchmark.cpm) * 100).toFixed(1) + '%' });
+      if (benchmark.cpc) benchmarkRows.push({ metric: 'CPC', actual: cpc.toFixed(2), benchmark: String(benchmark.cpc), diff: ((1 - cpc / benchmark.cpc) * 100).toFixed(1) + '%' });
+      if (benchmark.cpe) benchmarkRows.push({ metric: 'CPE', actual: cpe.toFixed(2), benchmark: String(benchmark.cpe), diff: ((1 - cpe / benchmark.cpe) * 100).toFixed(1) + '%' });
+
+      traceItems.push({
+        traceId: 'ch3_benchmark_compare',
+        chapterNumber: 3,
+        label: '大盘对比',
+        sourceTable: 'review_configs.benchmark',
+        sourceQuery: `SELECT benchmark FROM review_configs WHERE project_id = '${projectId}' ORDER BY created_at DESC LIMIT 1;`,
+        totalRows: benchmarkRows.length,
+        columns: [
+          { key: 'metric', label: '指标', type: 'string' },
+          { key: 'actual', label: '实际值', type: 'string' },
+          { key: 'benchmark', label: '大盘均值', type: 'string' },
+          { key: 'diff', label: '差异', type: 'string' },
+        ],
+        dataRows: benchmarkRows,
+      });
+    }
+
+    return this.buildContext(variables, traceItems);
   }
 }

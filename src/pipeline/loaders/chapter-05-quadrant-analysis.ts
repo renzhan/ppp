@@ -1,5 +1,5 @@
 import { PrismaClient } from '../../../generated/prisma';
-import { BaseChapterDataLoader, ChapterDataContext } from './types';
+import { BaseChapterDataLoader, ChapterDataContext, TraceItem } from './types';
 
 /**
  * Chapter 5 (综合分析 / 四象限分析) Data Loader
@@ -308,6 +308,47 @@ export class QuadrantAnalysisDataLoader extends BaseChapterDataLoader {
     );
     variables['quadrant_notes_table'] = tableRows.join('\n');
 
-    return this.buildContext(variables);
+    // ── 6. 构建溯源数据 ──
+    const traceItems: TraceItem[] = [];
+    traceItems.push({
+      traceId: 'ch5_quadrant_summary',
+      chapterNumber: 5,
+      label: '四象限汇总',
+      sourceTable: 'notes + note_base + juguang_data',
+      sourceQuery: `SELECT note_id, imp_num, read_num FROM notes WHERE project_id = '${projectId}';\nSELECT note_id, fee, impression, click, interaction FROM juguang_data WHERE project_id = '${projectId}' AND note_id IS NOT NULL;`,
+      totalRows: quadrantSummary.length,
+      columns: [
+        { key: 'quadrant', label: '象限', type: 'string' },
+        { key: 'count', label: '笔记数', type: 'number' },
+        { key: 'totalCost', label: '总费用', type: 'string' },
+        { key: 'avgNoteCpm', label: '笔记均CPM', type: 'string' },
+        { key: 'avgNoteCpe', label: '笔记均CPE', type: 'string' },
+      ],
+      dataRows: quadrantSummary,
+    });
+
+    if (analyzedNotes.length > 0) {
+      traceItems.push({
+        traceId: 'ch5_quadrant_notes',
+        chapterNumber: 5,
+        label: '笔记象限明细',
+        sourceTable: 'notes + note_base + juguang_data',
+        sourceQuery: `-- 按笔记维度计算指标后分类`,
+        totalRows: analyzedNotes.length,
+        columns: [
+          { key: 'kolNickName', label: '达人', type: 'string' },
+          { key: 'noteType', label: '形式', type: 'string' },
+          { key: 'contentDirection', label: '方向', type: 'string' },
+          { key: 'noteCpm', label: '笔记CPM', type: 'number' },
+          { key: 'noteCpe', label: '笔记CPE', type: 'number' },
+          { key: 'trafficCpm', label: '投流CPM', type: 'number' },
+          { key: 'trafficCpe', label: '投流CPE', type: 'number' },
+          { key: 'quadrant', label: '象限', type: 'string' },
+        ],
+        dataRows: analyzedNotes.slice(0, 100) as unknown as Record<string, unknown>[],
+      });
+    }
+
+    return this.buildContext(variables, traceItems);
   }
 }

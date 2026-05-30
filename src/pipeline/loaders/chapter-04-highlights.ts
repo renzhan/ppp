@@ -1,5 +1,5 @@
 import { PrismaClient } from '../../../generated/prisma';
-import { BaseChapterDataLoader, ChapterDataContext } from './types';
+import { BaseChapterDataLoader, ChapterDataContext, TraceItem } from './types';
 
 /**
  * Chapter 4 (项目亮点) Data Loader
@@ -282,6 +282,75 @@ export class HighlightsDataLoader extends BaseChapterDataLoader {
       `爆文：${viralCount}篇（${viralRate.toFixed(1)}%）`,
     ].join('\n');
 
-    return this.buildContext(variables);
+    // ── 10. 构建溯源数据 ──
+    const traceItems: TraceItem[] = [];
+
+    if (kpiHighlights.length > 0) {
+      traceItems.push({
+        traceId: 'ch4_kpi_highlights',
+        chapterNumber: 4,
+        label: 'KPI超额完成亮点',
+        sourceTable: 'notes + review_configs.kpi_targets',
+        sourceQuery: `SELECT kpi_targets FROM review_configs WHERE project_id = '${projectId}' ORDER BY created_at DESC LIMIT 1;`,
+        totalRows: kpiHighlights.length,
+        columns: [
+          { key: 'detail', label: '亮点详情', type: 'string' },
+        ],
+        dataRows: kpiHighlights.map((h) => ({ detail: h })),
+        calculations: kpiChecks.filter((c) => {
+          const target = kpi[c.key];
+          if (!target || target <= 0) return false;
+          const completion = c.isCost ? (target / c.actual) * 100 : (c.actual / target) * 100;
+          return completion > 100;
+        }).map((c) => {
+          const target = kpi[c.key]!;
+          const completion = c.isCost ? (target / c.actual) * 100 : (c.actual / target) * 100;
+          return {
+            metric: c.label,
+            formula: c.isCost ? 'target / actual * 100' : 'actual / target * 100',
+            inputs: { actual: Number(c.actual.toFixed(2)), target },
+            result: Number(completion.toFixed(1)),
+          };
+        }),
+      });
+    }
+
+    if (benchmarkHighlights.length > 0) {
+      traceItems.push({
+        traceId: 'ch4_benchmark_highlights',
+        chapterNumber: 4,
+        label: '大盘对比亮点',
+        sourceTable: 'review_configs.benchmark',
+        sourceQuery: `SELECT benchmark FROM review_configs WHERE project_id = '${projectId}' ORDER BY created_at DESC LIMIT 1;`,
+        totalRows: benchmarkHighlights.length,
+        columns: [
+          { key: 'detail', label: '亮点详情', type: 'string' },
+        ],
+        dataRows: benchmarkHighlights.map((h) => ({ detail: h })),
+      });
+    }
+
+    traceItems.push({
+      traceId: 'ch4_viral_highlights',
+      chapterNumber: 4,
+      label: '爆文数据',
+      sourceTable: 'notes',
+      sourceQuery: `SELECT like_num, fav_num, cmt_num FROM notes WHERE project_id = '${projectId}';`,
+      totalRows: 3,
+      columns: [
+        { key: 'metric', label: '指标', type: 'string' },
+        { key: 'value', label: '数值', type: 'string' },
+      ],
+      dataRows: [
+        { metric: '爆文数', value: String(viralCount) },
+        { metric: '爆文率', value: viralRate.toFixed(1) + '%' },
+        { metric: '总笔记数', value: String(noteCount) },
+      ],
+      calculations: [
+        { metric: '爆文率', formula: 'viralCount / noteCount * 100', inputs: { viralCount, noteCount }, result: Number(viralRate.toFixed(1)) },
+      ],
+    });
+
+    return this.buildContext(variables, traceItems);
   }
 }

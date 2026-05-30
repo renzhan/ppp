@@ -1,5 +1,5 @@
 import { PrismaClient } from '../../../generated/prisma';
-import { BaseChapterDataLoader, ChapterDataContext } from './types';
+import { BaseChapterDataLoader, ChapterDataContext, TraceItem } from './types';
 
 /**
  * Chapter 9 (Optimization Suggestions) Data Loader
@@ -135,6 +135,51 @@ export class OptimizationDataLoader extends BaseChapterDataLoader {
       console.warn(`[OptimizationDataLoader] Failed to load juguang_data: ${error}`);
     }
 
-    return this.buildContext(variables);
+    // 构建溯源数据
+    const traceItems: TraceItem[] = [];
+
+    if (variables['underperforming_metrics']) {
+      try {
+        const metrics = JSON.parse(variables['underperforming_metrics']);
+        traceItems.push({
+          traceId: 'ch9_underperforming',
+          chapterNumber: 9,
+          label: '未达标指标',
+          sourceTable: 'notes + kpi_targets',
+          sourceQuery: `SELECT metric_name, target_value FROM kpi_targets WHERE project_id = '${projectId}';`,
+          totalRows: metrics.length,
+          columns: [
+            { key: 'metric', label: '指标', type: 'string' },
+            { key: 'actual', label: '实际值', type: 'number' },
+            { key: 'target', label: '目标值', type: 'number' },
+            { key: 'completion', label: '完成率', type: 'string' },
+          ],
+          dataRows: metrics,
+        });
+      } catch { /* ignore parse errors */ }
+    }
+
+    if (variables['content_direction_performance']) {
+      try {
+        const perf = JSON.parse(variables['content_direction_performance']);
+        traceItems.push({
+          traceId: 'ch9_content_performance',
+          chapterNumber: 9,
+          label: '内容方向表现',
+          sourceTable: 'notes + business_annotations',
+          sourceQuery: `SELECT note_id, content_direction FROM business_annotations WHERE project_id = '${projectId}';`,
+          totalRows: perf.length,
+          columns: [
+            { key: 'name', label: '内容方向', type: 'string' },
+            { key: 'count', label: '篇数', type: 'number' },
+            { key: 'avgEngagement', label: '平均互动', type: 'string' },
+            { key: 'cpe', label: 'CPE', type: 'string' },
+          ],
+          dataRows: perf,
+        });
+      } catch { /* ignore parse errors */ }
+    }
+
+    return this.buildContext(variables, traceItems);
   }
 }

@@ -13,7 +13,9 @@ import {
 import { Loading } from '@/components/ui/loading';
 import { ReportChapterNav } from '@/components/proofread/report-chapter-nav';
 import { ReportAiChat } from '@/components/proofread/report-ai-chat';
+import { TraceDataPanel } from '@/components/proofread/trace-data-panel';
 import { useChartRenderer } from '@/components/charts/echarts-renderer';
+import { useResizablePanel } from '@/hooks/use-resizable-panel';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -22,6 +24,7 @@ interface ChapterData {
   title: string;
   number: number;
   content: string;
+  traceIds?: Array<{ traceId: string; label: string }>;
 }
 
 interface ReviewDetail {
@@ -57,6 +60,7 @@ export default function ProofreadPage({ params }: { params: { id: string } }) {
   const [isSaving, setIsSaving] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
+  const [activeTraceId, setActiveTraceId] = useState<string | null>(null);
 
   const eventSourceRef = useRef<EventSource | null>(null);
   const exportRef = useRef<HTMLDivElement>(null);
@@ -69,6 +73,13 @@ export default function ProofreadPage({ params }: { params: { id: string } }) {
 
   // Chart rendering for the active chapter
   useChartRenderer(contentRef, activeChapterContent);
+
+  // Trace anchors - show available trace items for active chapter
+  const activeChapterTraceIds = chapters.find((c) => c.id === activeChapterId)?.traceIds || [];
+
+  // Resizable panels
+  const leftPanel = useResizablePanel({ defaultWidth: 160, minWidth: 120, maxWidth: 320, side: 'left' });
+  const rightPanel = useResizablePanel({ defaultWidth: 288, minWidth: 200, maxWidth: 500, side: 'right' });
 
   // Scroll to top when switching chapters
   useEffect(() => {
@@ -468,16 +479,23 @@ export default function ProofreadPage({ params }: { params: { id: string } }) {
 
       {/* Three-panel layout */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Left: Chapter navigation */}
-        <ReportChapterNav
-          chapters={chapters}
-          activeChapterId={activeChapterId}
-          onSelectChapter={setActiveChapterId}
-          isGenerating={pageStatus === 'generating'}
+        {/* Left: Chapter navigation (resizable) */}
+        <div className="flex-shrink-0 overflow-y-auto" style={{ width: leftPanel.width }}>
+          <ReportChapterNav
+            chapters={chapters}
+            activeChapterId={activeChapterId}
+            onSelectChapter={setActiveChapterId}
+            isGenerating={pageStatus === 'generating'}
+          />
+        </div>
+        {/* Left resize handle */}
+        <div
+          className="w-1 cursor-col-resize bg-transparent hover:bg-blue-200 active:bg-blue-300 transition-colors flex-shrink-0"
+          onMouseDown={leftPanel.handleMouseDown}
         />
 
         {/* Center: Content editor */}
-        <main ref={mainRef} className="flex-1 overflow-y-auto bg-white px-8 py-6">
+        <main ref={mainRef} className="flex-1 overflow-y-auto bg-white px-8 py-6 min-w-0">
           {pageStatus === 'generating' && chapters.length === 0 ? (
             <div className="flex h-full flex-col items-center justify-center gap-4">
               <Loader2 size={32} className="animate-spin text-brand" />
@@ -486,6 +504,25 @@ export default function ProofreadPage({ params }: { params: { id: string } }) {
             </div>
           ) : activeChapter ? (
             <div className="mx-auto max-w-3xl">
+              {/* Trace toolbar - show available data sources for this chapter */}
+              {activeChapterTraceIds.length > 0 && (
+                <div className="mb-3 flex flex-wrap items-center gap-1.5 rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+                  <span className="text-xs text-slate-500 mr-1">📊 数据溯源：</span>
+                  {activeChapterTraceIds.map((t) => (
+                    <button
+                      key={t.traceId}
+                      onClick={() => setActiveTraceId(t.traceId)}
+                      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] transition ${
+                        activeTraceId === t.traceId
+                          ? 'border-blue-400 bg-blue-50 text-blue-700'
+                          : 'border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:text-blue-600'
+                      }`}
+                    >
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+              )}
               <div
                 ref={contentRef}
                 className="report-editor-content"
@@ -512,13 +549,28 @@ export default function ProofreadPage({ params }: { params: { id: string } }) {
           )}
         </main>
 
-        {/* Right: AI Chat */}
-        <ReportAiChat
-          reviewId={id}
-          chapterTitle={activeChapter?.title || ''}
-          chapterContent={activeChapter?.content || ''}
-          onApplySuggestion={handleApplySuggestion}
+        {/* Right resize handle */}
+        <div
+          className="w-1 cursor-col-resize bg-transparent hover:bg-blue-200 active:bg-blue-300 transition-colors flex-shrink-0"
+          onMouseDown={rightPanel.handleMouseDown}
         />
+        {/* Right: AI Chat or Trace Panel (resizable) */}
+        <div className="flex-shrink-0 overflow-hidden" style={{ width: rightPanel.width }}>
+          {activeTraceId ? (
+            <TraceDataPanel
+              reviewId={id}
+              traceId={activeTraceId}
+              onClose={() => setActiveTraceId(null)}
+            />
+          ) : (
+            <ReportAiChat
+              reviewId={id}
+              chapterTitle={activeChapter?.title || ''}
+              chapterContent={activeChapter?.content || ''}
+              onApplySuggestion={handleApplySuggestion}
+            />
+          )}
+        </div>
       </div>
     </div>
   );

@@ -7,6 +7,35 @@ import { PrismaClient } from '../../../generated/prisma';
 export interface ChapterDataContext {
   variables: Record<string, string>; // Template variable values
   missingFields: string[];           // Fields that couldn't be loaded
+  traceItems: TraceItem[];           // Paragraph-level traceability data
+}
+
+/**
+ * A single trace item representing the data source for one paragraph/table in the report.
+ */
+export interface TraceItem {
+  traceId: string;                   // e.g. "ch3_kpi_table"
+  chapterNumber: number;
+  label: string;                     // Display name, e.g. "KPI达成数据"
+  sourceTable: string;               // e.g. "notes + kpi_targets"
+  sourceQuery: string;               // SQL query text
+  totalRows: number;
+  columns: TraceColumn[];
+  dataRows: Record<string, unknown>[];
+  calculations?: CalculationTrace[];
+}
+
+export interface TraceColumn {
+  key: string;
+  label: string;
+  type: 'string' | 'number' | 'date' | 'boolean';
+}
+
+export interface CalculationTrace {
+  metric: string;
+  formula: string;
+  inputs: Record<string, number | string>;
+  result: number | string;
 }
 
 /**
@@ -74,7 +103,7 @@ export abstract class BaseChapterDataLoader implements ChapterDataLoader {
    * Automatically computes missingFields as the difference between
    * requiredFields and the keys present in variables.
    */
-  protected buildContext(variables: Record<string, string>): ChapterDataContext {
+  protected buildContext(variables: Record<string, string>, traceItems: TraceItem[] = []): ChapterDataContext {
     const loadedKeys = Object.keys(variables).filter((k) => variables[k] !== undefined && variables[k] !== '');
     const missingFields = this.requiredFields.filter((f) => !loadedKeys.includes(f));
     // Remove empty-string entries from variables for missing fields
@@ -82,6 +111,6 @@ export abstract class BaseChapterDataLoader implements ChapterDataLoader {
     for (const key of loadedKeys) {
       cleanVariables[key] = variables[key];
     }
-    return { variables: cleanVariables, missingFields };
+    return { variables: cleanVariables, missingFields, traceItems };
   }
 }

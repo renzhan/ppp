@@ -1,5 +1,5 @@
 import { PrismaClient } from '../../../generated/prisma';
-import { BaseChapterDataLoader, ChapterDataContext } from './types';
+import { BaseChapterDataLoader, ChapterDataContext, TraceItem } from './types';
 
 /**
  * 聚光 placement 字段编码 → 中文名称映射
@@ -286,7 +286,43 @@ export class TrafficAnalysisDataLoader extends BaseChapterDataLoader {
     // ── 9. 按关键词（搜索主题名称）分析 ──
     variables['keyword_analysis'] = this.buildGroupAnalysis(juguangRecords, 'keyword', '关键词');
 
-    return this.buildContext(variables);
+    // ── 10. 构建溯源数据 ──
+    const traceItems: TraceItem[] = [];
+
+    traceItems.push({
+      traceId: 'ch7_traffic_overview',
+      chapterNumber: 7,
+      label: '投流总览',
+      sourceTable: 'juguang_data',
+      sourceQuery: `SELECT SUM(fee), SUM(impression), SUM(click), SUM(interaction), SUM(i_user_num), SUM(ti_user_num) FROM juguang_data WHERE project_id = '${projectId}';`,
+      totalRows: 1,
+      columns: [
+        { key: 'metric', label: '指标', type: 'string' },
+        { key: 'value', label: '数值', type: 'string' },
+      ],
+      dataRows: [
+        { metric: '总消耗', value: totalFee.toFixed(2) + '元' },
+        { metric: '总曝光', value: String(totalImpression) },
+        { metric: '总点击', value: String(totalClick) },
+        { metric: '总互动', value: String(totalInteraction) },
+        { metric: 'CPM', value: paidCpm.toFixed(2) },
+        { metric: 'CPC', value: paidCpc.toFixed(2) },
+        { metric: 'CPE', value: paidCpe.toFixed(2) },
+        { metric: 'CTR', value: paidCtr.toFixed(2) + '%' },
+        { metric: '种草人群(I)', value: String(totalIUserNum) },
+        { metric: '深度种草人群(TI)', value: String(totalTiUserNum) },
+        { metric: 'CPI', value: cpi.toFixed(2) },
+        { metric: 'CPTI', value: cpti.toFixed(2) },
+      ],
+      calculations: [
+        { metric: 'CPM', formula: 'totalFee / totalImpression * 1000', inputs: { totalFee, totalImpression }, result: Number(paidCpm.toFixed(2)) },
+        { metric: 'CPC', formula: 'totalFee / totalClick', inputs: { totalFee, totalClick }, result: Number(paidCpc.toFixed(2)) },
+        { metric: 'CPE', formula: 'totalFee / totalInteraction', inputs: { totalFee, totalInteraction }, result: Number(paidCpe.toFixed(2)) },
+        { metric: 'CTR', formula: 'totalClick / totalImpression * 100', inputs: { totalClick, totalImpression }, result: Number(paidCtr.toFixed(2)) },
+      ],
+    });
+
+    return this.buildContext(variables, traceItems);
   }
 
   /**

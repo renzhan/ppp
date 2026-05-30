@@ -630,11 +630,34 @@ model ReviewConfig {
   updatedAt        DateTime @default(now()) @map("updated_at") @db.Timestamptz()
 
   // Relations
-  project Project @relation(fields: [projectId], references: [id])
+  project    Project          @relation(fields: [projectId], references: [id])
+  traceItems ReportTraceItem[]
 
   @@index([projectId])
   @@index([createdBy])
   @@map("review_configs")
+}
+
+// 报告溯源条目表
+model ReportTraceItem {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  reviewConfigId String   @map("review_config_id") @db.Uuid
+  traceId        String   @map("trace_id") @db.VarChar(100)
+  chapterNumber  Int      @map("chapter_number")
+  label          String   @db.VarChar(200)
+  sourceTable    String   @map("source_table") @db.VarChar(100)
+  sourceQuery    String   @map("source_query") @db.Text
+  totalRows      Int      @default(0) @map("total_rows")
+  columns        Json     // [{key, label, type}]
+  dataRows       Json     @map("data_rows") // 全部数据行
+  calculations   Json?    // [{metric, formula, inputs, result}]
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  reviewConfig ReviewConfig @relation(fields: [reviewConfigId], references: [id], onDelete: Cascade)
+
+  @@unique([reviewConfigId, traceId])
+  @@index([reviewConfigId])
+  @@map("report_trace_items")
 }
 
 // 舆情数据表

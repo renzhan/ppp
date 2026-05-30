@@ -1,5 +1,5 @@
 import { PrismaClient } from '../../../generated/prisma';
-import { BaseChapterDataLoader, ChapterDataContext } from './types';
+import { BaseChapterDataLoader, ChapterDataContext, TraceItem } from './types';
 
 /**
  * Chapter 8 (Audience Assets) Data Loader
@@ -67,6 +67,30 @@ export class AudienceAssetsDataLoader extends BaseChapterDataLoader {
       console.warn(`[AudienceAssetsDataLoader] Failed to load lingxi_data: ${error}`);
     }
 
-    return this.buildContext(variables);
+    // 构建溯源数据
+    const traceItems: TraceItem[] = [];
+    const populationRows: Record<string, unknown>[] = [];
+    if (variables['aips_awareness']) populationRows.push({ level: 'A(被看见)', value: variables['aips_awareness'] });
+    if (variables['aips_interest']) populationRows.push({ level: 'I(被互动)', value: variables['aips_interest'] });
+    if (variables['aips_purchase']) populationRows.push({ level: 'P(被购买)', value: variables['aips_purchase'] });
+    if (variables['aips_share']) populationRows.push({ level: 'S(被分享)', value: variables['aips_share'] });
+
+    if (populationRows.length > 0) {
+      traceItems.push({
+        traceId: 'ch8_aips_population',
+        chapterNumber: 8,
+        label: 'AIPS人群规模',
+        sourceTable: 'lingxi_data',
+        sourceQuery: `SELECT data_content FROM lingxi_data WHERE project_id = '${projectId}' AND data_type = 'aips' ORDER BY created_at DESC;`,
+        totalRows: populationRows.length,
+        columns: [
+          { key: 'level', label: '人群层级', type: 'string' },
+          { key: 'value', label: '人群规模', type: 'string' },
+        ],
+        dataRows: populationRows,
+      });
+    }
+
+    return this.buildContext(variables, traceItems);
   }
 }

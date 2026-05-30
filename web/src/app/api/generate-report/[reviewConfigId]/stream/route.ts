@@ -46,7 +46,13 @@ const HTML_OUTPUT_INSTRUCTION = `
 5. 分析段落用 <p>，列表用 <ul>/<li> 或 <ol>/<li>
 6. 完成率超过100%的用 <span class="text-green">，低于100%的用 <span class="text-red">
 7. 语言专业简洁，必须引用具体数据，使用营销行业术语
-8. 仅输出HTML片段，不要包含任何解释性文字或markdown语法`;
+8. 仅输出HTML片段，不要包含任何解释性文字或markdown语法
+9. 每个包含数据引用的段落、表格、列表，必须添加 data-trace-id 属性标识数据来源：
+   - 数据表格: <table data-trace-id="ch3_kpi_table" class="report-table">
+   - 数据段落: <p data-trace-id="ch3_overview_stats">总费用128,000元...</p>
+   - 对比表格: <table data-trace-id="ch3_natural_vs_paid" class="report-table">
+   data-trace-id 命名规则: ch{章节号}_{模块}_{类型}，如 ch3_kpi_table, ch7_by_placement
+   纯文字分析段落（不直接引用具体数据数字）不需要添加此属性。`;
 
 /**
  * GET /api/generate-report/[reviewConfigId]/stream
@@ -119,11 +125,12 @@ export async function GET(
 
         send({ type: 'start', totalChapters: CHAPTER_DEFS.length });
 
-        const completedChapters: Array<{ id: string; title: string; number: number; content: string }> = [];
+        const completedChapters: Array<{ id: string; title: string; number: number; content: string; traceIds?: { traceId: string; label: string }[] }> = [];
+        const allTraceItems: Array<{ traceId: string; chapterNumber: number; label: string; sourceTable: string; sourceQuery: string; totalRows: number; columns: unknown; dataRows: unknown; calculations?: unknown }> = [];
 
         // Generate chapters in parallel with concurrency limit
         // Results are sent in chapter order (flushReady sends as soon as consecutive chapters are ready)
-        const chapterResults = new Array<{ id: string; title: string; number: number; content: string } | null>(CHAPTER_DEFS.length).fill(null);
+        const chapterResults = new Array<{ id: string; title: string; number: number; content: string; traceIds?: { traceId: string; label: string }[] } | null>(CHAPTER_DEFS.length).fill(null);
         let nextToSend = 0;
 
         const flushReady = () => {
@@ -189,7 +196,13 @@ export async function GET(
               title,
               number: chapterDef.number,
               content,
+              traceIds: (dataContext.traceItems || []).map((t) => ({ traceId: t.traceId, label: t.label })),
             };
+
+            // Collect trace items for this chapter
+            if (dataContext.traceItems && dataContext.traceItems.length > 0) {
+              allTraceItems.push(...dataContext.traceItems);
+            }
           } catch (err) {
             const errorMsg = err instanceof Error ? err.message : '生成失败';
             const template = templateLoader.loadTemplate(chapterDef.number);
@@ -225,6 +238,25 @@ export async function GET(
             status: 'completed',
           },
         });
+
+        // Save trace items (delete old ones first, then bulk insert)
+        if (allTraceItems.length > 0) {
+          await prisma.reportTraceItem.deleteMany({ where: { reviewConfigId } });
+          await prisma.reportTraceItem.createMany({
+            data: allTraceItems.map((item) => ({
+              reviewConfigId,
+              traceId: item.traceId,
+              chapterNumber: item.chapterNumber,
+              label: item.label,
+              sourceTable: item.sourceTable,
+              sourceQuery: item.sourceQuery,
+              totalRows: item.totalRows,
+              columns: item.columns as any,
+              dataRows: item.dataRows as any,
+              calculations: item.calculations as any ?? undefined,
+            })),
+          });
+        }
 
         send({ type: 'done', chapters: completedChapters });
       } catch (err) {

@@ -1,5 +1,5 @@
 import { PrismaClient } from '../../../generated/prisma';
-import { BaseChapterDataLoader, ChapterDataContext } from './types';
+import { BaseChapterDataLoader, ChapterDataContext, TraceItem } from './types';
 
 /**
  * Chapter 6 (内容分析) Data Loader
@@ -327,6 +327,58 @@ export class ContentAnalysisDataLoader extends BaseChapterDataLoader {
     variables['total_viral'] = String(enrichedNotes.filter((n) => n.isViral).length);
     variables['viral_metric'] = viralMetric === 'like_only' ? '千赞（赞≥1000）' : '千互（赞+藏+评≥1000）';
 
-    return this.buildContext(variables);
+    // ── 11. 构建溯源数据 ──
+    const traceItems: TraceItem[] = [];
+
+    // 内容方向分析表溯源
+    const directionRows = Array.from(byDirection.entries()).map(([name, items]) => {
+      const agg = { count: items.length, impNum: items.reduce((s, n) => s + n.impNum, 0), engagement: items.reduce((s, n) => s + n.engagement, 0), tiUserNum: items.reduce((s, n) => s + n.tiUserNum, 0), totalCost: items.reduce((s, n) => s + n.totalCost, 0), viralCount: items.filter((n) => n.isViral).length };
+      return { direction: name, count: agg.count, impressions: agg.impNum, engagement: agg.engagement, ti: agg.tiUserNum, cpe: agg.engagement > 0 ? (agg.totalCost / agg.engagement).toFixed(2) : '-', viralCount: agg.viralCount, viralRate: agg.count > 0 ? ((agg.viralCount / agg.count) * 100).toFixed(1) + '%' : '0%' };
+    });
+    traceItems.push({
+      traceId: 'ch6_by_direction',
+      chapterNumber: 6,
+      label: '内容方向分析',
+      sourceTable: 'notes + note_base + juguang_data',
+      sourceQuery: `SELECT note_id, content_direction FROM note_base WHERE project_id = '${projectId}';\nSELECT note_id, imp_num, like_num, fav_num, cmt_num FROM notes WHERE project_id = '${projectId}';`,
+      totalRows: directionRows.length,
+      columns: [
+        { key: 'direction', label: '内容方向', type: 'string' },
+        { key: 'count', label: '篇数', type: 'number' },
+        { key: 'impressions', label: '曝光量', type: 'number' },
+        { key: 'engagement', label: '互动量', type: 'number' },
+        { key: 'ti', label: 'TI人群', type: 'number' },
+        { key: 'cpe', label: 'CPE', type: 'string' },
+        { key: 'viralCount', label: '爆文数', type: 'number' },
+        { key: 'viralRate', label: '爆文率', type: 'string' },
+      ],
+      dataRows: directionRows,
+    });
+
+    // 达人层级分析表溯源
+    const tierRows = Array.from(byKolTier.entries()).map(([name, items]) => {
+      const agg = { count: items.length, impNum: items.reduce((s, n) => s + n.impNum, 0), engagement: items.reduce((s, n) => s + n.engagement, 0), totalCost: items.reduce((s, n) => s + n.totalCost, 0), viralCount: items.filter((n) => n.isViral).length };
+      return { tier: name, count: agg.count, impressions: agg.impNum, engagement: agg.engagement, cpe: agg.engagement > 0 ? (agg.totalCost / agg.engagement).toFixed(2) : '-', viralCount: agg.viralCount, viralRate: agg.count > 0 ? ((agg.viralCount / agg.count) * 100).toFixed(1) + '%' : '0%' };
+    });
+    traceItems.push({
+      traceId: 'ch6_by_kol_tier',
+      chapterNumber: 6,
+      label: '达人层级分析',
+      sourceTable: 'notes + review_configs.influencer_tiers',
+      sourceQuery: `SELECT note_id, kol_fan_num FROM notes WHERE project_id = '${projectId}';\nSELECT influencer_tiers FROM review_configs WHERE project_id = '${projectId}';`,
+      totalRows: tierRows.length,
+      columns: [
+        { key: 'tier', label: '达人层级', type: 'string' },
+        { key: 'count', label: '篇数', type: 'number' },
+        { key: 'impressions', label: '曝光量', type: 'number' },
+        { key: 'engagement', label: '互动量', type: 'number' },
+        { key: 'cpe', label: 'CPE', type: 'string' },
+        { key: 'viralCount', label: '爆文数', type: 'number' },
+        { key: 'viralRate', label: '爆文率', type: 'string' },
+      ],
+      dataRows: tierRows,
+    });
+
+    return this.buildContext(variables, traceItems);
   }
 }
