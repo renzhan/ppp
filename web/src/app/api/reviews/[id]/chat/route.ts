@@ -38,11 +38,19 @@ export async function POST(
 ${chapterContent.slice(0, 3000)}
 
 请根据用户的指令，对当前章节内容进行优化、润色或重写。
-输出要求：
-- 直接输出优化后的 HTML 内容片段
+
+【重要】你必须严格按以下 JSON 格式输出，不要输出任何其他内容：
+{
+  "content": "优化后的完整HTML内容片段（替换整个章节）",
+  "summary": "一句话总结你做了什么修改（中文，20字以内）"
+}
+
+输出规则：
+- content 字段：输出优化后的完整 HTML 内容片段，用于直接替换当前章节
+- summary 字段：简短总结修改内容，如"优化了3处表达，补充了数据对比"
 - 保持专业营销复盘语气
 - 数据引用必须准确
-- 不要输出解释性文字，直接给出优化后的内容`;
+- 仅输出 JSON，不要有任何前缀或后缀文字`;
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
@@ -57,14 +65,44 @@ ${chapterContent.slice(0, 3000)}
           { timeout: 60000, temperature: 0.3 },
         );
 
-        // Send the response as SSE chunks
-        // Split into smaller chunks for streaming effect
-        const chunkSize = 20;
-        for (let i = 0; i < response.length; i += chunkSize) {
-          const chunk = response.slice(i, i + chunkSize);
-          const event = JSON.stringify({ type: 'text', content: chunk });
-          controller.enqueue(encoder.encode(`data: ${event}\n\n`));
+        // Parse the JSON response from LLM
+        let content = '';
+        let summary = '';
+
+        try {
+          // Strip markdown code block wrappers if present
+          let cleaned = response.trim();
+          if (cleaned.startsWith('```json')) {
+            cleaned = cleaned.replace(/^```json\s*\n?/, '').replace(/\n?```\s*$/, '');
+          } else if (cleaned.startsWith('```')) {
+            cleaned = cleaned.replace(/^```\s*\n?/, '').replace(/\n?```\s*$/, '');
+          }
+
+          const parsed = JSON.parse(cleaned);
+          content = parsed.content || '';
+          summary = parsed.summary || '已完成修改';
+        } catch {
+          // If JSON parsing fails, treat entire response as content
+          content = response.trim();
+          if (content.startsWith('```html')) {
+            content = content.replace(/^```html\s*\n?/, '').replace(/\n?```\s*$/, '');
+          } else if (content.startsWith('```')) {
+            content = content.replace(/^```\s*\n?/, '').replace(/\n?```\s*$/, '');
+          }
+          summary = '已完成内容优化';
         }
+
+        // Send the updated content for the chapter
+        if (content) {
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify({ type: 'apply', content })}\n\n`)
+          );
+        }
+
+        // Send the summary as chat message
+        const summaryText = `✅ ${summary}`;
+        const event = JSON.stringify({ type: 'text', content: summaryText });
+        controller.enqueue(encoder.encode(`data: ${event}\n\n`));
 
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'done' })}\n\n`));
       } catch (err) {

@@ -114,7 +114,10 @@ export function ReportAiChat({
 
           try {
             const event = JSON.parse(dataStr);
-            if (event.type === 'text') {
+            if (event.type === 'apply') {
+              // Apply the updated content to the chapter
+              onApplySuggestion(event.content);
+            } else if (event.type === 'text') {
               accumulated += event.content || '';
               setMessages((prev) =>
                 prev.map((m) => m.id === assistantId ? { ...m, content: accumulated } : m)
