@@ -183,8 +183,6 @@ model JuguangData {
   acp                   Decimal  @default(0) @db.Decimal(12, 2)
   cpm                   Decimal  @default(0) @db.Decimal(12, 2)
   cpi                   Decimal  @default(0) @db.Decimal(12, 2)
-  placement             String?  @db.VarChar(20)
-  keyword               String?  @db.VarChar(200)
   targetDetail          String?  @map("target_detail") @db.VarChar(100)
   createdAt             DateTime? @default(now()) @map("created_at") @db.Timestamptz()
 
