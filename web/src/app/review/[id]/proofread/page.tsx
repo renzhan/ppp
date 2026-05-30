@@ -201,30 +201,33 @@ export default function ProofreadPage({ params }: { params: { id: string } }) {
 
   // ─── Save Report ────────────────────────────────────────────────────────
 
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const chaptersRef = useRef(chapters);
+  chaptersRef.current = chapters;
+  const savingRef = useRef(false);
+
   const handleSave = useCallback(async () => {
-    if (!review || chapters.length === 0 || isSaving) return;
+    if (!review || chaptersRef.current.length === 0 || savingRef.current) return;
+    savingRef.current = true;
     setIsSaving(true);
     try {
       await fetch(`/api/reviews/${id}/report`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          content: { type: 'chapters', chapters, generatedAt: new Date().toISOString() },
+          content: { type: 'chapters', chapters: chaptersRef.current, generatedAt: new Date().toISOString() },
         }),
       });
       setLastSavedAt(new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }));
     } catch {
       // Silently fail
     } finally {
+      savingRef.current = false;
       setIsSaving(false);
     }
-  }, [review, chapters, id, isSaving]);
+  }, [review, id]);
 
   // ─── Auto-save: debounce 5s after content changes ────────────────────────
-
-  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const chaptersRef = useRef(chapters);
-  chaptersRef.current = chapters;
 
   const triggerAutoSave = useCallback(() => {
     if (autoSaveTimerRef.current) {

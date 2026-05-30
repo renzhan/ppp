@@ -43,6 +43,7 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
   const [form, setForm] = useState<FormState | null>(null);
   const [errors, setErrors] = useState<FormErrors>({});
   const [showParticipantDropdown, setShowParticipantDropdown] = useState(false);
+  const [participantSearch, setParticipantSearch] = useState('');
   const participantRef = useRef<HTMLDivElement>(null);
 
   // Fetch project detail
@@ -254,11 +255,30 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
                 <ChevronDown size={16} className="ml-auto text-gray-400" />
               </div>
               {showParticipantDropdown && (
-                <div className="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
-                  {availableParticipants.length === 0 ? (
-                    <div className="px-3 py-2 text-sm text-gray-400">暂无可选用户</div>
+                <div className="absolute z-10 mt-1 max-h-60 w-full overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg">
+                  <div className="border-b px-3 py-2">
+                    <input
+                      type="text"
+                      value={participantSearch}
+                      onChange={(e) => setParticipantSearch(e.target.value)}
+                      placeholder="搜索姓名..."
+                      className="h-8 w-full rounded border border-gray-200 px-2 text-sm outline-none focus:border-brand focus:ring-1 focus:ring-brand/20"
+                      autoFocus
+                    />
+                  </div>
+                  <div className="max-h-48 overflow-y-auto">
+                  {availableParticipants.filter((u) => {
+                    if (!participantSearch.trim()) return true;
+                    const q = participantSearch.toLowerCase();
+                    return (u.displayName || '').toLowerCase().includes(q) || u.username.toLowerCase().includes(q);
+                  }).length === 0 ? (
+                    <div className="px-3 py-2 text-sm text-gray-400">无匹配用户</div>
                   ) : (
-                    availableParticipants.map((user) => {
+                    availableParticipants.filter((u) => {
+                      if (!participantSearch.trim()) return true;
+                      const q = participantSearch.toLowerCase();
+                      return (u.displayName || '').toLowerCase().includes(q) || u.username.toLowerCase().includes(q);
+                    }).map((user) => {
                       const isSelected = form.participants.includes(user.id);
                       return (
                         <button
@@ -286,6 +306,7 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
                       );
                     })
                   )}
+                  </div>
                 </div>
               )}
             </div>

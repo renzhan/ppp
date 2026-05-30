@@ -89,7 +89,7 @@ export async function GET(request: NextRequest) {
         where,
         skip: (page - 1) * pageSize,
         take: pageSize,
-        orderBy: { createdAt: 'desc' },
+        orderBy: { startDate: 'desc' },
         include: {
           reportVersions: {
             orderBy: [{ versionNumber: 'desc' }],
@@ -263,7 +263,8 @@ export async function POST(request: Request) {
         projectName,
         projectType: projectType || undefined,
         startDate,
-        endDate: startDate, // Default endDate same as startDate
+        endDate: body.endDate ? new Date(body.endDate) : startDate,
+        executionStartDate: body.executionStartDate ? new Date(body.executionStartDate) : null,
         createdBy: createdBy || null,
         participants,
       },

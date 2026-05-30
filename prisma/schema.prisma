@@ -38,6 +38,7 @@ model Project {
   projectType       String    @default("日常种草") @map("project_type") @db.VarChar(50)
   startDate         DateTime  @map("start_date") @db.Date
   endDate           DateTime  @map("end_date") @db.Date
+  executionStartDate DateTime? @map("execution_start_date") @db.Date
   launchPhases      Json?     @map("launch_phases")
   engagementConfig  Json      @default("{\"includeShare\": true, \"includeFollow\": true}") @map("engagement_config")
   cooperationPolicy Json      @default("{\"defaultDiscount\": 1, \"specialRules\": []}") @map("cooperation_policy")

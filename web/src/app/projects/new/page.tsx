@@ -27,6 +27,8 @@ interface FormState {
   cascade: CascadeSelectorValue;
   projectName: string;
   startDate: string;
+  executionStartDate: string;
+  endDate: string;
   participants: string[];
 }
 
@@ -43,11 +45,14 @@ export default function NewProjectPage() {
     cascade: { category: '', brand: '', businessLine: '' },
     projectName: '',
     startDate: getTodayString(),
+    executionStartDate: '',
+    endDate: '',
     participants: [],
   });
   const [errors, setErrors] = useState<FormErrors>({});
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [showParticipantDropdown, setShowParticipantDropdown] = useState(false);
+  const [participantSearch, setParticipantSearch] = useState('');
   const [createdProjectId, setCreatedProjectId] = useState<string | null>(null);
   const [pendingNoteFile, setPendingNoteFile] = useState<File | null>(null);
   const [noteUploadStatus, setNoteUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
@@ -75,12 +80,12 @@ export default function NewProjectPage() {
     },
   });
 
-  // Fetch imported projects for name suggestions
+  // Fetch all projects for name suggestions
   const { data: importedProjects } = useQuery<ImportedProject[]>({
-    queryKey: ['imported-projects'],
+    queryKey: ['all-projects-suggestions'],
     queryFn: async () => {
-      const res = await fetch('/api/projects?pageSize=500&isImported=true');
-      if (!res.ok) throw new Error('获取已导入项目失败');
+      const res = await fetch('/api/projects?pageSize=500');
+      if (!res.ok) throw new Error('获取项目列表失败');
       const data = await res.json();
       return (data.items ?? []).map((p: { id: string; projectName: string; category: string; brand: string; businessLine: string | null }) => ({
         id: p.id,
@@ -151,6 +156,8 @@ export default function NewProjectPage() {
           businessLine: form.cascade.businessLine || null,
           projectName: form.projectName,
           startDate: form.startDate,
+          executionStartDate: form.executionStartDate || null,
+          endDate: form.endDate || null,
           createdBy: currentUser?.id,
           participants: form.participants,
         }),
@@ -343,11 +350,30 @@ export default function NewProjectPage() {
               </div>
 
               {showParticipantDropdown && (
-                <div className="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
-                  {availableParticipants.length === 0 ? (
-                    <div className="px-3 py-2 text-sm text-gray-400">暂无可选用户</div>
+                <div className="absolute z-10 mt-1 max-h-60 w-full overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg">
+                  <div className="border-b px-3 py-2">
+                    <input
+                      type="text"
+                      value={participantSearch}
+                      onChange={(e) => setParticipantSearch(e.target.value)}
+                      placeholder="搜索姓名..."
+                      className="h-8 w-full rounded border border-gray-200 px-2 text-sm outline-none focus:border-brand focus:ring-1 focus:ring-brand/20"
+                      autoFocus
+                    />
+                  </div>
+                  <div className="max-h-48 overflow-y-auto">
+                  {availableParticipants.filter((u) => {
+                    if (!participantSearch.trim()) return true;
+                    const q = participantSearch.toLowerCase();
+                    return (u.displayName || '').toLowerCase().includes(q) || u.username.toLowerCase().includes(q);
+                  }).length === 0 ? (
+                    <div className="px-3 py-2 text-sm text-gray-400">无匹配用户</div>
                   ) : (
-                    availableParticipants.map((user) => {
+                    availableParticipants.filter((u) => {
+                      if (!participantSearch.trim()) return true;
+                      const q = participantSearch.toLowerCase();
+                      return (u.displayName || '').toLowerCase().includes(q) || u.username.toLowerCase().includes(q);
+                    }).map((user) => {
                       const isSelected = form.participants.includes(user.id);
                       return (
                         <button
@@ -377,6 +403,7 @@ export default function NewProjectPage() {
                       );
                     })
                   )}
+                  </div>
                 </div>
               )}
             </div>
@@ -397,6 +424,28 @@ export default function NewProjectPage() {
               className="h-11 w-full rounded-lg border border-gray-200 px-3 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
             />
             {errors.startDate && <p className="text-xs text-rose-500">{errors.startDate}</p>}
+          </div>
+
+          {/* 开始执行日期 */}
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-gray-900">开始执行日期</label>
+            <input
+              type="date"
+              value={form.executionStartDate}
+              onChange={(e) => setForm((prev) => ({ ...prev, executionStartDate: e.target.value }))}
+              className="h-11 w-full rounded-lg border border-gray-200 px-3 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
+            />
+          </div>
+
+          {/* 项目结束日期 */}
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-gray-900">项目结束日期</label>
+            <input
+              type="date"
+              value={form.endDate}
+              onChange={(e) => setForm((prev) => ({ ...prev, endDate: e.target.value }))}
+              className="h-11 w-full rounded-lg border border-gray-200 px-3 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
+            />
           </div>
 
           {/* 笔记底表上传 - optional */}
