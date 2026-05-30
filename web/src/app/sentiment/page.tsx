@@ -18,6 +18,7 @@ import {
 } from 'recharts';
 import { Search, Download, FileText, MessageCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Loading } from '@/components/ui/loading';
+import { WordCloud } from '@/components/ui/word-cloud';
 import { formatDate } from '@/lib/project-meta';
 
 interface TreeNode {
@@ -536,27 +537,8 @@ function SentimentPageContent() {
                 {/* Word Cloud */}
                 <div>
                   <h4 className="mb-2 text-xs font-medium text-slate-600">关键词云</h4>
-                  <div className="flex min-h-[200px] flex-wrap items-center justify-center gap-x-3 gap-y-2 rounded-md border border-slate-100 bg-slate-50 p-6">
-                    {keywordsData.map((kw, idx) => {
-                      const maxCount = keywordsData[0]?.count || 1;
-                      const ratio = kw.count / maxCount;
-                      // 更大的字体差异：14px ~ 42px
-                      const size = 14 + ratio * 28;
-                      // 颜色深浅：频次越高颜色越深
-                      const opacity = 0.4 + ratio * 0.6;
-                      return (
-                        <span
-                          key={idx}
-                          className="inline-block font-medium"
-                          style={{
-                            fontSize: `${size}px`,
-                            color: `rgba(79, 70, 229, ${opacity})`,
-                          }}
-                        >
-                          {kw.word}
-                        </span>
-                      );
-                    })}
+                  <div className="h-[320px] rounded-md border border-slate-100 bg-slate-50">
+                    <WordCloud words={keywordsData} />
                   </div>
                 </div>
 
