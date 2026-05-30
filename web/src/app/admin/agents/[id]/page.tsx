@@ -310,7 +310,7 @@ export default function AgentDetailPage() {
         {agent.type === 'master' ? (
           <Crown size={24} className="text-yellow-500" />
         ) : (
-          <Bot size={24} className="text-blue-500" />
+          <Bot size={24} className="text-brand" />
         )}
         <div>
           <h1 className="text-2xl font-bold text-gray-900">{agent.name}</h1>
@@ -347,7 +347,7 @@ export default function AgentDetailPage() {
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
               />
             </div>
 
@@ -359,7 +359,7 @@ export default function AgentDetailPage() {
                 onChange={(e) => setDescription(e.target.value)}
                 rows={3}
                 placeholder="Agent 的功能描述..."
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none"
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand resize-none"
               />
             </div>
 
@@ -395,7 +395,7 @@ export default function AgentDetailPage() {
             onChange={(e) => setSystemPrompt(e.target.value)}
             rows={16}
             placeholder="在此输入 Agent 的系统提示词（支持 Markdown 格式）..."
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm font-mono focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 resize-y"
+            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm font-mono focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand resize-y"
           />
           <p className="mt-2 text-xs text-gray-400">
             系统提示词将在 Agent 执行任务时作为上下文注入，关联的 Skill 内容也会自动追加。
@@ -408,7 +408,7 @@ export default function AgentDetailPage() {
           <select
             value={modelConfigId}
             onChange={(e) => setModelConfigId(e.target.value)}
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
           >
             <option value="">使用默认配置</option>
             {models.map((model) => (
@@ -429,7 +429,7 @@ export default function AgentDetailPage() {
             <h2 className="text-lg font-medium text-gray-900">关联 Skill</h2>
             <button
               onClick={() => setShowSkillPicker(true)}
-              className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-blue-700 transition-colors"
+              className="inline-flex items-center gap-1.5 rounded-md bg-brand px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-brand-600 transition-colors"
             >
               <Plus size={14} />
               添加 Skill
@@ -479,7 +479,7 @@ export default function AgentDetailPage() {
           <button
             onClick={handleSave}
             disabled={saveMutation.isPending}
-            className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-6 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-blue-700 disabled:opacity-50 transition-colors"
+            className="inline-flex items-center gap-2 rounded-md bg-brand px-6 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-brand-600 disabled:opacity-50 transition-colors"
           >
             {saveMutation.isPending ? (
               <Loader2 size={16} className="animate-spin" />
@@ -546,7 +546,7 @@ function SkillPickerModal({ availableSkills, onSelect, onClose, isPending }: Ski
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="搜索 Skill..."
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
           />
         </div>
 
@@ -563,7 +563,7 @@ function SkillPickerModal({ availableSkills, onSelect, onClose, isPending }: Ski
                   key={skill.id}
                   onClick={() => onSelect(skill.id)}
                   disabled={isPending}
-                  className="w-full rounded-md border border-gray-200 px-4 py-3 text-left hover:border-blue-300 hover:bg-blue-50 transition-colors disabled:opacity-50"
+                  className="w-full rounded-md border border-gray-200 px-4 py-3 text-left hover:border-brand-300 hover:bg-brand-50 transition-colors disabled:opacity-50"
                 >
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium text-gray-900">

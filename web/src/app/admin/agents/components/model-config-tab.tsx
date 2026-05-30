@@ -174,7 +174,7 @@ export function ModelConfigTab() {
         <h2 className="text-lg font-medium text-gray-900">Model 配置列表</h2>
         <button
           onClick={handleCreate}
-          className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 transition-colors"
+          className="inline-flex items-center gap-1.5 rounded-md bg-brand px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-600 transition-colors"
         >
           <Plus size={16} />
           新建
@@ -187,71 +187,73 @@ export function ModelConfigTab() {
           <p className="text-sm text-gray-500">暂无 Model 配置，点击"新建"创建第一个配置。</p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">名称</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">模型</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Base URL</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">API Key</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">默认</th>
-                <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">操作</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {models.map((config) => (
-                <tr key={config.id} className="hover:bg-gray-50">
-                  <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-900">
-                    {config.name}
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600">
-                    {config.modelName}
-                  </td>
-                  <td className="max-w-[200px] truncate px-4 py-3 text-sm text-gray-600" title={config.baseUrl}>
-                    {config.baseUrl}
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-500 font-mono">
-                    {config.maskedApiKey || '****'}
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-sm">
-                    {config.isDefault ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-800">
-                        <Star size={12} className="fill-yellow-500 text-yellow-500" />
-                        默认
-                      </span>
-                    ) : (
-                      <button
-                        onClick={() => handleSetDefault(config.id)}
-                        disabled={setDefaultMutation.isPending}
-                        className="text-xs text-gray-400 hover:text-blue-600 transition-colors"
-                      >
-                        设为默认
-                      </button>
-                    )}
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-right text-sm">
-                    <div className="flex items-center justify-end gap-2">
-                      <button
-                        onClick={() => handleEdit(config)}
-                        className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-blue-600 transition-colors"
-                        title="编辑"
-                      >
-                        <Pencil size={16} />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteClick(config)}
-                        className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-red-600 transition-colors"
-                        title="删除"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </td>
+        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full">
+              <thead className="bg-gray-50 border-b">
+                <tr>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">名称</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">模型</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Base URL</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">API Key</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">默认</th>
+                  <th className="px-4 py-3 text-right text-sm font-medium text-gray-600">操作</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {models.map((config) => (
+                  <tr key={config.id} className="bg-white text-sm text-gray-900 border-b hover:bg-gray-50">
+                    <td className="whitespace-nowrap px-4 py-3 font-medium">
+                      {config.name}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-gray-600">
+                      {config.modelName}
+                    </td>
+                    <td className="max-w-[200px] truncate px-4 py-3 text-gray-600" title={config.baseUrl}>
+                      {config.baseUrl}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-gray-500 font-mono">
+                      {config.maskedApiKey || '****'}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3">
+                      {config.isDefault ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-800">
+                          <Star size={12} className="fill-yellow-500 text-yellow-500" />
+                          默认
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => handleSetDefault(config.id)}
+                          disabled={setDefaultMutation.isPending}
+                          className="text-xs text-gray-400 hover:text-brand transition-colors"
+                        >
+                          设为默认
+                        </button>
+                      )}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => handleEdit(config)}
+                          className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-brand transition-colors"
+                          title="编辑"
+                        >
+                          <Pencil size={16} />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteClick(config)}
+                          className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-red-600 transition-colors"
+                          title="删除"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
@@ -389,7 +391,7 @@ function ModelFormModal({ config, onClose, onSuccess }: ModelFormModalProps) {
               value={formData.name}
               onChange={(e) => handleChange('name', e.target.value)}
               placeholder="例如：GPT-4o 生产配置"
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
             />
           </FormField>
 
@@ -405,7 +407,7 @@ function ModelFormModal({ config, onClose, onSuccess }: ModelFormModalProps) {
               value={formData.apiKey}
               onChange={(e) => handleChange('apiKey', e.target.value)}
               placeholder={isEditing ? '留空表示不修改' : 'sk-...'}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm font-mono focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm font-mono focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
             />
           </FormField>
 
@@ -420,7 +422,7 @@ function ModelFormModal({ config, onClose, onSuccess }: ModelFormModalProps) {
               value={formData.baseUrl}
               onChange={(e) => handleChange('baseUrl', e.target.value)}
               placeholder="https://api.openai.com/v1"
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
             />
           </FormField>
 
@@ -435,7 +437,7 @@ function ModelFormModal({ config, onClose, onSuccess }: ModelFormModalProps) {
               value={formData.modelName}
               onChange={(e) => handleChange('modelName', e.target.value)}
               placeholder="gpt-4o"
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
             />
           </FormField>
 
@@ -448,7 +450,7 @@ function ModelFormModal({ config, onClose, onSuccess }: ModelFormModalProps) {
                 onChange={(e) => handleChange('timeoutMs', parseInt(e.target.value) || 30000)}
                 min={1000}
                 step={1000}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
               />
             </FormField>
             <FormField label="最大重试次数" error={fieldErrors['maxRetries']}>
@@ -458,7 +460,7 @@ function ModelFormModal({ config, onClose, onSuccess }: ModelFormModalProps) {
                 onChange={(e) => handleChange('maxRetries', parseInt(e.target.value) || 0)}
                 min={0}
                 max={10}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
               />
             </FormField>
           </div>
@@ -469,7 +471,7 @@ function ModelFormModal({ config, onClose, onSuccess }: ModelFormModalProps) {
               type="checkbox"
               checked={formData.isDefault}
               onChange={(e) => handleChange('isDefault', e.target.checked)}
-              className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              className="h-4 w-4 rounded border-gray-300 text-brand focus:ring-brand"
             />
             设为默认配置
           </label>
@@ -487,7 +489,7 @@ function ModelFormModal({ config, onClose, onSuccess }: ModelFormModalProps) {
             <button
               type="submit"
               disabled={isPending}
-              className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              className="inline-flex items-center gap-1.5 rounded-md bg-brand px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-600 disabled:opacity-50 transition-colors"
             >
               {isPending && <Loader2 size={14} className="animate-spin" />}
               {isEditing ? '保存' : '创建'}

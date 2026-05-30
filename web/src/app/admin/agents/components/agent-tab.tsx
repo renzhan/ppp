@@ -205,7 +205,7 @@ export function AgentTab() {
         <h2 className="text-lg font-medium text-gray-900">Agent 列表</h2>
         <button
           onClick={() => setModalOpen(true)}
-          className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 transition-colors"
+          className="inline-flex items-center gap-1.5 rounded-md bg-brand px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-600 transition-colors"
         >
           <Plus size={16} />
           新建 Agent
@@ -312,7 +312,7 @@ function AgentRow({ agent, onToggle, onNavigate, onDelete, isMaster, togglePendi
         <div className="min-w-0">
           <button
             onClick={() => onNavigate(agent.id)}
-            className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline truncate block"
+            className="text-sm font-medium text-brand hover:text-brand-600 hover:underline truncate block"
           >
             {agent.name}
           </button>
@@ -334,8 +334,8 @@ function AgentRow({ agent, onToggle, onNavigate, onDelete, isMaster, togglePendi
         <button
           onClick={() => onToggle(agent)}
           disabled={togglePending}
-          className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-            agent.isEnabled ? 'bg-blue-600' : 'bg-gray-200'
+          className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-brand focus:ring-offset-2 ${
+            agent.isEnabled ? 'bg-brand' : 'bg-gray-200'
           }`}
           role="switch"
           aria-checked={agent.isEnabled}
@@ -455,7 +455,7 @@ function AgentFormModal({ onClose, onSuccess }: AgentFormModalProps) {
               value={formData.name}
               onChange={(e) => handleChange('name', e.target.value)}
               placeholder="例如：复盘文档生成 Agent"
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
             />
           </FormField>
 
@@ -464,7 +464,7 @@ function AgentFormModal({ onClose, onSuccess }: AgentFormModalProps) {
             <select
               value={formData.workspaceId}
               onChange={(e) => handleChange('workspaceId', e.target.value)}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
             >
               <option value="">请选择工作区</option>
               {workspaces.map((ws) => (
@@ -480,7 +480,7 @@ function AgentFormModal({ onClose, onSuccess }: AgentFormModalProps) {
             <select
               value={formData.modelConfigId}
               onChange={(e) => handleChange('modelConfigId', e.target.value)}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
             >
               <option value="">使用默认配置</option>
               {models.map((model) => (
@@ -499,7 +499,7 @@ function AgentFormModal({ onClose, onSuccess }: AgentFormModalProps) {
               onChange={(e) => handleChange('description', e.target.value)}
               placeholder="Agent 的功能描述..."
               rows={3}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none"
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand resize-none"
             />
           </FormField>
 
@@ -516,7 +516,7 @@ function AgentFormModal({ onClose, onSuccess }: AgentFormModalProps) {
             <button
               type="submit"
               disabled={createMutation.isPending}
-              className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              className="inline-flex items-center gap-1.5 rounded-md bg-brand px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-600 disabled:opacity-50 transition-colors"
             >
               {createMutation.isPending && <Loader2 size={14} className="animate-spin" />}
               创建

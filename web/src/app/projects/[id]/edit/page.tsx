@@ -188,7 +188,7 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
         <div className="mx-auto max-w-3xl space-y-8">
           {/* 品类/品牌/业务线 */}
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-slate-900">
+            <label className="block text-sm font-medium text-gray-900">
               品类 / 品牌 / 业务线 <span className="text-rose-500">*</span>
             </label>
             <CascadeSelector value={form.cascade} onChange={handleCascadeChange} />
@@ -199,7 +199,7 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
 
           {/* 项目名称 */}
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-slate-900">
+            <label className="block text-sm font-medium text-gray-900">
               项目名称 <span className="text-rose-500">*</span>
             </label>
             <input
@@ -209,54 +209,54 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
                 setForm((prev) => prev ? { ...prev, projectName: e.target.value } : prev);
                 setErrors((prev) => { const n = { ...prev }; delete n.projectName; return n; });
               }}
-              className="h-11 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              className="h-11 w-full rounded-lg border border-gray-200 px-3 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
             />
             {errors.projectName && <p className="text-xs text-rose-500">{errors.projectName}</p>}
           </div>
 
           {/* 立项时间 */}
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-slate-900">立项时间</label>
+            <label className="block text-sm font-medium text-gray-900">立项时间</label>
             <input
               type="date"
               value={form.startDate}
               onChange={(e) => setForm((prev) => prev ? { ...prev, startDate: e.target.value } : prev)}
-              className="h-11 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              className="h-11 w-full rounded-lg border border-gray-200 px-3 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
             />
           </div>
 
           {/* 参与者 */}
           <div className="space-y-2" ref={participantRef}>
-            <label className="block text-sm font-medium text-slate-900">参与者</label>
+            <label className="block text-sm font-medium text-gray-900">参与者</label>
             <div className="relative">
               <div
                 onClick={() => setShowParticipantDropdown(!showParticipantDropdown)}
-                className="flex min-h-[44px] w-full cursor-pointer flex-wrap items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm transition hover:border-slate-300"
+                className="flex min-h-[44px] w-full cursor-pointer flex-wrap items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-sm transition hover:border-gray-300"
               >
                 {form.participants.length === 0 && (
-                  <span className="text-slate-400">点击选择参与者</span>
+                  <span className="text-gray-400">点击选择参与者</span>
                 )}
                 {form.participants.map((userId) => (
                   <span
                     key={userId}
-                    className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700"
+                    className="inline-flex items-center gap-1 rounded-md bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand"
                   >
                     {getDisplayName(userId)}
                     <button
                       type="button"
                       onClick={(e) => { e.stopPropagation(); removeParticipant(userId); }}
-                      className="ml-0.5 rounded-full p-0.5 transition hover:bg-blue-100"
+                      className="ml-0.5 rounded-full p-0.5 transition hover:bg-brand-100"
                     >
                       <X size={12} />
                     </button>
                   </span>
                 ))}
-                <ChevronDown size={16} className="ml-auto text-slate-400" />
+                <ChevronDown size={16} className="ml-auto text-gray-400" />
               </div>
               {showParticipantDropdown && (
-                <div className="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg">
+                <div className="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
                   {availableParticipants.length === 0 ? (
-                    <div className="px-3 py-2 text-sm text-slate-400">暂无可选用户</div>
+                    <div className="px-3 py-2 text-sm text-gray-400">暂无可选用户</div>
                   ) : (
                     availableParticipants.map((user) => {
                       const isSelected = form.participants.includes(user.id);
@@ -266,11 +266,11 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
                           type="button"
                           onClick={() => toggleParticipant(user.id)}
                           className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition ${
-                            isSelected ? 'bg-blue-50 text-blue-700' : 'text-slate-700 hover:bg-slate-50'
+                            isSelected ? 'bg-brand-50 text-brand' : 'text-gray-700 hover:bg-gray-50'
                           }`}
                         >
                           <span className={`flex h-4 w-4 items-center justify-center rounded border ${
-                            isSelected ? 'border-blue-500 bg-blue-500' : 'border-slate-300'
+                            isSelected ? 'border-brand bg-brand' : 'border-gray-300'
                           }`}>
                             {isSelected && (
                               <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -280,7 +280,7 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
                           </span>
                           <span>{user.displayName || user.username}</span>
                           {user.role && user.role !== 'admin' && (
-                            <span className="ml-auto text-xs text-slate-400">{user.role}</span>
+                            <span className="ml-auto text-xs text-gray-400">{user.role}</span>
                           )}
                         </button>
                       );
@@ -293,8 +293,8 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
 
           {/* 笔记底表上传 */}
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-slate-900">笔记底表</label>
-            <p className="text-xs text-slate-500">
+            <label className="block text-sm font-medium text-gray-900">笔记底表</label>
+            <p className="text-xs text-gray-500">
               {project?.noteCount ? `当前已有 ${project.noteCount} 条笔记数据。重新上传将覆盖现有数据。` : '尚未上传笔记底表，上传后可用于复盘分析。'}
             </p>
             <NoteBaseUploader
@@ -315,7 +315,7 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
             <button
               type="button"
               onClick={() => router.push('/')}
-              className="inline-flex h-10 items-center rounded-lg border border-slate-200 px-5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+              className="inline-flex h-10 items-center rounded-lg border border-gray-200 px-5 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
             >
               取消
             </button>
@@ -323,7 +323,7 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
               type="button"
               onClick={handleSubmit}
               disabled={updateProjectMutation.isPending}
-              className="inline-flex h-10 items-center gap-2 rounded-lg bg-blue-600 px-6 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex h-10 items-center gap-2 rounded-lg bg-brand px-6 text-sm font-medium text-white transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {updateProjectMutation.isPending && <Loader2 size={16} className="animate-spin" />}
               保存修改

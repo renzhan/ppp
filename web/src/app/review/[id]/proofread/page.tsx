@@ -342,7 +342,7 @@ export default function ProofreadPage({ params }: { params: { id: string } }) {
         <p className="text-sm text-rose-600">{errorMessage || '加载失败'}</p>
         <Link
           href={`/review/${id}`}
-          className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
+          className="inline-flex items-center gap-1.5 rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50"
         >
           <ArrowLeft size={14} />
           返回复盘详情
@@ -362,12 +362,12 @@ export default function ProofreadPage({ params }: { params: { id: string } }) {
         <div className="flex items-center gap-3">
           <Link
             href="/review"
-            className="text-xs text-slate-500 hover:text-slate-700"
+            className="text-xs text-gray-500 hover:text-gray-700"
           >
             复盘系统
           </Link>
-          <span className="text-xs text-slate-300">/</span>
-          <span className="text-xs text-slate-700">审校台</span>
+          <span className="text-xs text-gray-300">/</span>
+          <span className="text-xs text-gray-700">审校台</span>
         </div>
 
         <div className="flex items-center gap-2">
@@ -375,7 +375,7 @@ export default function ProofreadPage({ params }: { params: { id: string } }) {
           <button
             onClick={handleSave}
             disabled={isSaving || chapters.length === 0}
-            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 px-3 text-xs font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-gray-200 px-3 text-xs font-medium text-gray-600 transition hover:bg-gray-50 disabled:opacity-50"
           >
             {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
             保存
@@ -386,22 +386,22 @@ export default function ProofreadPage({ params }: { params: { id: string } }) {
             <button
               onClick={() => setExportOpen(!exportOpen)}
               disabled={chapters.length === 0}
-              className="inline-flex h-8 items-center gap-1.5 rounded-md bg-blue-600 px-3 text-xs font-medium text-white transition hover:bg-blue-700 disabled:opacity-50"
+              className="inline-flex h-8 items-center gap-1.5 rounded-md bg-brand px-3 text-xs font-medium text-white transition hover:bg-brand-600 disabled:opacity-50"
             >
               下载
               <ChevronDown size={12} />
             </button>
             {exportOpen && (
-              <div className="absolute right-0 top-full z-50 mt-1 w-28 rounded-md border border-slate-200 bg-white py-1 shadow-lg">
+              <div className="absolute right-0 top-full z-50 mt-1 w-28 rounded-md border border-gray-200 bg-white py-1 shadow-lg">
                 <button
                   onClick={handleExportPDF}
-                  className="flex w-full items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-50"
+                  className="flex w-full items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
                 >
                   PDF
                 </button>
                 <button
                   onClick={handleExportWord}
-                  className="flex w-full items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-50"
+                  className="flex w-full items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
                 >
                   Word
                 </button>
@@ -413,10 +413,10 @@ export default function ProofreadPage({ params }: { params: { id: string } }) {
 
       {/* Report title area */}
       <div className="border-b bg-white px-8 py-4">
-        <h1 className="text-xl font-bold text-slate-900">
+        <h1 className="text-xl font-bold text-gray-900">
           {review?.project.projectName || ''}-复盘
         </h1>
-        <p className="mt-1 text-xs text-slate-500">
+        <p className="mt-1 text-xs text-gray-500">
           {review?.reportContent?.generatedAt
             ? `${new Date(review.reportContent.generatedAt).toLocaleString('zh-CN')}`
             : ''}
@@ -438,9 +438,9 @@ export default function ProofreadPage({ params }: { params: { id: string } }) {
         <main className="flex-1 overflow-y-auto bg-white px-8 py-6">
           {pageStatus === 'generating' && chapters.length === 0 ? (
             <div className="flex h-full flex-col items-center justify-center gap-4">
-              <Loader2 size={32} className="animate-spin text-blue-600" />
-              <p className="text-sm text-slate-600">正在生成复盘报告...</p>
-              <p className="text-xs text-slate-400">按章节逐步生成，请稍候</p>
+              <Loader2 size={32} className="animate-spin text-brand" />
+              <p className="text-sm text-gray-600">正在生成复盘报告...</p>
+              <p className="text-xs text-gray-400">按章节逐步生成，请稍候</p>
             </div>
           ) : activeChapter ? (
             <div className="mx-auto max-w-3xl">
@@ -457,7 +457,7 @@ export default function ProofreadPage({ params }: { params: { id: string } }) {
                 dangerouslySetInnerHTML={{ __html: activeChapter.content }}
               />
               {pageStatus === 'generating' && (
-                <div className="mt-4 flex items-center gap-2 text-xs text-blue-600">
+                <div className="mt-4 flex items-center gap-2 text-xs text-brand">
                   <Loader2 size={12} className="animate-spin" />
                   后续章节生成中...
                 </div>
@@ -465,7 +465,7 @@ export default function ProofreadPage({ params }: { params: { id: string } }) {
             </div>
           ) : (
             <div className="flex h-full items-center justify-center">
-              <p className="text-sm text-slate-400">选择左侧章节查看内容</p>
+              <p className="text-sm text-gray-400">选择左侧章节查看内容</p>
             </div>
           )}
         </main>

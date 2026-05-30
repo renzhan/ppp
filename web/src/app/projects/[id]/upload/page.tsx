@@ -71,13 +71,13 @@ export default function ProjectUploadPage() {
                 }}
                 className={`flex items-center gap-3 rounded-lg border px-4 py-3 text-left transition ${
                   active
-                    ? 'border-blue-500 bg-blue-50 text-blue-700'
-                    : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+                    ? 'border-brand bg-brand-50 text-brand'
+                    : 'border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'
                 }`}
               >
                 <div
                   className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold ${
-                    active ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'
+                    active ? 'bg-brand text-white' : 'bg-gray-100 text-gray-500'
                   }`}
                 >
                   {index + 1}
@@ -414,13 +414,13 @@ function ExternalSyncPanel({
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="text-lg font-semibold text-slate-900">派查查数据同步</h2>
-        <p className="mt-2 text-sm text-slate-500">
+        <h2 className="text-lg font-semibold text-gray-900">派查查数据同步</h2>
+        <p className="mt-2 text-sm text-gray-500">
           根据项目基础信息 mock 一份灵犀千瓜数据，供报告生成和审校台演示使用。
         </p>
       </div>
 
-      <div className="rounded-lg border border-blue-200 bg-blue-50 p-5 text-sm text-blue-800">
+      <div className="rounded-lg border border-brand-100 bg-brand-50 p-5 text-sm text-brand-800">
         当前没有真实接口，这一步会按项目品牌、类型和周期生成一份模拟外部数据并入库。
       </div>
 
@@ -428,7 +428,7 @@ function ExternalSyncPanel({
         type="button"
         onClick={() => mutation.mutate()}
         disabled={mutation.isPending}
-        className="inline-flex h-11 items-center gap-2 rounded-lg bg-blue-600 px-5 text-sm font-medium text-white transition hover:bg-blue-700 disabled:opacity-60"
+        className="inline-flex h-11 items-center gap-2 rounded-lg bg-brand px-5 text-sm font-medium text-white transition hover:bg-brand-600 disabled:opacity-60"
       >
         {mutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
         开始同步
@@ -482,8 +482,8 @@ function NoteFetchPanel({
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="text-lg font-semibold text-slate-900">录入小红书 ID</h2>
-        <p className="mt-2 text-sm text-slate-500">
+        <h2 className="text-lg font-semibold text-gray-900">录入小红书 ID</h2>
+        <p className="mt-2 text-sm text-gray-500">
           输入笔记 ID，mock 获取蒲公英与聚光侧数据，补齐后续复盘分析所需字段。
         </p>
       </div>
@@ -493,18 +493,18 @@ function NoteFetchPanel({
         onChange={(event) => setNoteIdInput(event.target.value)}
         rows={7}
         placeholder={'每行一个笔记 ID，或用逗号分隔多个 ID。'}
-        className="w-full rounded-lg border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+        className="w-full rounded-lg border border-gray-200 px-4 py-3 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
       />
 
       <div className="flex items-center justify-between">
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-gray-500">
           {parsedIds.length > 0 ? `已识别 ${parsedIds.length} 个笔记 ID` : '请输入至少一个笔记 ID'}
         </p>
         <button
           type="button"
           onClick={() => mutation.mutate()}
           disabled={mutation.isPending || parsedIds.length === 0}
-          className="inline-flex h-11 items-center gap-2 rounded-lg bg-blue-600 px-5 text-sm font-medium text-white transition hover:bg-blue-700 disabled:opacity-60"
+          className="inline-flex h-11 items-center gap-2 rounded-lg bg-brand px-5 text-sm font-medium text-white transition hover:bg-brand-600 disabled:opacity-60"
         >
           {mutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <CloudDownload size={16} />}
           开始拉取
@@ -548,19 +548,19 @@ function FileUploadPanel({
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
-        <p className="mt-2 text-sm text-slate-500">{description}</p>
+        <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
+        <p className="mt-2 text-sm text-gray-500">{description}</p>
       </div>
 
       {selectedFiles.length > 0 ? (
-        <div className="space-y-3 rounded-lg border border-blue-200 bg-blue-50 p-4">
+        <div className="space-y-3 rounded-lg border border-brand-200 bg-brand-50 p-4">
           <div className="space-y-2">
             {selectedFiles.map((file, idx) => (
               <div key={idx} className="flex items-center gap-3">
-                <FileText size={16} className="text-blue-600 shrink-0" />
+                <FileText size={16} className="text-brand shrink-0" />
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-slate-900 truncate">{file.name}</p>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-sm font-medium text-gray-900 truncate">{file.name}</p>
+                  <p className="text-xs text-gray-500">
                     {(file.size / 1024 / 1024).toFixed(2)} MB
                   </p>
                 </div>
@@ -571,7 +571,7 @@ function FileUploadPanel({
             <button
               type="button"
               onClick={() => setSelectedFiles([])}
-              className="inline-flex h-10 items-center rounded-lg border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+              className="inline-flex h-10 items-center rounded-lg border border-gray-200 bg-white px-4 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
             >
               重新选择
             </button>
@@ -579,7 +579,7 @@ function FileUploadPanel({
               type="button"
               onClick={() => selectedFiles.length > 0 && onSubmit(selectedFiles)}
               disabled={isPending}
-              className="inline-flex h-10 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-medium text-white transition hover:bg-blue-700 disabled:opacity-60"
+              className="inline-flex h-10 items-center gap-2 rounded-lg bg-brand px-4 text-sm font-medium text-white transition hover:bg-brand-600 disabled:opacity-60"
             >
               {isPending ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
               {buttonText}{multiple ? ` (${selectedFiles.length}个文件)` : ''}
@@ -590,8 +590,8 @@ function FileUploadPanel({
         <label
           className={`flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed px-6 py-12 text-center transition ${
             isDragging
-              ? 'border-blue-500 bg-blue-50'
-              : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+              ? 'border-brand bg-[#FFF8E1]'
+              : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50'
           }`}
           onDragOver={(event) => {
             event.preventDefault();
@@ -604,9 +604,9 @@ function FileUploadPanel({
             handleFiles(event.dataTransfer.files);
           }}
         >
-          <Upload size={28} className="mb-3 text-slate-400" />
-          <p className="text-sm font-medium text-slate-700">拖拽文件到此处，或点击选择文件</p>
-          <p className="mt-2 text-xs text-slate-500">{supportText}</p>
+          <Upload size={28} className="mb-3 text-gray-400" />
+          <p className="text-sm font-medium text-gray-700">拖拽文件到此处，或点击选择文件</p>
+          <p className="mt-2 text-xs text-gray-500">{supportText}</p>
           <input
             type="file"
             accept={accept}
@@ -623,8 +623,8 @@ function FileUploadPanel({
 function SummaryItem({ label, value }: { label: string; value: string | null | undefined }) {
   return (
     <div className="rounded-lg border border-emerald-100 bg-white px-4 py-3">
-      <p className="text-xs text-slate-500">{label}</p>
-      <p className="mt-2 text-sm text-slate-800">{value?.trim() ? value : '暂无'}</p>
+      <p className="text-xs text-gray-500">{label}</p>
+      <p className="mt-2 text-sm text-gray-800">{value?.trim() ? value : '暂无'}</p>
     </div>
   );
 }

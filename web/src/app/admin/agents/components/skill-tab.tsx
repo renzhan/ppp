@@ -224,7 +224,7 @@ export function SkillTab() {
         <h2 className="text-lg font-medium text-gray-900">Skill 列表</h2>
         <button
           onClick={handleCreate}
-          className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 transition-colors"
+          className="inline-flex items-center gap-1.5 rounded-md bg-brand px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-600 transition-colors"
         >
           <Plus size={16} />
           新建 Skill
@@ -358,14 +358,14 @@ function SkillRow({ skill, onEdit, onDelete, onViewVersions }: SkillRowProps) {
       <div className="flex items-center gap-2 flex-shrink-0 ml-4">
         <button
           onClick={() => onViewVersions(skill)}
-          className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-blue-600 transition-colors"
+          className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-brand transition-colors"
           title="版本历史"
         >
           <History size={16} />
         </button>
         <button
           onClick={() => onEdit(skill)}
-          className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-blue-600 transition-colors"
+          className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-brand transition-colors"
           title="编辑"
         >
           <Pencil size={16} />
@@ -503,7 +503,7 @@ function SkillFormModal({ skill, onClose, onSuccess }: SkillFormModalProps) {
               value={formData.name}
               onChange={(e) => handleChange('name', e.target.value)}
               placeholder="例如：文档格式化 Skill"
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
             />
           </FormField>
 
@@ -514,7 +514,7 @@ function SkillFormModal({ skill, onClose, onSuccess }: SkillFormModalProps) {
               value={formData.description}
               onChange={(e) => handleChange('description', e.target.value)}
               placeholder="Skill 的功能描述"
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
             />
           </FormField>
 
@@ -524,7 +524,7 @@ function SkillFormModal({ skill, onClose, onSuccess }: SkillFormModalProps) {
               <select
                 value={formData.scope}
                 onChange={(e) => handleChange('scope', e.target.value)}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
               >
                 <option value="public">公用 - 所有 Agent 可引用</option>
                 <option value="workspace">工作区专属 - 仅指定工作区 Agent 可引用</option>
@@ -538,7 +538,7 @@ function SkillFormModal({ skill, onClose, onSuccess }: SkillFormModalProps) {
               <select
                 value={formData.workspaceId}
                 onChange={(e) => handleChange('workspaceId', e.target.value)}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
               >
                 <option value="">请选择工作区</option>
                 {workspaces.map((ws) => (
@@ -557,7 +557,7 @@ function SkillFormModal({ skill, onClose, onSuccess }: SkillFormModalProps) {
               onChange={(e) => handleChange('content', e.target.value)}
               placeholder="在此输入 Skill 的 Markdown 内容..."
               rows={12}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm font-mono focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 resize-y"
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm font-mono focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand resize-y"
             />
           </FormField>
 
@@ -574,7 +574,7 @@ function SkillFormModal({ skill, onClose, onSuccess }: SkillFormModalProps) {
             <button
               type="submit"
               disabled={isPending}
-              className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              className="inline-flex items-center gap-1.5 rounded-md bg-brand px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-600 disabled:opacity-50 transition-colors"
             >
               {isPending && <Loader2 size={14} className="animate-spin" />}
               {isEditing ? '保存' : '创建'}
@@ -696,7 +696,7 @@ function VersionHistoryModal({ skill, onClose }: VersionHistoryModalProps) {
                 className="rounded-lg border border-gray-200 p-4"
               >
                 <div className="mb-2 flex items-center justify-between">
-                  <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-700">
+                  <span className="inline-flex items-center rounded-full bg-brand-100 px-2.5 py-0.5 text-xs font-medium text-brand-700">
                     v{ver.version}
                   </span>
                   <span className="text-xs text-gray-400">

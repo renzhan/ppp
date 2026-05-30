@@ -119,13 +119,13 @@ export default function ReviewDetailPage({ params }: { params: { id: string } })
         <div className="flex items-center gap-3">
           <Link
             href="/review"
-            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 text-slate-600 transition hover:bg-slate-50"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-gray-200 text-gray-600 transition hover:bg-gray-50"
           >
             <ArrowLeft size={16} />
           </Link>
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-gray-900">复盘配置</h1>
-            <p className="mt-0.5 text-sm text-slate-500">{review.project.projectName}</p>
+            <p className="mt-0.5 text-sm text-gray-500">{review.project.projectName}</p>
           </div>
         </div>
         {review.status === 'completed' ? (
@@ -137,7 +137,7 @@ export default function ReviewDetailPage({ params }: { params: { id: string } })
             审校台
           </Link>
         ) : review.status === 'generating' ? (
-          <span className="inline-flex h-9 items-center gap-2 rounded-lg bg-slate-100 px-4 text-sm font-medium text-slate-500">
+          <span className="inline-flex h-9 items-center gap-2 rounded-lg bg-gray-100 px-4 text-sm font-medium text-gray-500">
             <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
@@ -145,7 +145,7 @@ export default function ReviewDetailPage({ params }: { params: { id: string } })
             草稿生成中...
           </span>
         ) : (
-          <span className="inline-flex h-9 items-center gap-2 rounded-lg bg-slate-50 px-4 text-sm text-slate-400">
+          <span className="inline-flex h-9 items-center gap-2 rounded-lg bg-gray-50 px-4 text-sm text-gray-400">
             等待生成
           </span>
         )}
@@ -200,25 +200,27 @@ export default function ReviewDetailPage({ params }: { params: { id: string } })
       {/* Section: 达人层级 */}
       {review.influencerTiers && review.influencerTiers.length > 0 && (
         <DetailSection title="达人层级配置">
-          <div className="overflow-hidden rounded-md border">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-slate-50">
-                  <th className="px-4 py-2 text-left font-medium text-slate-600">层级名称</th>
-                  <th className="px-4 py-2 text-left font-medium text-slate-600">粉丝范围</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {review.influencerTiers.map((tier) => (
-                  <tr key={tier.id}>
-                    <td className="px-4 py-2 text-slate-700">{tier.name}</td>
-                    <td className="px-4 py-2 text-slate-700">
-                      {tier.fanRangeMin.toLocaleString()} - {tier.fanRangeMax.toLocaleString()}
-                    </td>
+          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-gray-50">
+                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">层级名称</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">粉丝范围</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {review.influencerTiers.map((tier) => (
+                    <tr key={tier.id} className="bg-white text-sm text-gray-900 border-b hover:bg-gray-50">
+                      <td className="px-4 py-3">{tier.name}</td>
+                      <td className="px-4 py-3">
+                        {tier.fanRangeMin.toLocaleString()} - {tier.fanRangeMax.toLocaleString()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </DetailSection>
       )}
@@ -234,10 +236,10 @@ export default function ReviewDetailPage({ params }: { params: { id: string } })
                 className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm ${
                   enabled
                     ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                    : 'border-slate-200 bg-slate-50 text-slate-400'
+                    : 'border-gray-200 bg-gray-50 text-gray-400'
                 }`}
               >
-                <span className={`h-2 w-2 rounded-full ${enabled ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+                <span className={`h-2 w-2 rounded-full ${enabled ? 'bg-emerald-500' : 'bg-gray-300'}`} />
                 {MODULE_LABELS[key] || key}
               </div>
             );
@@ -248,25 +250,27 @@ export default function ReviewDetailPage({ params }: { params: { id: string } })
       {/* Section: 投流周期 */}
       {review.launchPhases && review.launchPhases.length > 0 && (
         <DetailSection title="投流周期配置">
-          <div className="overflow-hidden rounded-md border">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-slate-50">
-                  <th className="px-4 py-2 text-left font-medium text-slate-600">阶段名称</th>
-                  <th className="px-4 py-2 text-left font-medium text-slate-600">开始日期</th>
-                  <th className="px-4 py-2 text-left font-medium text-slate-600">结束日期</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {review.launchPhases.map((phase) => (
-                  <tr key={phase.id}>
-                    <td className="px-4 py-2 text-slate-700">{phase.name}</td>
-                    <td className="px-4 py-2 text-slate-700">{formatDate(phase.startDate)}</td>
-                    <td className="px-4 py-2 text-slate-700">{formatDate(phase.endDate)}</td>
+          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-gray-50">
+                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">阶段名称</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">开始日期</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">结束日期</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {review.launchPhases.map((phase) => (
+                    <tr key={phase.id} className="bg-white text-sm text-gray-900 border-b hover:bg-gray-50">
+                      <td className="px-4 py-3">{phase.name}</td>
+                      <td className="px-4 py-3">{formatDate(phase.startDate)}</td>
+                      <td className="px-4 py-3">{formatDate(phase.endDate)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </DetailSection>
       )}
@@ -277,7 +281,7 @@ export default function ReviewDetailPage({ params }: { params: { id: string } })
           <a
             href={review.planFileUrl || '#'}
             download={review.planFileName}
-            className="inline-flex items-center gap-2 rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+            className="inline-flex items-center gap-2 rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
           >
             <Download size={16} />
             {review.planFileName}
@@ -293,7 +297,7 @@ export default function ReviewDetailPage({ params }: { params: { id: string } })
 function DetailSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="rounded-lg border bg-white p-6">
-      <h2 className="mb-4 text-base font-semibold text-slate-800">{title}</h2>
+      <h2 className="mb-4 text-base font-semibold text-gray-800">{title}</h2>
       {children}
     </section>
   );
@@ -302,8 +306,8 @@ function DetailSection({ title, children }: { title: string; children: React.Rea
 function InfoItem({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="text-xs font-medium text-slate-500">{label}</dt>
-      <dd className="mt-0.5 text-sm text-slate-900">{value}</dd>
+      <dt className="text-xs font-medium text-gray-500">{label}</dt>
+      <dd className="mt-0.5 text-sm text-gray-900">{value}</dd>
     </div>
   );
 }
@@ -315,7 +319,7 @@ function ReportContentDisplay({ content }: { content: unknown }) {
   if (typeof content === 'string') {
     return (
       <div
-        className="prose prose-sm max-w-none text-slate-700"
+        className="prose prose-sm max-w-none text-gray-700"
         dangerouslySetInnerHTML={{ __html: simpleMarkdownToHtml(content) }}
       />
     );
@@ -329,11 +333,11 @@ function ReportContentDisplay({ content }: { content: unknown }) {
           {(content as Array<{ title?: string; content?: string }>).map((section, idx) => (
             <div key={idx}>
               {section.title && (
-                <h3 className="mb-2 text-sm font-semibold text-slate-800">{section.title}</h3>
+                <h3 className="mb-2 text-sm font-semibold text-gray-800">{section.title}</h3>
               )}
               {section.content && (
                 <div
-                  className="prose prose-sm max-w-none text-slate-700"
+                  className="prose prose-sm max-w-none text-gray-700"
                   dangerouslySetInnerHTML={{ __html: simpleMarkdownToHtml(section.content) }}
                 />
               )}
@@ -349,12 +353,12 @@ function ReportContentDisplay({ content }: { content: unknown }) {
       <div className="space-y-4">
         {entries.map(([key, value]) => (
           <div key={key}>
-            <h3 className="mb-1 text-sm font-semibold text-slate-800">{key}</h3>
-            <div className="text-sm text-slate-700">
+            <h3 className="mb-1 text-sm font-semibold text-gray-800">{key}</h3>
+            <div className="text-sm text-gray-700">
               {typeof value === 'string' ? (
                 <div dangerouslySetInnerHTML={{ __html: simpleMarkdownToHtml(value) }} />
               ) : (
-                <pre className="whitespace-pre-wrap rounded bg-slate-50 p-3 text-xs">
+                <pre className="whitespace-pre-wrap rounded bg-gray-50 p-3 text-xs">
                   {JSON.stringify(value, null, 2)}
                 </pre>
               )}

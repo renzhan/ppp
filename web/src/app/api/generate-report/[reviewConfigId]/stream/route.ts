@@ -182,7 +182,7 @@ export async function GET(
               id: chapterDef.id,
               title: template.metadata.chapter_name,
               number: chapterDef.number,
-              content: `<p class="text-slate-400">章节生成失败：${errorMsg}</p>`,
+              content: `<p class="text-gray-400">章节生成失败：${errorMsg}</p>`,
             };
             completedChapters.push(fallbackChapter);
             send({ type: 'chapter', chapter: fallbackChapter });

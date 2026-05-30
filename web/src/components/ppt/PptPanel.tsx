@@ -35,7 +35,7 @@ export function PptPanel({
       <button
         onClick={onGenerate}
         disabled={isGenerating}
-        className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-3 text-base font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+        className="inline-flex items-center gap-2 rounded-md bg-brand px-6 py-3 text-base font-medium text-white hover:bg-brand-600 disabled:opacity-50"
       >
         {isGenerating ? (
           <Loader2 size={16} className="animate-spin" />

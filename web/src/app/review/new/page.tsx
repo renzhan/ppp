@@ -345,7 +345,7 @@ function NewReviewPageContent() {
 
     // Check note count
     if (selectedProject && selectedProject.noteCount === 0) {
-      setSubmitError('请先为该项目上传笔记底表，再开始复盘。');
+      setSubmitError('请先为该项目上传笔记底表，再开始复盘');
       return;
     }
 
@@ -381,43 +381,43 @@ function NewReviewPageContent() {
     <div className="mx-auto max-w-4xl space-y-8 pb-12">
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-gray-900">新建复盘</h1>
-        <p className="mt-1 text-sm text-slate-500">配置复盘参数，系统将基于笔记数据生成复盘报告。</p>
+        <p className="mt-1 text-sm text-gray-500">配置复盘参数，系统将基于笔记数据生成复盘报告</p>
       </div>
 
       {/* Section: 项目信息 */}
       <FormSection title="项目信息">
         {/* Cascade filters from existing projects */}
-        <div className="mb-4 grid grid-cols-3 gap-3">
-          <div>
-            <label className="mb-1 block text-xs font-medium text-slate-600">品类</label>
+        <div className="mb-4 flex flex-wrap gap-4">
+          <div className="min-w-[140px] flex-1">
+            <label className="mb-1 block text-xs text-gray-500">品类</label>
             <select
               value={filterCategory}
               onChange={(e) => { setFilterCategory(e.target.value); setFilterBrand(''); setFilterBusinessLine(''); setSelectedProjectId(''); }}
-              className="block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="block w-full rounded-sm border border-gray-300 bg-white px-3 h-10 text-sm text-gray-900 placeholder:text-gray-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
             >
               <option value="">全部品类</option>
               {categoryOptions.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium text-slate-600">品牌</label>
+          <div className="min-w-[140px] flex-1">
+            <label className="mb-1 block text-xs text-gray-500">品牌</label>
             <select
               value={filterBrand}
               onChange={(e) => { setFilterBrand(e.target.value); setFilterBusinessLine(''); setSelectedProjectId(''); }}
               disabled={!filterCategory}
-              className="block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-slate-50"
+              className="block w-full rounded-sm border border-gray-300 bg-white px-3 h-10 text-sm text-gray-900 placeholder:text-gray-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20 disabled:cursor-not-allowed disabled:bg-gray-50"
             >
               <option value="">全部品牌</option>
               {brandOptions.map((b) => <option key={b} value={b}>{b}</option>)}
             </select>
           </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium text-slate-600">业务线</label>
+          <div className="min-w-[140px] flex-1">
+            <label className="mb-1 block text-xs text-gray-500">业务线</label>
             <select
               value={filterBusinessLine}
               onChange={(e) => { setFilterBusinessLine(e.target.value); setSelectedProjectId(''); }}
               disabled={!filterBrand}
-              className="block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-slate-50"
+              className="block w-full rounded-sm border border-gray-300 bg-white px-3 h-10 text-sm text-gray-900 placeholder:text-gray-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20 disabled:cursor-not-allowed disabled:bg-gray-50"
             >
               <option value="">全部业务线</option>
               {businessLineOptions.map((bl) => <option key={bl} value={bl}>{bl}</option>)}
@@ -426,10 +426,10 @@ function NewReviewPageContent() {
         </div>
 
         <div>
-          <label className="mb-1 block text-xs font-medium text-slate-600">选择项目</label>
+          <label className="mb-1 block text-sm font-medium text-gray-700">选择项目</label>
           <div className="relative">
             <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-              <Search size={16} className="text-slate-400" />
+              <Search size={16} className="text-gray-400" />
             </div>
             <input
               type="text"
@@ -445,36 +445,36 @@ function NewReviewPageContent() {
                   setSelectedProjectId('');
                 }
               }}
-              className="block w-full rounded-md border border-slate-300 bg-white py-2 pl-9 pr-3 text-sm text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="block w-full rounded-sm border border-gray-300 bg-white h-10 pl-9 pr-3 text-sm text-gray-900 placeholder:text-gray-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
             />
           </div>
           {!selectedProjectId && filteredProjects.length > 0 && projectSearch && (
-            <ul className="mt-1 max-h-48 overflow-y-auto rounded-md border border-slate-200 bg-white shadow-sm">
+            <ul className="mt-1 max-h-48 overflow-y-auto rounded-md border border-gray-200 bg-white shadow-sm">
               {filteredProjects.map((p) => (
                 <li key={p.id}>
                   <button
                     type="button"
                     onClick={() => handleProjectChange(p.id)}
-                    className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-slate-50"
+                    className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-gray-50"
                   >
-                    <span className="font-medium text-slate-800">{p.projectName}</span>
-                    <span className="text-xs text-slate-400">{p.category} / {p.brand}</span>
+                    <span className="font-medium text-gray-800">{p.projectName}</span>
+                    <span className="text-xs text-gray-400">{p.category} / {p.brand}</span>
                   </button>
                 </li>
               ))}
             </ul>
           )}
           {!selectedProjectId && !projectSearch && filteredProjects.length > 0 && (
-            <ul className="mt-1 max-h-48 overflow-y-auto rounded-md border border-slate-200 bg-white shadow-sm">
+            <ul className="mt-1 max-h-48 overflow-y-auto rounded-md border border-gray-200 bg-white shadow-sm">
               {filteredProjects.slice(0, 10).map((p) => (
                 <li key={p.id}>
                   <button
                     type="button"
                     onClick={() => handleProjectChange(p.id)}
-                    className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-slate-50"
+                    className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-gray-50"
                   >
-                    <span className="font-medium text-slate-800">{p.projectName}</span>
-                    <span className="text-xs text-slate-400">{p.category} / {p.brand}</span>
+                    <span className="font-medium text-gray-800">{p.projectName}</span>
+                    <span className="text-xs text-gray-400">{p.category} / {p.brand}</span>
                   </button>
                 </li>
               ))}
@@ -483,18 +483,18 @@ function NewReviewPageContent() {
         </div>
         {/* 选择项目后展示品类/品牌/业务线（只读） */}
         {selectedProject && (
-          <div className="mt-4 grid grid-cols-3 gap-4 rounded-md border border-slate-200 bg-slate-50 p-3">
+          <div className="mt-4 grid grid-cols-3 gap-4 rounded-md border border-gray-200 bg-gray-50 p-3">
             <div>
-              <span className="block text-xs text-slate-500">品类</span>
-              <span className="text-sm font-medium text-slate-800">{selectedProject.category || '-'}</span>
+              <span className="block text-xs text-gray-500">品类</span>
+              <span className="text-sm font-medium text-gray-800">{selectedProject.category || '-'}</span>
             </div>
             <div>
-              <span className="block text-xs text-slate-500">品牌</span>
-              <span className="text-sm font-medium text-slate-800">{selectedProject.brand || '-'}</span>
+              <span className="block text-xs text-gray-500">品牌</span>
+              <span className="text-sm font-medium text-gray-800">{selectedProject.brand || '-'}</span>
             </div>
             <div>
-              <span className="block text-xs text-slate-500">业务线</span>
-              <span className="text-sm font-medium text-slate-800">{selectedProject.businessLine || '-'}</span>
+              <span className="block text-xs text-gray-500">业务线</span>
+              <span className="text-sm font-medium text-gray-800">{selectedProject.businessLine || '-'}</span>
             </div>
           </div>
         )}
@@ -505,7 +505,7 @@ function NewReviewPageContent() {
         <div className="space-y-4">
           {/* 是否有（非官方）合作 */}
           <div>
-            <label className="mb-2 block text-xs font-medium text-slate-600">是否有（非官方）合作</label>
+            <label className="mb-2 block text-xs font-medium text-gray-600">是否有（非官方）合作</label>
             <div className="flex gap-4">
               <RadioOption
                 name="hasUnofficialCooperation"
@@ -526,36 +526,36 @@ function NewReviewPageContent() {
 
           {/* 项目执行周期 */}
           <div>
-            <label className="mb-2 block text-xs font-medium text-slate-600">项目执行周期</label>
+            <label className="mb-2 block text-xs font-medium text-gray-600">项目执行周期</label>
             <div className="flex items-center gap-3">
               <input
                 type="date"
                 value={executionPeriodStart}
                 onChange={(e) => setExecutionPeriodStart(e.target.value)}
-                className="rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="rounded-sm border border-gray-300 px-3 h-10 text-sm placeholder:text-gray-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
               />
-              <span className="text-slate-400">—</span>
+              <span className="text-gray-400">至</span>
               <input
                 type="date"
                 value={executionPeriodEnd}
                 onChange={(e) => setExecutionPeriodEnd(e.target.value)}
-                className="rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="rounded-sm border border-gray-300 px-3 h-10 text-sm placeholder:text-gray-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
               />
             </div>
           </div>
 
           {/* 历史项目拉新成本基准值 */}
           <div>
-            <label className="mb-2 block text-xs font-medium text-slate-600">历史项目拉新成本基准值（元）</label>
+            <label className="mb-2 block text-xs font-medium text-gray-600">历史项目拉新成本基准值（元）</label>
             <input
               type="number"
               step="any"
               value={historicalAcquisitionCost}
               onChange={(e) => setHistoricalAcquisitionCost(e.target.value)}
               placeholder="请输入历史项目拉新成本基准值"
-              className="w-64 rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-64 rounded-sm border border-gray-300 px-3 h-10 text-sm placeholder:text-gray-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
             />
-            <p className="mt-1 text-xs text-slate-400">非必填，用于与本次项目拉新成本对比</p>
+            <p className="mt-1 text-xs text-gray-400">非必填，用于与本次项目拉新成本对比</p>
           </div>
         </div>
       </FormSection>
@@ -581,27 +581,27 @@ function NewReviewPageContent() {
                 placeholder="层级名称"
                 value={tier.name}
                 onChange={(e) => handleTierChange(tier.id, 'name', e.target.value)}
-                className="w-28 rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="w-28 rounded-sm border border-gray-300 px-3 h-10 text-sm placeholder:text-gray-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
               />
               <input
                 type="number"
                 placeholder="粉丝下限"
                 value={tier.fanRangeMin || ''}
                 onChange={(e) => handleTierChange(tier.id, 'fanRangeMin', Number(e.target.value))}
-                className="w-32 rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="w-32 rounded-sm border border-gray-300 px-3 h-10 text-sm placeholder:text-gray-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
               />
-              <span className="text-slate-400">-</span>
+              <span className="text-gray-400">-</span>
               <input
                 type="number"
                 placeholder="粉丝上限"
                 value={tier.fanRangeMax || ''}
                 onChange={(e) => handleTierChange(tier.id, 'fanRangeMax', Number(e.target.value))}
-                className="w-32 rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="w-32 rounded-sm border border-gray-300 px-3 h-10 text-sm placeholder:text-gray-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
               />
               <button
                 type="button"
                 onClick={() => handleRemoveTier(tier.id)}
-                className="rounded p-1 text-slate-400 transition hover:bg-rose-50 hover:text-rose-500"
+                className="rounded p-1 text-gray-400 transition hover:bg-rose-50 hover:text-rose-500"
               >
                 <Trash2 size={16} />
               </button>
@@ -610,7 +610,7 @@ function NewReviewPageContent() {
           <button
             type="button"
             onClick={handleAddTier}
-            className="inline-flex items-center gap-1 rounded-md border border-dashed border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:border-blue-400 hover:text-blue-600"
+            className="inline-flex items-center gap-1 rounded-md border border-dashed border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600 transition hover:border-brand hover:text-brand"
           >
             <Plus size={14} />
             添加层级
@@ -649,7 +649,7 @@ function NewReviewPageContent() {
       <FormSection title="统计口径选择">
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
           <div>
-            <label className="mb-2 block text-xs font-medium text-slate-600">互动统计口径</label>
+            <label className="mb-2 block text-xs font-medium text-gray-600">互动统计口径</label>
             <div className="flex gap-4">
               <RadioOption
                 name="engagementMetric"
@@ -668,7 +668,7 @@ function NewReviewPageContent() {
             </div>
           </div>
           <div>
-            <label className="mb-2 block text-xs font-medium text-slate-600">爆文统计口径</label>
+            <label className="mb-2 block text-xs font-medium text-gray-600">爆文统计口径</label>
             <div className="flex gap-4">
               <RadioOption
                 name="viralMetric"
@@ -694,7 +694,7 @@ function NewReviewPageContent() {
         {/* 第一级：选择口径类型 */}
         <div className="space-y-4">
           <div>
-            <label className="mb-2 block text-xs font-medium text-slate-600">选择金额口径</label>
+            <label className="mb-2 block text-xs font-medium text-gray-600">选择金额口径</label>
             <div className="flex gap-4">
               <RadioOption
                 name="costCaliberType"
@@ -715,8 +715,8 @@ function NewReviewPageContent() {
 
           {/* 第二级：根据选择的口径类型，选择消耗/结算 */}
           {costCaliberType === 'content' && (
-            <div className="ml-4 rounded-md border border-slate-200 bg-slate-50 p-3">
-              <label className="mb-2 block text-xs font-medium text-slate-600">内容金额口径</label>
+            <div className="ml-4 rounded-md border border-gray-200 bg-gray-50 p-3">
+              <label className="mb-2 block text-xs font-medium text-gray-600">内容金额口径</label>
               <div className="flex gap-4">
                 <RadioOption
                   name="contentCostCaliber"
@@ -737,8 +737,8 @@ function NewReviewPageContent() {
           )}
 
           {costCaliberType === 'traffic' && (
-            <div className="ml-4 rounded-md border border-slate-200 bg-slate-50 p-3">
-              <label className="mb-2 block text-xs font-medium text-slate-600">投流金额口径</label>
+            <div className="ml-4 rounded-md border border-gray-200 bg-gray-50 p-3">
+              <label className="mb-2 block text-xs font-medium text-gray-600">投流金额口径</label>
               <div className="flex gap-4">
                 <RadioOption
                   name="trafficCostCaliber"
@@ -760,23 +760,23 @@ function NewReviewPageContent() {
         </div>
 
         {/* 总费用实时计算展示 */}
-        <div className="mt-4 rounded-md border border-blue-100 bg-blue-50 p-4">
+        <div className="mt-4 rounded-md border border-brand-100 bg-brand-50 p-4">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-slate-700">总费用（实时计算）</span>
+            <span className="text-sm font-medium text-gray-700">总费用（实时计算）</span>
             {!selectedProjectId ? (
-              <span className="text-sm text-slate-400">请先选择项目</span>
+              <span className="text-sm text-gray-400">请先选择项目</span>
             ) : isCostLoading ? (
-              <span className="text-sm text-slate-400">计算中...</span>
+              <span className="text-sm text-gray-400">计算中...</span>
             ) : costData ? (
-              <span className="text-lg font-bold text-blue-700">
+              <span className="text-lg font-bold text-brand-700">
                 ¥{costData.totalCost.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             ) : (
-              <span className="text-sm text-slate-400">--</span>
+              <span className="text-sm text-gray-400">--</span>
             )}
           </div>
           {costData && selectedProjectId && (
-            <div className="mt-2 flex gap-6 text-xs text-slate-500">
+            <div className="mt-2 flex gap-6 text-xs text-gray-500">
               <span>内容费用：¥{costData.contentCost.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               <span>投流费用：¥{costData.trafficCost.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
@@ -790,15 +790,15 @@ function NewReviewPageContent() {
           {REPORT_MODULES.map((mod) => (
             <label
               key={mod.key}
-              className="flex cursor-pointer items-center gap-2 rounded-md border border-slate-200 px-3 py-2 transition hover:bg-slate-50"
+              className="flex cursor-pointer items-center gap-2 rounded-md border border-gray-200 px-3 py-2 transition hover:bg-gray-50"
             >
               <input
                 type="checkbox"
                 checked={modules[mod.key] ?? true}
                 onChange={() => handleModuleToggle(mod.key)}
-                className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                className="h-4 w-4 rounded border-gray-300 text-brand focus:ring-brand/50"
               />
-              <span className="text-sm text-slate-700">{mod.label}</span>
+              <span className="text-sm text-gray-700">{mod.label}</span>
             </label>
           ))}
         </div>
@@ -815,25 +815,25 @@ function NewReviewPageContent() {
                   placeholder="阶段名称"
                   value={phase.name}
                   onChange={(e) => handlePhaseChange(phase.id, 'name', e.target.value)}
-                  className="w-28 rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  className="w-28 rounded-sm border border-gray-300 px-3 h-10 text-sm placeholder:text-gray-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
                 />
                 <input
                   type="date"
                   value={phase.startDate}
                   onChange={(e) => handlePhaseChange(phase.id, 'startDate', e.target.value)}
-                  className="rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  className="rounded-sm border border-gray-300 px-3 h-10 text-sm placeholder:text-gray-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
                 />
-                <span className="text-slate-400">至</span>
+                <span className="text-gray-400">至</span>
                 <input
                   type="date"
                   value={phase.endDate}
                   onChange={(e) => handlePhaseChange(phase.id, 'endDate', e.target.value)}
-                  className="rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  className="rounded-sm border border-gray-300 px-3 h-10 text-sm placeholder:text-gray-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
                 />
                 <button
                   type="button"
                   onClick={() => handleRemovePhase(phase.id)}
-                  className="rounded p-1 text-slate-400 transition hover:bg-rose-50 hover:text-rose-500"
+                  className="rounded p-1 text-gray-400 transition hover:bg-rose-50 hover:text-rose-500"
                 >
                   <Trash2 size={16} />
                 </button>
@@ -842,7 +842,7 @@ function NewReviewPageContent() {
             <button
               type="button"
               onClick={handleAddPhase}
-              className="inline-flex items-center gap-1 rounded-md border border-dashed border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:border-blue-400 hover:text-blue-600"
+              className="inline-flex items-center gap-1 rounded-md border border-dashed border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600 transition hover:border-brand hover:text-brand"
             >
               <Plus size={14} />
               添加阶段
@@ -853,9 +853,27 @@ function NewReviewPageContent() {
 
       {/* Section: 策划方案上传 */}
       <FormSection title="策划方案上传">
-        <div className="flex items-center gap-4">
-          <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50">
-            <Upload size={16} />
+        <div
+          className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-white p-8 transition hover:border-brand hover:bg-[#FFF8E1]"
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => {
+            e.preventDefault();
+            const file = e.dataTransfer.files?.[0];
+            if (file) {
+              const ext = '.' + file.name.split('.').pop()?.toLowerCase();
+              if (!ALLOWED_PLAN_EXTENSIONS.includes(ext)) {
+                setSubmitError('策划方案仅支持 .pdf、.docx、.doc、.pptx、.ppt 格式');
+                return;
+              }
+              setPlanFile(file);
+              setPlanFileName(file.name);
+              setSubmitError(null);
+            }
+          }}
+        >
+          <Upload size={24} className="mb-2 text-gray-400" />
+          <p className="text-sm text-gray-600">拖拽文件到此处，或</p>
+          <label className="mt-2 inline-flex cursor-pointer items-center gap-2 rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50">
             选择文件
             <input
               type="file"
@@ -865,13 +883,13 @@ function NewReviewPageContent() {
             />
           </label>
           {planFileName && (
-            <div className="flex items-center gap-2 text-sm text-slate-600">
-              <FileText size={16} className="text-blue-500" />
+            <div className="mt-3 flex items-center gap-2 text-sm text-gray-600">
+              <FileText size={16} className="text-brand" />
               {planFileName}
             </div>
           )}
         </div>
-        <p className="mt-2 text-xs text-slate-400">支持格式：.pdf、.docx、.doc、.pptx、.ppt</p>
+        <p className="mt-2 text-xs text-gray-400">支持格式：.pdf、.docx、.doc、.pptx、.ppt</p>
       </FormSection>
 
       {/* Error Message */}
@@ -882,7 +900,7 @@ function NewReviewPageContent() {
           {submitError.includes('笔记底表') && selectedProjectId && (
             <a
               href={`/projects/${selectedProjectId}/edit`}
-              className="ml-2 font-medium text-blue-600 underline hover:text-blue-700"
+              className="ml-2 font-medium text-brand underline hover:text-brand-700"
             >
               前往上传
             </a>
@@ -896,7 +914,7 @@ function NewReviewPageContent() {
           type="button"
           onClick={handleSubmit}
           disabled={createReview.isPending}
-          className="inline-flex h-10 items-center gap-2 rounded-lg bg-blue-600 px-6 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex h-[44px] items-center gap-2 rounded-md bg-brand px-6 text-sm font-medium text-white transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {createReview.isPending ? (
             <Loading size="sm" />
@@ -913,7 +931,7 @@ function NewReviewPageContent() {
 function FormSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="rounded-lg border bg-white p-6">
-      <h2 className="mb-4 text-base font-semibold text-slate-800">{title}</h2>
+      <h2 className="mb-4 text-base font-bold text-gray-900">{title}</h2>
       {children}
     </section>
   );
@@ -930,14 +948,14 @@ function NumberInput({
 }) {
   return (
     <div>
-      <label className="mb-1 block text-xs font-medium text-slate-600">{label}</label>
+      <label className="mb-1 block text-sm font-medium text-gray-700">{label}</label>
       <input
         type="number"
         step="any"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder="--"
-        className="block w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+        className="block w-full rounded-sm border border-gray-300 px-3 h-10 text-sm text-gray-900 placeholder:text-gray-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
       />
     </div>
   );
@@ -964,9 +982,9 @@ function RadioOption({
         value={value}
         checked={checked}
         onChange={onChange}
-        className="h-4 w-4 border-slate-300 text-blue-600 focus:ring-blue-500"
+        className="h-4 w-4 border-gray-300 text-brand focus:ring-brand/50"
       />
-      <span className="text-sm text-slate-700">{label}</span>
+      <span className="text-sm text-gray-700">{label}</span>
     </label>
   );
 }

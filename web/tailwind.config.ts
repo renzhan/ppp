@@ -9,6 +9,20 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        brand: {
+          DEFAULT: '#F5A623',
+          50: '#FFF8E1',
+          100: '#FFECB3',
+          200: '#FFD54F',
+          300: '#FFCA28',
+          400: '#FFC107',
+          500: '#F5A623',
+          600: '#E09000',
+          700: '#CC7A00',
+          800: '#B36800',
+          900: '#995700',
+        },
+        success: '#10B981',
         rating: {
           S: '#166534',   // 深绿
           A: '#4ade80',   // 浅绿
@@ -50,10 +64,34 @@ const config: Config = {
           foreground: 'hsl(var(--card-foreground))',
         },
       },
+      fontFamily: {
+        sans: ['"PingFang SC"', '"Microsoft YaHei"', '"Helvetica Neue"', 'Arial', 'sans-serif'],
+      },
+      fontSize: {
+        xs: ['12px', { lineHeight: '1.5' }],
+        sm: ['14px', { lineHeight: '1.5' }],
+        base: ['14px', { lineHeight: '1.5' }],
+        lg: ['16px', { lineHeight: '1.5' }],
+        xl: ['20px', { lineHeight: '1.4' }],
+      },
       borderRadius: {
-        lg: 'var(--radius)',
-        md: 'calc(var(--radius) - 2px)',
-        sm: 'calc(var(--radius) - 4px)',
+        lg: '8px',
+        md: '6px',
+        sm: '4px',
+      },
+      keyframes: {
+        'fade-in': {
+          from: { opacity: '0', transform: 'translateY(-4px)' },
+          to: { opacity: '1', transform: 'translateY(0)' },
+        },
+        'fade-out': {
+          from: { opacity: '1', transform: 'translateY(0)' },
+          to: { opacity: '0', transform: 'translateY(-4px)' },
+        },
+      },
+      animation: {
+        'fade-in': 'fade-in 200ms ease-out',
+        'fade-out': 'fade-out 200ms ease-in',
       },
     },
   },

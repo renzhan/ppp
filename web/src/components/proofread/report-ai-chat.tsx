@@ -144,10 +144,10 @@ export function ReportAiChat({
       {/* Header */}
       <div className="flex items-center justify-between border-b px-4 py-3">
         <div className="flex items-center gap-2">
-          <MessageCircle size={14} className="text-blue-600" />
-          <h2 className="text-xs font-semibold text-slate-800">AI 助手</h2>
+          <MessageCircle size={14} className="text-brand" />
+          <h2 className="text-xs font-semibold text-gray-800">AI 助手</h2>
         </div>
-        <span className="text-[10px] text-slate-400">当前：{chapterTitle || '-'}</span>
+        <span className="text-[10px] text-gray-400">当前：{chapterTitle || '-'}</span>
       </div>
 
       {/* Preset commands */}
@@ -160,8 +160,8 @@ export function ReportAiChat({
               onClick={() => sendMessage(cmd.prompt)}
               disabled={isLoading}
               className={cn(
-                'inline-flex items-center gap-1 rounded-full border border-slate-200 px-2 py-0.5 text-[11px] font-medium',
-                'text-slate-600 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700',
+                'inline-flex items-center gap-1 rounded-full border border-gray-200 px-2 py-0.5 text-[11px] font-medium',
+                'text-gray-600 hover:border-brand hover:bg-brand-50 hover:text-brand',
                 'disabled:cursor-not-allowed disabled:opacity-50'
               )}
             >
@@ -176,8 +176,8 @@ export function ReportAiChat({
       <div className="flex-1 overflow-y-auto p-3 space-y-3">
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center py-8 text-center">
-            <MessageCircle size={28} className="mb-2 text-slate-200" />
-            <p className="text-[11px] text-slate-400">
+            <MessageCircle size={28} className="mb-2 text-gray-200" />
+            <p className="text-[11px] text-gray-400">
               AI 审校助手<br />
               输入指令基于当前模块内容进行优化和重新生成
             </p>
@@ -189,11 +189,11 @@ export function ReportAiChat({
             <div className={cn(
               'rounded-lg px-3 py-2 text-xs leading-relaxed',
               msg.role === 'user'
-                ? 'ml-4 bg-blue-600 text-white'
-                : 'mr-4 bg-slate-100 text-slate-700'
+                ? 'ml-4 bg-brand text-white'
+                : 'mr-4 bg-gray-100 text-gray-700'
             )}>
               {msg.isStreaming && !msg.content ? (
-                <span className="inline-flex items-center gap-1 text-slate-400">
+                <span className="inline-flex items-center gap-1 text-gray-400">
                   <Loader2 size={12} className="animate-spin" />
                   思考中...
                 </span>
@@ -201,7 +201,7 @@ export function ReportAiChat({
                 <span className="whitespace-pre-wrap">{msg.content}</span>
               )}
               {msg.isStreaming && msg.content && (
-                <span className="inline-block ml-0.5 w-1.5 h-3.5 bg-slate-400 animate-pulse" />
+                <span className="inline-block ml-0.5 w-1.5 h-3.5 bg-gray-400 animate-pulse" />
               )}
             </div>
           </div>
@@ -220,9 +220,9 @@ export function ReportAiChat({
             placeholder="输入指令重新生成当前模块内容..."
             disabled={isLoading}
             className={cn(
-              'w-full rounded-lg border border-slate-200 bg-amber-50 px-3 py-2.5 pr-10 text-xs',
-              'focus:border-blue-300 focus:outline-none focus:ring-1 focus:ring-blue-100',
-              'placeholder:text-slate-400',
+              'w-full rounded-lg border border-gray-300 bg-amber-50 px-3 py-2.5 pr-10 text-xs',
+              'focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20',
+              'placeholder:text-gray-400',
               'disabled:opacity-50'
             )}
           />
@@ -230,7 +230,7 @@ export function ReportAiChat({
             type="button"
             onClick={() => sendMessage(inputValue)}
             disabled={!inputValue.trim() || isLoading}
-            className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex h-6 w-6 items-center justify-center rounded-md bg-blue-600 text-white transition hover:bg-blue-700 disabled:opacity-50"
+            className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex h-6 w-6 items-center justify-center rounded-md bg-brand text-white transition hover:bg-brand-600 disabled:opacity-50"
           >
             {isLoading ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
           </button>

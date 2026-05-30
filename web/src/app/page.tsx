@@ -131,11 +131,11 @@ export default function ProjectListPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-gray-900">项目管理</h1>
-          <p className="mt-1 text-sm text-slate-500">管理所有项目，支持按品类、品牌、业务线、项目名称和立项日期筛选。</p>
+          <p className="mt-1 text-sm text-gray-500">管理所有项目，支持按品类、品牌、业务线、项目名称和立项日期筛选。</p>
         </div>
         <Link
           href="/projects/new"
-          className="inline-flex h-10 items-center gap-2 rounded-lg bg-blue-600 px-5 text-sm font-medium text-white transition hover:bg-blue-700"
+          className="inline-flex h-10 items-center gap-2 rounded-md bg-brand px-5 text-sm font-medium text-white transition hover:bg-brand-600"
         >
           <Plus size={16} />
           新建项目
@@ -143,15 +143,15 @@ export default function ProjectListPage() {
       </div>
 
       {/* Filter Bar */}
-      <div className="rounded-lg border bg-white p-4">
-        <div className="flex flex-wrap items-end gap-3">
+      <div className="rounded-lg border border-gray-200 bg-white p-4">
+        <div className="flex flex-wrap items-end gap-4">
           {/* Category */}
           <div className="min-w-[140px]">
-            <label className="mb-1 block text-xs font-medium text-slate-600">品类</label>
+            <label className="mb-1 block text-xs text-gray-500">品类</label>
             <select
               value={filters.category}
               onChange={(e) => handleCategoryChange(e.target.value)}
-              className="h-9 w-full rounded-md border border-slate-200 px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              className="h-10 w-full rounded-sm border border-gray-300 px-3 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
             >
               <option value="">全部品类</option>
               {(treeData ?? []).map((node) => (
@@ -162,12 +162,12 @@ export default function ProjectListPage() {
 
           {/* Brand */}
           <div className="min-w-[140px]">
-            <label className="mb-1 block text-xs font-medium text-slate-600">品牌</label>
+            <label className="mb-1 block text-xs text-gray-500">品牌</label>
             <select
               value={filters.brand}
               onChange={(e) => handleBrandChange(e.target.value)}
               disabled={!filters.category}
-              className="h-9 w-full rounded-md border border-slate-200 px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-50"
+              className="h-10 w-full rounded-sm border border-gray-300 px-3 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20 disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-gray-50"
             >
               <option value="">全部品牌</option>
               {brandOptions.map((node) => (
@@ -178,12 +178,12 @@ export default function ProjectListPage() {
 
           {/* Business Line */}
           <div className="min-w-[140px]">
-            <label className="mb-1 block text-xs font-medium text-slate-600">产品线</label>
+            <label className="mb-1 block text-xs text-gray-500">产品线</label>
             <select
               value={filters.businessLine}
               onChange={(e) => handleBusinessLineChange(e.target.value)}
               disabled={!filters.brand}
-              className="h-9 w-full rounded-md border border-slate-200 px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-50"
+              className="h-10 w-full rounded-sm border border-gray-300 px-3 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20 disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-gray-50"
             >
               <option value="">全部产品线</option>
               {businessLineOptions.map((node) => (
@@ -194,43 +194,53 @@ export default function ProjectListPage() {
 
           {/* Project Name Search */}
           <div className="min-w-[180px]">
-            <label className="mb-1 block text-xs font-medium text-slate-600">项目名称</label>
+            <label className="mb-1 block text-xs text-gray-500">项目名称</label>
             <div className="relative">
-              <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
                 value={search}
                 onChange={(e) => { setSearch(e.target.value); setPage(1); }}
                 placeholder="搜索项目名称"
-                className="h-9 w-full rounded-md border border-slate-200 pl-9 pr-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                className="h-10 w-full rounded-sm border border-gray-300 pl-9 pr-3 text-sm placeholder:text-gray-400 outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
               />
             </div>
           </div>
 
           {/* Date Range */}
           <div className="min-w-[140px]">
-            <label className="mb-1 block text-xs font-medium text-slate-600">立项开始日期</label>
+            <label className="mb-1 block text-xs text-gray-500">立项开始日期</label>
             <input
               type="date"
               value={filters.dateFrom}
               onChange={(e) => { setFilters((prev) => ({ ...prev, dateFrom: e.target.value })); setPage(1); }}
-              className="h-9 w-full rounded-md border border-slate-200 px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              className="h-10 w-full rounded-sm border border-gray-300 px-3 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
             />
           </div>
           <div className="min-w-[140px]">
-            <label className="mb-1 block text-xs font-medium text-slate-600">立项结束日期</label>
+            <label className="mb-1 block text-xs text-gray-500">立项结束日期</label>
             <input
               type="date"
               value={filters.dateTo}
               onChange={(e) => { setFilters((prev) => ({ ...prev, dateTo: e.target.value })); setPage(1); }}
-              className="h-9 w-full rounded-md border border-slate-200 px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              className="h-10 w-full rounded-sm border border-gray-300 px-3 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
             />
           </div>
+
+          {/* Query (Search triggers automatically, but adding explicit button for spec compliance) */}
+          <button
+            type="button"
+            onClick={() => setPage(1)}
+            className="inline-flex h-10 items-center gap-1.5 rounded-md bg-brand px-6 text-sm font-medium text-white transition hover:bg-brand-600"
+          >
+            <Search size={14} />
+            查询
+          </button>
 
           {/* Reset */}
           <button
             type="button"
             onClick={resetFilters}
-            className="inline-flex h-9 items-center gap-1.5 rounded-md border border-slate-200 px-3 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
+            className="inline-flex h-10 items-center gap-1.5 rounded-md border border-gray-300 bg-white px-6 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
           >
             <RotateCcw size={14} />
             重置
@@ -246,40 +256,40 @@ export default function ProjectListPage() {
           {(error as Error).message || '获取项目列表失败'}
         </div>
       ) : data?.items.length ? (
-        <div className="overflow-hidden rounded-lg border bg-white">
+        <div className="bg-white rounded-lg border border-gray-200">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b bg-slate-50 text-left">
-                  <th className="whitespace-nowrap px-4 py-3 font-medium text-slate-600">品类</th>
-                  <th className="whitespace-nowrap px-4 py-3 font-medium text-slate-600">品牌</th>
-                  <th className="whitespace-nowrap px-4 py-3 font-medium text-slate-600">业务线</th>
-                  <th className="whitespace-nowrap px-4 py-3 font-medium text-slate-600">项目名称</th>
-                  <th className="whitespace-nowrap px-4 py-3 font-medium text-slate-600">创建者</th>
-                  <th className="whitespace-nowrap px-4 py-3 font-medium text-slate-600">笔记数量</th>
-                  <th className="whitespace-nowrap px-4 py-3 font-medium text-slate-600">立项时间</th>
-                  <th className="whitespace-nowrap px-4 py-3 font-medium text-slate-600">参与者</th>
-                  <th className="whitespace-nowrap px-4 py-3 font-medium text-slate-600">操作</th>
+                <tr className="border-b bg-gray-50 text-left">
+                  <th className="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-600">品类</th>
+                  <th className="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-600">品牌</th>
+                  <th className="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-600">业务线</th>
+                  <th className="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-600">项目名称</th>
+                  <th className="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-600">创建者</th>
+                  <th className="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-600">笔记数量</th>
+                  <th className="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-600">立项时间</th>
+                  <th className="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-600">参与者</th>
+                  <th className="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-600">操作</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
                 {data.items.map((project) => (
-                  <tr key={project.id} className="transition hover:bg-slate-50">
-                    <td className="whitespace-nowrap px-4 py-3 text-slate-700">{project.category || '-'}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-slate-700">{project.brand || '-'}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-slate-700">{project.businessLine || '-'}</td>
-                    <td className="max-w-[200px] truncate px-4 py-3 font-medium text-slate-900">{project.projectName}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-slate-700">{project.createdByDisplayName || '-'}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-slate-700">{project.noteCount ?? 0}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-slate-700">{formatDate(project.startDate)}</td>
-                    <td className="max-w-[150px] truncate px-4 py-3 text-slate-700">
+                  <tr key={project.id} className="bg-white text-sm text-gray-900 border-b transition hover:bg-gray-50">
+                    <td className="whitespace-nowrap px-4 py-3">{project.category || '-'}</td>
+                    <td className="whitespace-nowrap px-4 py-3">{project.brand || '-'}</td>
+                    <td className="whitespace-nowrap px-4 py-3">{project.businessLine || '-'}</td>
+                    <td className="max-w-[200px] truncate px-4 py-3 font-medium">{project.projectName}</td>
+                    <td className="whitespace-nowrap px-4 py-3">{project.createdByDisplayName || '-'}</td>
+                    <td className="whitespace-nowrap px-4 py-3">{project.noteCount ?? 0}</td>
+                    <td className="whitespace-nowrap px-4 py-3">{formatDate(project.startDate)}</td>
+                    <td className="max-w-[150px] truncate px-4 py-3">
                       {project.participants?.length > 0 ? `${project.participants.length}人` : '-'}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3">
                       <div className="flex items-center gap-2">
                         <Link
                           href={`/projects/${project.id}/edit`}
-                          className="inline-flex items-center rounded px-2 py-1 text-xs font-medium text-blue-600 transition hover:bg-blue-50"
+                          className="inline-flex items-center rounded px-2 py-1 text-xs font-medium text-brand transition hover:bg-brand-50"
                         >
                           编辑
                         </Link>
@@ -311,7 +321,7 @@ export default function ProjectListPage() {
 
           {/* Pagination */}
           <div className="flex items-center justify-between border-t px-4 py-3">
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-gray-500">
               共 {data.totalItems} 条记录，第 {data.page}/{totalPages} 页
             </p>
             <div className="flex items-center gap-1">
@@ -319,22 +329,22 @@ export default function ProjectListPage() {
                 type="button"
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page <= 1}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-sm bg-white border border-gray-300 text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <ChevronLeft size={16} />
               </button>
               {generatePageNumbers(page, totalPages).map((p, idx) =>
                 p === '...' ? (
-                  <span key={`ellipsis-${idx}`} className="px-1 text-slate-400">...</span>
+                  <span key={`ellipsis-${idx}`} className="px-1 text-gray-400">...</span>
                 ) : (
                   <button
                     key={p}
                     type="button"
                     onClick={() => setPage(p as number)}
-                    className={`inline-flex h-8 w-8 items-center justify-center rounded-md text-sm font-medium transition ${
+                    className={`inline-flex h-8 w-8 items-center justify-center rounded-sm text-sm font-medium transition ${
                       page === p
-                        ? 'bg-blue-600 text-white'
-                        : 'border border-slate-200 text-slate-600 hover:bg-slate-50'
+                        ? 'bg-brand text-white'
+                        : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
                     }`}
                   >
                     {p}
@@ -345,7 +355,7 @@ export default function ProjectListPage() {
                 type="button"
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={page >= totalPages}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-sm bg-white border border-gray-300 text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <ChevronRight size={16} />
               </button>
@@ -353,7 +363,7 @@ export default function ProjectListPage() {
           </div>
         </div>
       ) : (
-        <div className="rounded-lg border bg-white px-6 py-16 text-center text-sm text-slate-500">
+        <div className="rounded-lg border bg-white px-6 py-16 text-center text-sm text-gray-500">
           暂无项目数据
         </div>
       )}
