@@ -52,7 +52,6 @@ interface RawJuguangNote {
   acp?: string;
   cpm?: string;
   cpi?: string;
-  target_detail?: string;
 }
 
 interface JuguangPageResponse {
@@ -209,7 +208,6 @@ function mapToJuguangNote(raw: RawJuguangNote): JuguangNote {
     acp: parseNum(raw.acp),
     cpm: parseNum(raw.cpm),
     cpi: parseNum(raw.cpi),
-    targetDetail: raw.target_detail || undefined,
   };
 }
 

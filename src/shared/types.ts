@@ -187,7 +187,6 @@ export interface JuguangNote {
   acp: number;                    // 平均点击成本（元）— 推广消费/推广点击量
   cpm: number;                    // 平均千次展现费用（元）— 推广消费/推广展现量*1000
   cpi: number;                    // 平均互动成本（元）— 消费/互动量
-  targetDetail?: string | null;    // 精准定向
 }
 
 /**

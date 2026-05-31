@@ -42,6 +42,10 @@ export interface DataPersistenceService {
   saveComments(projectId: string, data: CommentData[]): Promise<void>;
   /** 千瓜数据（按 dataType 分片存储） */
   saveQianguaData(projectId: string, stats: QianguaStatsData, hotNotePublish: QianguaHotNotePublishData): Promise<void>;
+  /** 查找项目基础信息 */
+  findProject(projectId: string): Promise<{ startDate: Date; endDate: Date; brand: string; category: string } | null>;
+  /** 查找项目底表中的所有 noteId */
+  findNoteIdsByProject(projectId: string): Promise<string[]>;
 }
 
 /**
@@ -216,7 +220,6 @@ export class PrismaDataPersistenceService implements DataPersistenceService {
           acp: record.acp,
           cpm: record.cpm,
           cpi: record.cpi,
-          targetDetail: record.targetDetail ?? null,
         })),
       });
     });
@@ -351,6 +354,22 @@ export class PrismaDataPersistenceService implements DataPersistenceService {
         where: { projectId, noteId: { in: noteIds }, commentId: { notIn: [...incomingIds] }, isActive: true },
         data: { isActive: false },
       });
+    });
+  }
+
+  async findNoteIdsByProject(projectId: string): Promise<string[]> {
+    const rows = await prisma.noteBase.findMany({
+      where: { projectId },
+      select: { noteId: true },
+      distinct: ['noteId'],
+    });
+    return rows.map((r) => r.noteId);
+  }
+
+  async findProject(projectId: string): Promise<{ startDate: Date; endDate: Date; brand: string; category: string } | null> {
+    return prisma.project.findUnique({
+      where: { id: projectId },
+      select: { startDate: true, endDate: true, brand: true, category: true },
     });
   }
 

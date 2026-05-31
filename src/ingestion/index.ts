@@ -77,24 +77,33 @@ export class DataIngestionService {
    * @param noteIds - The note IDs to fetch data for
    * @returns Result containing fetched data and any errors encountered
    */
-  async ingestFromAPI(projectId: string, noteIds: string[]): Promise<APIIngestionResult> {
-
-      
-    // ---- 测试项目配置（后续由前端项目配置替换）----
-    const TEST_PROJECT = {
-      brandName: '爷爷不泡茶',
-      keyword: '酸奶',
-      taxonomyNames: ['方便速食'],
-      juguangBrandName: '奈雪的茶-派芽1',
-      // start=项目开始日期, end=项目结束日期, campaignStart=投放开始日期
-      dateRange: { start: '2026-04-01', end: '2026-05-27' },
-      campaignStart: '2026-04-27',
-      qianguaDays: 30,
-    };
-
+  async ingestFromAPI(projectId: string, noteIds?: string[]): Promise<APIIngestionResult> {
     const errors: string[] = [];
     let pugongyingNotes: PugongyingNote[] = [];
     let juguangNotes: JuguangNote[] = [];
+
+    // 未传 noteIds 时，从底表自动获取
+    if (!noteIds || noteIds.length === 0) {
+      noteIds = await this.persistenceService.findNoteIdsByProject(projectId);
+    }
+
+    // 从项目配置读取参数
+    const project = await this.persistenceService.findProject(projectId);
+    if (!project) throw new Error(`项目不存在: ${projectId}`);
+    const brandName = project.brand;
+    const taxonomyNames = [project.category];
+    const startDate = new Date(project.startDate).toISOString().slice(0,10);
+    const endDate   = new Date(project.endDate).toISOString().slice(0,10);
+    // campaignStart 临时取项目周期中点，后续完善
+    const cs = new Date(startDate), ce = new Date(endDate);
+    const campaignStart = new Date((cs.getTime() + ce.getTime()) / 2).toISOString().slice(0,10);
+
+    // 暂保留的硬编码参数
+    const TEST_PROJECT = {
+      keyword: '酸奶',
+      juguangBrandName: '奈雪的茶-派芽1',
+      qianguaDays: 30,
+    };
 
     // Fetch pugongying data
     try {
@@ -107,9 +116,7 @@ export class DataIngestionService {
     // Fetch juguang data
     try {
       juguangNotes = await this.paichachaClient.fetchJuguangData(
-        TEST_PROJECT.juguangBrandName,
-        TEST_PROJECT.dateRange.start,
-        TEST_PROJECT.dateRange.end,
+        TEST_PROJECT.juguangBrandName, startDate, endDate,
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -120,7 +127,7 @@ export class DataIngestionService {
     let lingxiData: LingxiData | undefined;
     try {
       // 投后到今天，投前 = 投放前等长时段
-      const cs = new Date(TEST_PROJECT.campaignStart);
+      const cs = new Date(campaignStart);
       const today = new Date(); today.setHours(0,0,0,0);
       const duration = Math.ceil((today.getTime() - cs.getTime()) / 86400000);
       const preEnd = new Date(cs); preEnd.setDate(preEnd.getDate() - 1);
@@ -129,11 +136,11 @@ export class DataIngestionService {
       const preEndDate   = preEnd.toISOString().slice(0, 10);
       const postEndDate = today.toISOString().slice(0,10);
       lingxiData = await this.paichachaClient.fetchLingxiData(
-        TEST_PROJECT.brandName,
+        brandName,
         TEST_PROJECT.keyword,
-        TEST_PROJECT.campaignStart,  // 投后 start = 投放开始
-        postEndDate,                  // 投后 end   = 今天
-        TEST_PROJECT.taxonomyNames,
+        campaignStart,    // 投后 start = 投放开始
+        postEndDate,      // 投后 end   = 今天
+        taxonomyNames,
         preStartDate,
         preEndDate,
       );
@@ -147,7 +154,7 @@ export class DataIngestionService {
     let qianguaHotNotePublish: QianguaHotNotePublishData | undefined;
     try {
       const qianguaData = await this.paichachaClient.fetchQianguaData(
-        TEST_PROJECT.brandName, TEST_PROJECT.qianguaDays,
+        brandName, TEST_PROJECT.qianguaDays,
       );
       qianguaStats = qianguaData.stats;
       qianguaHotNotePublish = qianguaData.hotNotePublish;
