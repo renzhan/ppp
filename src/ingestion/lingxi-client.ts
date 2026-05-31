@@ -54,11 +54,9 @@ export class LingxiClient {
 
   // ── 统一入口 ──
 
-  async fetchLingxiData(brandName: string, keyword: string, startDate: string, endDate: string, taxonomyNames?: string | string[], preStartDate?: string, preEndDate?: string): Promise<LingxiData> {
+  async fetchLingxiData(brandName: string, startDate: string, endDate: string, taxonomyNames?: string | string[], preStartDate?: string, preEndDate?: string): Promise<LingxiData> {
     const brand = await this.fetchBrandData(brandName, startDate, endDate, taxonomyNames, preStartDate, preEndDate);
-    const kw = await this.fetchKeywordData(brandName, keyword, startDate, endDate);
-
-    return { brand, keyword: [kw] };
+    return { brand };
   }
 
   // ── asset_analyse + move_analyse → 品牌数据 ──
@@ -131,21 +129,6 @@ export class LingxiClient {
     };
   }
 
-  // ── keyword_trend → 月搜索指数 ──
-
-  async fetchKeywordData(brandName: string, keyword: string, startDate: string, endDate: string): Promise<KeywordData> {
-    const res = await this.callTask('keyword_trend', brandName, {
-      trendKeyword: keyword,
-      startTime: startDate,
-      endTime: endDate,
-    });
-    const captured = res.data?.captured ?? [];
-
-    const searchVolume = extractSum(captured, startDate, endDate);
-
-    return { keyword, searchVolume, period: getPeriod() };
-  }
-
   // ── 截图 ──
 
   async extractScreenshots(res: LingxiTaskResponse, projectId: string): Promise<ScreenshotData[]> {
@@ -213,26 +196,6 @@ export class LingxiClient {
 }
 
 // ── Field extraction ──
-
-/** chartview/2006 → extraInfo.sum，同时校验 request_body 中的日期与传入一致 */
-function extractSum(captured: CapturedItem[], startDate: string, endDate: string): number {
-  const hit = captured.find(c => {
-    if (!c.url.includes('chartview/2006') || c.data?.data?.extraInfo?.sum == null) return false;
-    // 校验 request_body 中 startTime/endTime 与传入参数一致
-    try {
-      const body = JSON.parse((c as any).request_body || '{}');
-      return body.startTime === startDate && body.endTime === endDate;
-    } catch {
-      return false;
-    }
-  });
-  if (!hit) {
-    throw new Error(
-      `灵犀 keyword_trend: 未找到匹配的 chartview/2006 数据（startTime=${startDate} endTime=${endDate}）`
-    );
-  }
-  return Number(hit.data.data.extraInfo.sum);
-}
 
 /** asset/overall → list[] → name="AIPS 人群总数" → userNum */
 function extractAips(captured: CapturedItem[]): number {

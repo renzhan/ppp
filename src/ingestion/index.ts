@@ -100,7 +100,6 @@ export class DataIngestionService {
 
     // 暂保留的硬编码参数
     const TEST_PROJECT = {
-      keyword: '酸奶',
       juguangBrandName: '奈雪的茶-派芽1',
       qianguaDays: 30,
     };
@@ -137,7 +136,6 @@ export class DataIngestionService {
       const postEndDate = today.toISOString().slice(0,10);
       lingxiData = await this.paichachaClient.fetchLingxiData(
         brandName,
-        TEST_PROJECT.keyword,
         campaignStart,    // 投后 start = 投放开始
         postEndDate,      // 投后 end   = 今天
         taxonomyNames,
