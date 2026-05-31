@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { X, ChevronLeft, ChevronRight, Database, Calculator } from 'lucide-react';
 
@@ -43,6 +43,11 @@ interface TraceDataPanelProps {
 export function TraceDataPanel({ reviewId, traceId, onClose }: TraceDataPanelProps) {
   const [page, setPage] = useState(1);
   const pageSize = 10;
+
+  // 切换 traceId 时重置页码为1
+  useEffect(() => {
+    setPage(1);
+  }, [traceId]);
 
   const { data, isLoading, error } = useQuery<TraceDataResponse>({
     queryKey: ['trace', reviewId, traceId, page],

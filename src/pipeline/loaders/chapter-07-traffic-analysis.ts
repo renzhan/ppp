@@ -287,38 +287,54 @@ export class TrafficAnalysisDataLoader extends BaseChapterDataLoader {
     variables['keyword_analysis'] = this.buildGroupAnalysis(juguangRecords, 'keyword', '关键词');
 
     // ── 10. 构建溯源数据 ──
+    // 溯源展示原始聚光记录 + 计算公式
     const traceItems: TraceItem[] = [];
+
+    // 投流总览 — 展示聚光原始记录（每条记录的fee/impression/click/interaction）
+    const trafficRawRows = juguangRecords.slice(0, 200).map(j => ({
+      noteId: j.noteId || '(无关联笔记)',
+      placement: j.placement ? (PLACEMENT_LABELS[j.placement] || j.placement) : '-',
+      targetsDetail: j.targetsDetail || '-',
+      keyword: j.keyword || '-',
+      fee: Number(Number(j.fee).toFixed(2)),
+      impression: j.impression,
+      click: j.click,
+      interaction: j.interaction,
+      iUserNum: j.iUserNum,
+      tiUserNum: j.tiUserNum,
+    }));
 
     traceItems.push({
       traceId: 'ch7_traffic_overview',
       chapterNumber: 7,
-      label: '投流总览',
+      label: '投流原始数据',
       sourceTable: 'juguang_data',
-      sourceQuery: `SELECT SUM(fee), SUM(impression), SUM(click), SUM(interaction), SUM(i_user_num), SUM(ti_user_num) FROM juguang_data WHERE project_id = '${projectId}';`,
-      totalRows: 1,
+      sourceQuery: `SELECT note_id, placement, targets_detail, keyword, fee, impression, click, interaction, i_user_num, ti_user_num\nFROM juguang_data WHERE project_id = '${projectId}';`,
+      totalRows: juguangRecords.length,
       columns: [
-        { key: 'metric', label: '指标', type: 'string' },
-        { key: 'value', label: '数值', type: 'string' },
+        { key: 'noteId', label: '关联笔记', type: 'string' },
+        { key: 'placement', label: '广告类型', type: 'string' },
+        { key: 'targetsDetail', label: '人群定向', type: 'string' },
+        { key: 'keyword', label: '关键词', type: 'string' },
+        { key: 'fee', label: '消耗(原始)', type: 'number' },
+        { key: 'impression', label: '展现(原始)', type: 'number' },
+        { key: 'click', label: '点击(原始)', type: 'number' },
+        { key: 'interaction', label: '互动(原始)', type: 'number' },
+        { key: 'iUserNum', label: 'I人群(原始)', type: 'number' },
+        { key: 'tiUserNum', label: 'TI人群(原始)', type: 'number' },
       ],
-      dataRows: [
-        { metric: '总消耗', value: totalFee.toFixed(2) + '元' },
-        { metric: '总曝光', value: String(totalImpression) },
-        { metric: '总点击', value: String(totalClick) },
-        { metric: '总互动', value: String(totalInteraction) },
-        { metric: 'CPM', value: paidCpm.toFixed(2) },
-        { metric: 'CPC', value: paidCpc.toFixed(2) },
-        { metric: 'CPE', value: paidCpe.toFixed(2) },
-        { metric: 'CTR', value: paidCtr.toFixed(2) + '%' },
-        { metric: '种草人群(I)', value: String(totalIUserNum) },
-        { metric: '深度种草人群(TI)', value: String(totalTiUserNum) },
-        { metric: 'CPI', value: cpi.toFixed(2) },
-        { metric: 'CPTI', value: cpti.toFixed(2) },
-      ],
+      dataRows: trafficRawRows as unknown as Record<string, unknown>[],
       calculations: [
-        { metric: 'CPM', formula: 'totalFee / totalImpression * 1000', inputs: { totalFee, totalImpression }, result: Number(paidCpm.toFixed(2)) },
-        { metric: 'CPC', formula: 'totalFee / totalClick', inputs: { totalFee, totalClick }, result: Number(paidCpc.toFixed(2)) },
-        { metric: 'CPE', formula: 'totalFee / totalInteraction', inputs: { totalFee, totalInteraction }, result: Number(paidCpe.toFixed(2)) },
-        { metric: 'CTR', formula: 'totalClick / totalImpression * 100', inputs: { totalClick, totalImpression }, result: Number(paidCtr.toFixed(2)) },
+        { metric: '总消耗', formula: 'SUM(fee)', inputs: { '记录数': juguangRecords.length }, result: Number(totalFee.toFixed(2)) },
+        { metric: '总曝光', formula: 'SUM(impression)', inputs: { '记录数': juguangRecords.length }, result: totalImpression },
+        { metric: '总点击', formula: 'SUM(click)', inputs: { '记录数': juguangRecords.length }, result: totalClick },
+        { metric: '总互动', formula: 'SUM(interaction)', inputs: { '记录数': juguangRecords.length }, result: totalInteraction },
+        { metric: 'CPM', formula: 'SUM(fee) / SUM(impression) * 1000', inputs: { 'SUM(fee)': Number(totalFee.toFixed(2)), 'SUM(impression)': totalImpression }, result: Number(paidCpm.toFixed(2)) },
+        { metric: 'CPC', formula: 'SUM(fee) / SUM(click)', inputs: { 'SUM(fee)': Number(totalFee.toFixed(2)), 'SUM(click)': totalClick }, result: Number(paidCpc.toFixed(2)) },
+        { metric: 'CPE', formula: 'SUM(fee) / SUM(interaction)', inputs: { 'SUM(fee)': Number(totalFee.toFixed(2)), 'SUM(interaction)': totalInteraction }, result: Number(paidCpe.toFixed(2)) },
+        { metric: 'CTR', formula: 'SUM(click) / SUM(impression) * 100', inputs: { 'SUM(click)': totalClick, 'SUM(impression)': totalImpression }, result: Number(paidCtr.toFixed(2)) },
+        { metric: 'CPI', formula: 'SUM(fee) / SUM(i_user_num)', inputs: { 'SUM(fee)': Number(totalFee.toFixed(2)), 'SUM(i_user_num)': totalIUserNum }, result: Number(cpi.toFixed(2)) },
+        { metric: 'CPTI', formula: 'SUM(fee) / SUM(ti_user_num)', inputs: { 'SUM(fee)': Number(totalFee.toFixed(2)), 'SUM(ti_user_num)': totalTiUserNum }, result: Number(cpti.toFixed(2)) },
       ],
     });
 

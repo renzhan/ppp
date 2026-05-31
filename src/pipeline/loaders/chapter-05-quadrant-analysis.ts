@@ -309,43 +309,80 @@ export class QuadrantAnalysisDataLoader extends BaseChapterDataLoader {
     variables['quadrant_notes_table'] = tableRows.join('\n');
 
     // ── 6. 构建溯源数据 ──
+    // 溯源展示数据库原始行数据 + 计算公式
     const traceItems: TraceItem[] = [];
-    traceItems.push({
-      traceId: 'ch5_quadrant_summary',
-      chapterNumber: 5,
-      label: '四象限汇总',
-      sourceTable: 'notes + note_base + juguang_data',
-      sourceQuery: `SELECT note_id, imp_num, read_num FROM notes WHERE project_id = '${projectId}';\nSELECT note_id, fee, impression, click, interaction FROM juguang_data WHERE project_id = '${projectId}' AND note_id IS NOT NULL;`,
-      totalRows: quadrantSummary.length,
-      columns: [
-        { key: 'quadrant', label: '象限', type: 'string' },
-        { key: 'count', label: '笔记数', type: 'number' },
-        { key: 'totalCost', label: '总费用', type: 'string' },
-        { key: 'avgNoteCpm', label: '笔记均CPM', type: 'string' },
-        { key: 'avgNoteCpe', label: '笔记均CPE', type: 'string' },
-      ],
-      dataRows: quadrantSummary,
-    });
 
+    // 四象限分析 — 展示每篇笔记的原始数据（notes + note_base + juguang_data 关联后的原始字段）
     if (analyzedNotes.length > 0) {
+      traceItems.push({
+        traceId: 'ch5_quadrant_summary',
+        chapterNumber: 5,
+        label: '四象限笔记原始数据',
+        sourceTable: 'notes + note_base + juguang_data',
+        sourceQuery: `SELECT n.note_id, n.kol_nick_name, n.note_type, n.imp_num, n.read_num, n.engage_num, n.like_num, n.fav_num, n.cmt_num, n.share_num, nb.content_cost, nb.content_direction, j.fee AS juguang_fee, j.impression AS juguang_imp, j.click AS juguang_click, j.interaction AS juguang_interaction\nFROM notes n\nLEFT JOIN note_base nb ON n.note_id = nb.note_id AND nb.project_id = '${projectId}'\nLEFT JOIN (SELECT note_id, SUM(fee) fee, SUM(impression) impression, SUM(click) click, SUM(interaction) interaction FROM juguang_data WHERE project_id = '${projectId}' GROUP BY note_id) j ON n.note_id = j.note_id\nWHERE n.project_id = '${projectId}';`,
+        totalRows: analyzedNotes.length,
+        columns: [
+          { key: 'noteId', label: 'note_id', type: 'string' },
+          { key: 'kolNickName', label: 'kol_nick_name', type: 'string' },
+          { key: 'noteType', label: 'note_type', type: 'string' },
+          { key: 'contentDirection', label: 'content_direction', type: 'string' },
+          { key: 'impNum', label: 'imp_num', type: 'number' },
+          { key: 'readNum', label: 'read_num', type: 'number' },
+          { key: 'engagement', label: 'engagement', type: 'number' },
+          { key: 'contentCost', label: 'content_cost', type: 'number' },
+          { key: 'juguangFee', label: 'juguang_fee', type: 'number' },
+        ],
+        dataRows: analyzedNotes.slice(0, 200).map(n => ({
+          noteId: n.noteId,
+          kolNickName: n.kolNickName,
+          noteType: n.noteType,
+          contentDirection: n.contentDirection,
+          impNum: n.impNum,
+          readNum: n.readNum,
+          engagement: n.engagement,
+          contentCost: n.contentCost,
+          juguangFee: n.juguangFee,
+        })) as unknown as Record<string, unknown>[],
+        calculations: [
+          { metric: '笔记CPM', formula: '(content_cost + juguang_fee) / imp_num * 1000', inputs: { '大盘CPM(分界线)': benchmarkCpm }, result: '每篇笔记单独计算' },
+          { metric: '笔记CPE', formula: '(content_cost + juguang_fee) / engagement', inputs: { '大盘CPE(分界线)': benchmarkCpe }, result: '每篇笔记单独计算' },
+          { metric: '笔记CTR', formula: 'read_num / imp_num * 100', inputs: { '大盘CTR(分界线)': benchmarkCtr }, result: '每篇笔记单独计算' },
+          { metric: '象限判定', formula: '笔记质量(CPM/CPE低于大盘 或 CTR高于大盘) × 投流质量(CPM/CPE低于大盘)', inputs: { '分析笔记数': analyzedNotes.length, '排除笔记数(无投流)': excludedCount }, result: `高质高投${quadrantGroups['高质高投'].length}篇, 高质低投${quadrantGroups['高质低投'].length}篇, 低质高投${quadrantGroups['低质高投'].length}篇, 低质低投${quadrantGroups['低质低投'].length}篇` },
+        ],
+      });
+
+      // 聚光原始数据（投流维度）
       traceItems.push({
         traceId: 'ch5_quadrant_notes',
         chapterNumber: 5,
-        label: '笔记象限明细',
-        sourceTable: 'notes + note_base + juguang_data',
-        sourceQuery: `-- 按笔记维度计算指标后分类`,
+        label: '聚光投流原始数据',
+        sourceTable: 'juguang_data',
+        sourceQuery: `SELECT note_id, SUM(fee) AS fee, SUM(impression) AS impression, SUM(click) AS click, SUM(interaction) AS interaction\nFROM juguang_data WHERE project_id = '${projectId}' AND note_id IS NOT NULL GROUP BY note_id;`,
         totalRows: analyzedNotes.length,
         columns: [
-          { key: 'kolNickName', label: '达人', type: 'string' },
-          { key: 'noteType', label: '形式', type: 'string' },
-          { key: 'contentDirection', label: '方向', type: 'string' },
-          { key: 'noteCpm', label: '笔记CPM', type: 'number' },
-          { key: 'noteCpe', label: '笔记CPE', type: 'number' },
-          { key: 'trafficCpm', label: '投流CPM', type: 'number' },
-          { key: 'trafficCpe', label: '投流CPE', type: 'number' },
-          { key: 'quadrant', label: '象限', type: 'string' },
+          { key: 'noteId', label: 'note_id', type: 'string' },
+          { key: 'kolNickName', label: 'kol_nick_name', type: 'string' },
+          { key: 'juguangFee', label: 'juguang_fee(原始)', type: 'number' },
+          { key: 'juguangImp', label: 'juguang_impression(原始)', type: 'number' },
+          { key: 'juguangClick', label: 'juguang_click(原始)', type: 'number' },
+          { key: 'juguangInteraction', label: 'juguang_interaction(原始)', type: 'number' },
         ],
-        dataRows: analyzedNotes.slice(0, 100) as unknown as Record<string, unknown>[],
+        dataRows: analyzedNotes.slice(0, 200).map(n => {
+          const jg = juguangMap.get(n.noteId);
+          return {
+            noteId: n.noteId,
+            kolNickName: n.kolNickName,
+            juguangFee: n.juguangFee,
+            juguangImp: jg?.impression ?? 0,
+            juguangClick: jg?.click ?? 0,
+            juguangInteraction: jg?.interaction ?? 0,
+          };
+        }) as unknown as Record<string, unknown>[],
+        calculations: [
+          { metric: '投流CPM', formula: 'juguang_fee / juguang_impression * 1000', inputs: { '大盘CPM(分界线)': benchmarkCpm }, result: '每篇笔记单独计算' },
+          { metric: '投流CPC', formula: 'juguang_fee / juguang_click', inputs: {}, result: '每篇笔记单独计算' },
+          { metric: '投流CPE', formula: 'juguang_fee / juguang_interaction', inputs: { '大盘CPE(分界线)': benchmarkCpe }, result: '每篇笔记单独计算' },
+        ],
       });
     }
 

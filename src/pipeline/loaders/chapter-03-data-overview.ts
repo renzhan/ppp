@@ -150,10 +150,26 @@ export class DataOverviewDataLoader extends BaseChapterDataLoader {
     let serviceFeeSum = 0;
     let viralCount = 0;
 
+    // 保留原始行数据用于溯源
+    let rawNoteRows: Array<{
+      noteId: string;
+      impNum: number;
+      readNum: number;
+      engageNum: number;
+      likeNum: number;
+      favNum: number;
+      cmtNum: number;
+      shareNum: number;
+      followNum: number;
+      kolPrice: number;
+      serviceFee: number;
+    }> = [];
+
     try {
       const notes = await this.prisma.note.findMany({
         where: { projectId },
         select: {
+          noteId: true,
           impNum: true,
           readNum: true,
           engageNum: true,
@@ -166,6 +182,20 @@ export class DataOverviewDataLoader extends BaseChapterDataLoader {
           serviceFee: true,
         },
       });
+
+      rawNoteRows = notes.map(n => ({
+        noteId: n.noteId,
+        impNum: n.impNum,
+        readNum: n.readNum,
+        engageNum: n.engageNum,
+        likeNum: n.likeNum,
+        favNum: n.favNum,
+        cmtNum: n.cmtNum,
+        shareNum: n.shareNum,
+        followNum: n.followNum,
+        kolPrice: Number(n.kolPrice),
+        serviceFee: Number(n.serviceFee),
+      }));
 
       for (const n of notes) {
         totalImpressions += n.impNum;
@@ -357,105 +387,119 @@ export class DataOverviewDataLoader extends BaseChapterDataLoader {
     }
 
     // ── 11. 构建溯源数据 (traceItems) ──
+    // 溯源展示数据库原始行数据 + 计算公式，让人工可以核对
     const traceItems: TraceItem[] = [];
 
-    // 整体投放数据溯源
+    // 整体投放数据溯源 — 展示 notes 表原始行数据
     traceItems.push({
       traceId: 'ch3_overview_stats',
       chapterNumber: 3,
       label: '整体投放数据',
-      sourceTable: 'note_base + notes + juguang_data',
-      sourceQuery: `SELECT COUNT(*) FROM note_base WHERE project_id = '${projectId}';\nSELECT SUM(kol_price), SUM(service_fee) FROM notes WHERE project_id = '${projectId}';\nSELECT SUM(fee) FROM juguang_data WHERE project_id = '${projectId}';`,
-      totalRows: 4,
+      sourceTable: 'notes',
+      sourceQuery: `SELECT id AS note_id, imp_num, read_num, engage_num, like_num, fav_num, cmt_num, share_num, follow_num, kol_price, service_fee\nFROM notes WHERE project_id = '${projectId}';`,
+      totalRows: rawNoteRows.length,
       columns: [
-        { key: 'metric', label: '指标', type: 'string' },
-        { key: 'value', label: '数值', type: 'string' },
-        { key: 'source', label: '数据来源', type: 'string' },
+        { key: 'noteId', label: 'note_id', type: 'string' },
+        { key: 'impNum', label: 'imp_num', type: 'number' },
+        { key: 'readNum', label: 'read_num', type: 'number' },
+        { key: 'engageNum', label: 'engage_num', type: 'number' },
+        { key: 'likeNum', label: 'like_num', type: 'number' },
+        { key: 'favNum', label: 'fav_num', type: 'number' },
+        { key: 'cmtNum', label: 'cmt_num', type: 'number' },
+        { key: 'shareNum', label: 'share_num', type: 'number' },
+        { key: 'followNum', label: 'follow_num', type: 'number' },
+        { key: 'kolPrice', label: 'kol_price', type: 'number' },
+        { key: 'serviceFee', label: 'service_fee', type: 'number' },
       ],
-      dataRows: [
-        { metric: '总笔记篇数', value: String(noteCount), source: 'note_base COUNT(*)' },
-        { metric: '内容费用', value: contentCost.toFixed(2), source: contentCostCaliber === 'settlement' ? 'note_base.content_settlement' : 'notes.kol_price + service_fee' },
-        { metric: '投流费用', value: trafficCost.toFixed(2), source: trafficCostCaliber === 'settlement' ? 'note_base.ad_spend' : 'juguang_data.fee' },
-        { metric: '总费用', value: totalCost.toFixed(2), source: '内容费用 + 投流费用' },
-      ],
+      dataRows: rawNoteRows as unknown as Record<string, unknown>[],
       calculations: [
-        { metric: '总费用', formula: 'contentCost + trafficCost', inputs: { contentCost, trafficCost }, result: totalCost },
+        { metric: '总笔记篇数', formula: 'note_base.COUNT(*)', inputs: { 'note_base行数': noteCount }, result: noteCount },
+        { metric: '内容费用', formula: contentCostCaliber === 'settlement' ? 'note_base.SUM(content_settlement)' : 'notes.SUM(kol_price) + notes.SUM(service_fee)', inputs: contentCostCaliber === 'settlement' ? { 'SUM(content_settlement)': contentSettlement } : { 'SUM(kol_price)': kolPriceSum, 'SUM(service_fee)': serviceFeeSum }, result: contentCost },
+        { metric: '投流费用', formula: trafficCostCaliber === 'settlement' ? 'note_base.SUM(ad_spend)' : 'juguang_data.SUM(fee)', inputs: trafficCostCaliber === 'settlement' ? { 'SUM(ad_spend)': adSpendSettlement } : { 'SUM(fee)': jgFee }, result: trafficCost },
+        { metric: '总费用', formula: '内容费用 + 投流费用', inputs: { '内容费用': contentCost, '投流费用': trafficCost }, result: totalCost },
+        { metric: 'CPM', formula: '总费用 / SUM(imp_num) * 1000', inputs: { '总费用': totalCost, 'SUM(imp_num)': totalImpressions }, result: Number(cpm.toFixed(2)) },
+        { metric: 'CPC', formula: '总费用 / SUM(read_num)', inputs: { '总费用': totalCost, 'SUM(read_num)': totalReads }, result: Number(cpc.toFixed(2)) },
+        { metric: 'CPE', formula: '总费用 / SUM(互动)', inputs: { '总费用': totalCost, 'SUM(互动)': totalEngagement }, result: Number(cpe.toFixed(2)) },
+        { metric: 'CTR', formula: 'SUM(read_num) / SUM(imp_num) * 100', inputs: { 'SUM(read_num)': totalReads, 'SUM(imp_num)': totalImpressions }, result: Number(ctr.toFixed(2)) },
       ],
     });
 
-    // KPI达成表溯源
-    const kpiRows: Record<string, unknown>[] = [];
-    for (const [kpiKey, config] of Object.entries(kpiMapping)) {
-      const target = kpi[kpiKey];
-      if (target != null && target > 0) {
-        const completion = config.isCost
-          ? (config.actual > 0 ? (target / config.actual) * 100 : 0)
-          : (config.actual / target) * 100;
-        kpiRows.push({
-          metric: config.varKey.toUpperCase(),
-          target: String(target),
-          actual: config.actual.toFixed(config.isCost ? 2 : 0),
-          completion: completion.toFixed(1) + '%',
-          type: config.isCost ? '成本类' : '量级类',
-        });
-      }
-    }
-    if (kpiRows.length > 0) {
+    // KPI达成表溯源 — 同样展示 notes 原始行（KPI的实际值就是从这些行聚合来的）
+    if (Object.keys(kpi).length > 0) {
       traceItems.push({
         traceId: 'ch3_kpi_table',
         chapterNumber: 3,
         label: 'KPI达成数据',
-        sourceTable: 'notes + juguang_data + review_configs.kpi_targets',
-        sourceQuery: `SELECT kpi_targets FROM review_configs WHERE project_id = '${projectId}' ORDER BY created_at DESC LIMIT 1;`,
-        totalRows: kpiRows.length,
+        sourceTable: 'review_configs.kpi_targets + notes + juguang_data',
+        sourceQuery: `SELECT kpi_targets FROM review_configs WHERE project_id = '${projectId}' ORDER BY created_at DESC LIMIT 1;\nSELECT id AS note_id, imp_num, read_num, engage_num, like_num, fav_num, cmt_num, share_num, kol_price, service_fee FROM notes WHERE project_id = '${projectId}';`,
+        totalRows: rawNoteRows.length,
         columns: [
-          { key: 'metric', label: '指标', type: 'string' },
-          { key: 'target', label: 'KPI目标', type: 'string' },
-          { key: 'actual', label: '实际达成', type: 'string' },
-          { key: 'completion', label: '完成率', type: 'string' },
-          { key: 'type', label: '指标类型', type: 'string' },
+          { key: 'noteId', label: 'note_id', type: 'string' },
+          { key: 'impNum', label: 'imp_num', type: 'number' },
+          { key: 'readNum', label: 'read_num', type: 'number' },
+          { key: 'engageNum', label: 'engage_num', type: 'number' },
+          { key: 'likeNum', label: 'like_num', type: 'number' },
+          { key: 'favNum', label: 'fav_num', type: 'number' },
+          { key: 'cmtNum', label: 'cmt_num', type: 'number' },
+          { key: 'shareNum', label: 'share_num', type: 'number' },
+          { key: 'kolPrice', label: 'kol_price', type: 'number' },
+          { key: 'serviceFee', label: 'service_fee', type: 'number' },
         ],
-        dataRows: kpiRows,
+        dataRows: rawNoteRows as unknown as Record<string, unknown>[],
         calculations: [
-          { metric: 'CPM', formula: 'totalCost / totalImpressions * 1000', inputs: { totalCost, totalImpressions }, result: Number(cpm.toFixed(2)) },
-          { metric: 'CPC', formula: 'totalCost / totalReads', inputs: { totalCost, totalReads }, result: Number(cpc.toFixed(2)) },
-          { metric: 'CPE', formula: 'totalCost / totalEngagement', inputs: { totalCost, totalEngagement }, result: Number(cpe.toFixed(2)) },
-          { metric: 'CTR', formula: 'totalReads / totalImpressions * 100', inputs: { totalReads, totalImpressions }, result: Number(ctr.toFixed(2)) },
+          { metric: '总曝光(实际)', formula: 'SUM(imp_num)', inputs: { '行数': rawNoteRows.length }, result: totalImpressions },
+          { metric: '总阅读(实际)', formula: 'SUM(read_num)', inputs: { '行数': rawNoteRows.length }, result: totalReads },
+          { metric: '总互动(实际)', formula: engagementMetric === 'include_follow' ? 'SUM(engage_num)' : 'SUM(like_num + fav_num + cmt_num + share_num)', inputs: engagementMetric === 'include_follow' ? { 'SUM(engage_num)': totalEngagement } : { 'SUM(like)': totalLikes, 'SUM(fav)': totalFavs, 'SUM(cmt)': totalComments, 'SUM(share)': totalShares }, result: totalEngagement },
+          { metric: '爆文率', formula: `COUNT(${viralMetric === 'like_only' ? 'like_num>=1000' : 'like+fav+cmt>=1000'}) / note_base.COUNT(*) * 100`, inputs: { '爆文数': viralCount, '总篇数(note_base)': noteCount }, result: Number(viralRate.toFixed(1)) },
+          { metric: 'CPM', formula: '总费用 / SUM(imp_num) * 1000', inputs: { '总费用': totalCost, 'SUM(imp_num)': totalImpressions }, result: Number(cpm.toFixed(2)) },
+          { metric: 'CPC', formula: '总费用 / SUM(read_num)', inputs: { '总费用': totalCost, 'SUM(read_num)': totalReads }, result: Number(cpc.toFixed(2)) },
+          { metric: 'CPE', formula: '总费用 / SUM(互动)', inputs: { '总费用': totalCost, 'SUM(互动)': totalEngagement }, result: Number(cpe.toFixed(2)) },
+          { metric: 'CTR', formula: 'SUM(read_num) / SUM(imp_num) * 100', inputs: { 'SUM(read_num)': totalReads, 'SUM(imp_num)': totalImpressions }, result: Number(ctr.toFixed(2)) },
+          { metric: '完成率(量级类)', formula: '实际值 / KPI目标 * 100', inputs: { 'KPI配置': JSON.stringify(kpi) }, result: '见上方各指标' },
+          { metric: '完成率(成本类)', formula: 'KPI目标 / 实际值 * 100（越低越好）', inputs: {}, result: '见上方各指标' },
         ],
       });
     }
 
-    // 自然流vs投流对比溯源
+    // 自然流vs投流对比溯源 — 展示 notes 原始行 + juguang_data 原始行
     traceItems.push({
       traceId: 'ch3_natural_vs_paid',
       chapterNumber: 3,
       label: '自然流vs投流对比',
       sourceTable: 'notes + juguang_data',
-      sourceQuery: `SELECT SUM(imp_num), SUM(read_num) FROM notes WHERE project_id = '${projectId}';\nSELECT SUM(impression), SUM(click), SUM(interaction) FROM juguang_data WHERE project_id = '${projectId}';`,
-      totalRows: 3,
+      sourceQuery: `SELECT id AS note_id, imp_num, read_num, engage_num FROM notes WHERE project_id = '${projectId}';\nSELECT SUM(impression), SUM(click), SUM(interaction) FROM juguang_data WHERE project_id = '${projectId}';`,
+      totalRows: rawNoteRows.length,
       columns: [
-        { key: 'dimension', label: '维度', type: 'string' },
-        { key: 'natural', label: '自然流', type: 'string' },
-        { key: 'paid', label: '投流(聚光)', type: 'string' },
-        { key: 'total', label: '合计', type: 'string' },
+        { key: 'noteId', label: 'note_id', type: 'string' },
+        { key: 'impNum', label: 'imp_num', type: 'number' },
+        { key: 'readNum', label: 'read_num', type: 'number' },
+        { key: 'engageNum', label: 'engage_num', type: 'number' },
       ],
-      dataRows: [
-        { dimension: '曝光', natural: String(naturalImp), paid: String(jgImpression), total: String(totalImpressions) },
-        { dimension: '阅读/点击', natural: String(naturalRead), paid: String(jgClick), total: String(totalReads) },
-        { dimension: '互动', natural: String(naturalEng), paid: String(jgInteraction), total: String(totalEngagement) },
-      ],
+      dataRows: rawNoteRows.map(n => ({ noteId: n.noteId, impNum: n.impNum, readNum: n.readNum, engageNum: n.engageNum })) as unknown as Record<string, unknown>[],
       calculations: [
-        { metric: '自然曝光', formula: 'MAX(0, notes.SUM(imp_num) - juguang.SUM(impression))', inputs: { 'notes.imp_num': totalImpressions, 'juguang.impression': jgImpression }, result: naturalImp },
+        { metric: '蒲公英总曝光', formula: 'notes.SUM(imp_num)', inputs: { 'SUM(imp_num)': totalImpressions }, result: totalImpressions },
+        { metric: '聚光总曝光', formula: 'juguang_data.SUM(impression)', inputs: { 'SUM(impression)': jgImpression }, result: jgImpression },
+        { metric: '自然曝光', formula: 'MAX(0, 蒲公英曝光 - 聚光曝光)', inputs: { '蒲公英曝光': totalImpressions, '聚光曝光': jgImpression }, result: naturalImp },
+        { metric: '蒲公英总阅读', formula: 'notes.SUM(read_num)', inputs: { 'SUM(read_num)': totalReads }, result: totalReads },
+        { metric: '聚光总点击', formula: 'juguang_data.SUM(click)', inputs: { 'SUM(click)': jgClick }, result: jgClick },
+        { metric: '自然阅读', formula: 'MAX(0, 蒲公英阅读 - 聚光点击)', inputs: { '蒲公英阅读': totalReads, '聚光点击': jgClick }, result: naturalRead },
+        { metric: '自然互动', formula: 'MAX(0, 蒲公英互动 - 聚光互动)', inputs: { '蒲公英互动': totalEngagement, '聚光互动': jgInteraction }, result: naturalEng },
       ],
     });
 
-    // 大盘对比溯源
+    // 大盘对比溯源 — 展示大盘配置原始值 + 计算公式
     if (Object.keys(benchmark).length > 0) {
-      const benchmarkRows: Record<string, unknown>[] = [];
-      if (benchmark.ctr) benchmarkRows.push({ metric: 'CTR', actual: ctr.toFixed(2) + '%', benchmark: benchmark.ctr + '%', diff: ((ctr - benchmark.ctr) / benchmark.ctr * 100).toFixed(1) + '%' });
-      if (benchmark.cpm) benchmarkRows.push({ metric: 'CPM', actual: cpm.toFixed(2), benchmark: String(benchmark.cpm), diff: ((1 - cpm / benchmark.cpm) * 100).toFixed(1) + '%' });
-      if (benchmark.cpc) benchmarkRows.push({ metric: 'CPC', actual: cpc.toFixed(2), benchmark: String(benchmark.cpc), diff: ((1 - cpc / benchmark.cpc) * 100).toFixed(1) + '%' });
-      if (benchmark.cpe) benchmarkRows.push({ metric: 'CPE', actual: cpe.toFixed(2), benchmark: String(benchmark.cpe), diff: ((1 - cpe / benchmark.cpe) * 100).toFixed(1) + '%' });
+      const benchmarkRawRows: Record<string, unknown>[] = [];
+      if (benchmark.ctr != null) benchmarkRawRows.push({ metric: 'CTR', benchmarkValue: benchmark.ctr, unit: '%' });
+      if (benchmark.cpm != null) benchmarkRawRows.push({ metric: 'CPM', benchmarkValue: benchmark.cpm, unit: '元' });
+      if (benchmark.cpc != null) benchmarkRawRows.push({ metric: 'CPC', benchmarkValue: benchmark.cpc, unit: '元' });
+      if (benchmark.cpe != null) benchmarkRawRows.push({ metric: 'CPE', benchmarkValue: benchmark.cpe, unit: '元' });
+
+      const benchmarkCalcs = [];
+      if (benchmark.ctr) benchmarkCalcs.push({ metric: 'CTR差异', formula: '(实际CTR - 大盘CTR) / 大盘CTR * 100', inputs: { '实际CTR': Number(ctr.toFixed(2)), '大盘CTR': benchmark.ctr }, result: ((ctr - benchmark.ctr) / benchmark.ctr * 100).toFixed(1) + '%' });
+      if (benchmark.cpm) benchmarkCalcs.push({ metric: 'CPM差异', formula: '(1 - 实际CPM / 大盘CPM) * 100', inputs: { '实际CPM': Number(cpm.toFixed(2)), '大盘CPM': benchmark.cpm }, result: ((1 - cpm / benchmark.cpm) * 100).toFixed(1) + '%' });
+      if (benchmark.cpc) benchmarkCalcs.push({ metric: 'CPC差异', formula: '(1 - 实际CPC / 大盘CPC) * 100', inputs: { '实际CPC': Number(cpc.toFixed(2)), '大盘CPC': benchmark.cpc }, result: ((1 - cpc / benchmark.cpc) * 100).toFixed(1) + '%' });
+      if (benchmark.cpe) benchmarkCalcs.push({ metric: 'CPE差异', formula: '(1 - 实际CPE / 大盘CPE) * 100', inputs: { '实际CPE': Number(cpe.toFixed(2)), '大盘CPE': benchmark.cpe }, result: ((1 - cpe / benchmark.cpe) * 100).toFixed(1) + '%' });
 
       traceItems.push({
         traceId: 'ch3_benchmark_compare',
@@ -463,14 +507,14 @@ export class DataOverviewDataLoader extends BaseChapterDataLoader {
         label: '大盘对比',
         sourceTable: 'review_configs.benchmark',
         sourceQuery: `SELECT benchmark FROM review_configs WHERE project_id = '${projectId}' ORDER BY created_at DESC LIMIT 1;`,
-        totalRows: benchmarkRows.length,
+        totalRows: benchmarkRawRows.length,
         columns: [
           { key: 'metric', label: '指标', type: 'string' },
-          { key: 'actual', label: '实际值', type: 'string' },
-          { key: 'benchmark', label: '大盘均值', type: 'string' },
-          { key: 'diff', label: '差异', type: 'string' },
+          { key: 'benchmarkValue', label: '大盘均值(原始配置)', type: 'number' },
+          { key: 'unit', label: '单位', type: 'string' },
         ],
-        dataRows: benchmarkRows,
+        dataRows: benchmarkRawRows,
+        calculations: benchmarkCalcs,
       });
     }
 

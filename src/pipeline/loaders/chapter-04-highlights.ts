@@ -84,15 +84,32 @@ export class HighlightsDataLoader extends BaseChapterDataLoader {
     let viralCount = 0;
     let noteCount = 0;
 
+    // 保留原始行数据用于溯源
+    let rawNoteRows: Array<Record<string, unknown>> = [];
+
     try {
       const notes = await this.prisma.note.findMany({
         where: { projectId },
         select: {
+          noteId: true,
           impNum: true, readNum: true, engageNum: true,
           likeNum: true, favNum: true, cmtNum: true, shareNum: true,
           kolPrice: true, serviceFee: true,
         },
       });
+
+      rawNoteRows = notes.map(n => ({
+        noteId: n.noteId,
+        impNum: n.impNum,
+        readNum: n.readNum,
+        engageNum: n.engageNum,
+        likeNum: n.likeNum,
+        favNum: n.favNum,
+        cmtNum: n.cmtNum,
+        shareNum: n.shareNum,
+        kolPrice: Number(n.kolPrice),
+        serviceFee: Number(n.serviceFee),
+      }));
 
       for (const n of notes) {
         totalImpressions += n.impNum;
@@ -283,21 +300,32 @@ export class HighlightsDataLoader extends BaseChapterDataLoader {
     ].join('\n');
 
     // ── 10. 构建溯源数据 ──
+    // 溯源展示数据库原始行数据 + 计算公式
     const traceItems: TraceItem[] = [];
 
-    if (kpiHighlights.length > 0) {
-      traceItems.push({
-        traceId: 'ch4_kpi_highlights',
-        chapterNumber: 4,
-        label: 'KPI超额完成亮点',
-        sourceTable: 'notes + review_configs.kpi_targets',
-        sourceQuery: `SELECT kpi_targets FROM review_configs WHERE project_id = '${projectId}' ORDER BY created_at DESC LIMIT 1;`,
-        totalRows: kpiHighlights.length,
-        columns: [
-          { key: 'detail', label: '亮点详情', type: 'string' },
-        ],
-        dataRows: kpiHighlights.map((h) => ({ detail: h })),
-        calculations: kpiChecks.filter((c) => {
+    // KPI亮点溯源 — 展示 notes 原始行数据
+    traceItems.push({
+      traceId: 'ch4_kpi_highlights',
+      chapterNumber: 4,
+      label: 'KPI亮点(原始数据)',
+      sourceTable: 'notes + review_configs.kpi_targets',
+      sourceQuery: `SELECT id AS note_id, imp_num, read_num, engage_num, like_num, fav_num, cmt_num, share_num, kol_price, service_fee FROM notes WHERE project_id = '${projectId}';\nSELECT kpi_targets FROM review_configs WHERE project_id = '${projectId}' ORDER BY created_at DESC LIMIT 1;`,
+      totalRows: rawNoteRows.length,
+      columns: [
+        { key: 'noteId', label: 'note_id', type: 'string' },
+        { key: 'impNum', label: 'imp_num', type: 'number' },
+        { key: 'readNum', label: 'read_num', type: 'number' },
+        { key: 'engageNum', label: 'engage_num', type: 'number' },
+        { key: 'likeNum', label: 'like_num', type: 'number' },
+        { key: 'favNum', label: 'fav_num', type: 'number' },
+        { key: 'cmtNum', label: 'cmt_num', type: 'number' },
+        { key: 'shareNum', label: 'share_num', type: 'number' },
+        { key: 'kolPrice', label: 'kol_price', type: 'number' },
+        { key: 'serviceFee', label: 'service_fee', type: 'number' },
+      ],
+      dataRows: rawNoteRows,
+      calculations: [
+        ...kpiChecks.filter((c) => {
           const target = kpi[c.key];
           if (!target || target <= 0) return false;
           const completion = c.isCost ? (target / c.actual) * 100 : (c.actual / target) * 100;
@@ -306,48 +334,65 @@ export class HighlightsDataLoader extends BaseChapterDataLoader {
           const target = kpi[c.key]!;
           const completion = c.isCost ? (target / c.actual) * 100 : (c.actual / target) * 100;
           return {
-            metric: c.label,
-            formula: c.isCost ? 'target / actual * 100' : 'actual / target * 100',
-            inputs: { actual: Number(c.actual.toFixed(2)), target },
+            metric: `${c.label}完成率`,
+            formula: c.isCost ? 'KPI目标 / 实际值 * 100' : '实际值 / KPI目标 * 100',
+            inputs: { '实际值': Number(c.actual.toFixed(2)), 'KPI目标': target },
             result: Number(completion.toFixed(1)),
           };
         }),
-      });
-    }
+      ],
+    });
 
+    // 大盘对比亮点溯源 — 展示 notes 原始行 + 大盘配置
     if (benchmarkHighlights.length > 0) {
       traceItems.push({
         traceId: 'ch4_benchmark_highlights',
         chapterNumber: 4,
-        label: '大盘对比亮点',
-        sourceTable: 'review_configs.benchmark',
-        sourceQuery: `SELECT benchmark FROM review_configs WHERE project_id = '${projectId}' ORDER BY created_at DESC LIMIT 1;`,
-        totalRows: benchmarkHighlights.length,
+        label: '大盘对比(原始数据)',
+        sourceTable: 'notes + review_configs.benchmark',
+        sourceQuery: `SELECT id AS note_id, imp_num, read_num, engage_num, like_num, fav_num, cmt_num, share_num, kol_price, service_fee FROM notes WHERE project_id = '${projectId}';\nSELECT benchmark FROM review_configs WHERE project_id = '${projectId}' ORDER BY created_at DESC LIMIT 1;`,
+        totalRows: rawNoteRows.length,
         columns: [
-          { key: 'detail', label: '亮点详情', type: 'string' },
+          { key: 'noteId', label: 'note_id', type: 'string' },
+          { key: 'impNum', label: 'imp_num', type: 'number' },
+          { key: 'readNum', label: 'read_num', type: 'number' },
+          { key: 'engageNum', label: 'engage_num', type: 'number' },
+          { key: 'likeNum', label: 'like_num', type: 'number' },
+          { key: 'favNum', label: 'fav_num', type: 'number' },
+          { key: 'cmtNum', label: 'cmt_num', type: 'number' },
+          { key: 'shareNum', label: 'share_num', type: 'number' },
+          { key: 'kolPrice', label: 'kol_price', type: 'number' },
+          { key: 'serviceFee', label: 'service_fee', type: 'number' },
         ],
-        dataRows: benchmarkHighlights.map((h) => ({ detail: h })),
+        dataRows: rawNoteRows,
+        calculations: [
+          { metric: 'CPM', formula: '总费用 / SUM(imp_num) * 1000', inputs: { '总费用': totalCost, 'SUM(imp_num)': totalImpressions, '大盘CPM': benchmark.cpm || 0 }, result: Number(cpm.toFixed(2)) },
+          { metric: 'CPC', formula: '总费用 / SUM(read_num)', inputs: { '总费用': totalCost, 'SUM(read_num)': totalReads, '大盘CPC': benchmark.cpc || 0 }, result: Number(cpc.toFixed(2)) },
+          { metric: 'CPE', formula: '总费用 / SUM(互动)', inputs: { '总费用': totalCost, 'SUM(互动)': totalEngagement, '大盘CPE': benchmark.cpe || 0 }, result: Number(cpe.toFixed(2)) },
+          { metric: 'CTR', formula: 'SUM(read_num) / SUM(imp_num) * 100', inputs: { 'SUM(read_num)': totalReads, 'SUM(imp_num)': totalImpressions, '大盘CTR': benchmark.ctr || 0 }, result: Number(ctr.toFixed(2)) },
+        ],
       });
     }
 
+    // 爆文数据溯源 — 展示 notes 原始行（like_num, fav_num, cmt_num 用于判定爆文）
     traceItems.push({
       traceId: 'ch4_viral_highlights',
       chapterNumber: 4,
-      label: '爆文数据',
-      sourceTable: 'notes',
-      sourceQuery: `SELECT like_num, fav_num, cmt_num FROM notes WHERE project_id = '${projectId}';`,
-      totalRows: 3,
+      label: '爆文判定(原始数据)',
+      sourceTable: 'notes + note_base',
+      sourceQuery: `SELECT id AS note_id, like_num, fav_num, cmt_num, share_num FROM notes WHERE project_id = '${projectId}';\nSELECT COUNT(*) FROM note_base WHERE project_id = '${projectId}';`,
+      totalRows: rawNoteRows.length,
       columns: [
-        { key: 'metric', label: '指标', type: 'string' },
-        { key: 'value', label: '数值', type: 'string' },
+        { key: 'noteId', label: 'note_id', type: 'string' },
+        { key: 'likeNum', label: 'like_num', type: 'number' },
+        { key: 'favNum', label: 'fav_num', type: 'number' },
+        { key: 'cmtNum', label: 'cmt_num', type: 'number' },
+        { key: 'shareNum', label: 'share_num', type: 'number' },
       ],
-      dataRows: [
-        { metric: '爆文数', value: String(viralCount) },
-        { metric: '爆文率', value: viralRate.toFixed(1) + '%' },
-        { metric: '总笔记数', value: String(noteCount) },
-      ],
+      dataRows: rawNoteRows.map(n => ({ noteId: n.noteId, likeNum: n.likeNum, favNum: n.favNum, cmtNum: n.cmtNum, shareNum: n.shareNum })),
       calculations: [
-        { metric: '爆文率', formula: 'viralCount / noteCount * 100', inputs: { viralCount, noteCount }, result: Number(viralRate.toFixed(1)) },
+        { metric: '爆文判定标准', formula: viralMetric === 'like_only' ? 'like_num >= 1000' : 'like_num + fav_num + cmt_num >= 1000', inputs: { '口径': viralMetric }, result: viralMetric === 'like_only' ? '千赞' : '千互' },
+        { metric: '爆文率', formula: 'COUNT(满足条件) / note_base.COUNT(*) * 100', inputs: { '爆文数': viralCount, '总篇数(note_base)': noteCount }, result: Number(viralRate.toFixed(1)) },
       ],
     });
 

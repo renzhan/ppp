@@ -67,27 +67,43 @@ export class AudienceAssetsDataLoader extends BaseChapterDataLoader {
       console.warn(`[AudienceAssetsDataLoader] Failed to load lingxi_data: ${error}`);
     }
 
-    // 构建溯源数据
+    // 构建溯源数据 — 展示灵犀原始数据
     const traceItems: TraceItem[] = [];
-    const populationRows: Record<string, unknown>[] = [];
-    if (variables['aips_awareness']) populationRows.push({ level: 'A(被看见)', value: variables['aips_awareness'] });
-    if (variables['aips_interest']) populationRows.push({ level: 'I(被互动)', value: variables['aips_interest'] });
-    if (variables['aips_purchase']) populationRows.push({ level: 'P(被购买)', value: variables['aips_purchase'] });
-    if (variables['aips_share']) populationRows.push({ level: 'S(被分享)', value: variables['aips_share'] });
 
-    if (populationRows.length > 0) {
+    // 获取灵犀原始记录用于溯源
+    let lingxiRawRows: Record<string, unknown>[] = [];
+    try {
+      const allLingxi = await this.prisma.lingxiData.findMany({
+        where: { projectId, dataType: 'aips' },
+        select: { dataContent: true, periodStart: true, periodEnd: true, createdAt: true },
+        orderBy: { createdAt: 'desc' },
+      });
+      lingxiRawRows = allLingxi.map(r => ({
+        periodStart: r.periodStart?.toISOString().split('T')[0] || '-',
+        periodEnd: r.periodEnd?.toISOString().split('T')[0] || '-',
+        dataContent: JSON.stringify(r.dataContent),
+        createdAt: r.createdAt?.toISOString().split('T')[0] || '-',
+      }));
+    } catch { /* already loaded above */ }
+
+    if (lingxiRawRows.length > 0) {
       traceItems.push({
         traceId: 'ch8_aips_population',
         chapterNumber: 8,
-        label: 'AIPS人群规模',
+        label: 'AIPS人群数据(灵犀原始)',
         sourceTable: 'lingxi_data',
-        sourceQuery: `SELECT data_content FROM lingxi_data WHERE project_id = '${projectId}' AND data_type = 'aips' ORDER BY created_at DESC;`,
-        totalRows: populationRows.length,
+        sourceQuery: `SELECT data_content, period_start, period_end, created_at FROM lingxi_data WHERE project_id = '${projectId}' AND data_type = 'aips' ORDER BY created_at DESC;`,
+        totalRows: lingxiRawRows.length,
         columns: [
-          { key: 'level', label: '人群层级', type: 'string' },
-          { key: 'value', label: '人群规模', type: 'string' },
+          { key: 'periodStart', label: '周期开始', type: 'date' },
+          { key: 'periodEnd', label: '周期结束', type: 'date' },
+          { key: 'dataContent', label: '原始数据(JSON)', type: 'string' },
+          { key: 'createdAt', label: '录入时间', type: 'date' },
         ],
-        dataRows: populationRows,
+        dataRows: lingxiRawRows,
+        calculations: variables['aips_flow_rates'] ? [
+          { metric: '流转率计算', formula: '(当期值 - 上期值) / 上期值 * 100', inputs: { '数据周期数': lingxiRawRows.length }, result: '按各层级分别计算增长率' },
+        ] : undefined,
       });
     }
 

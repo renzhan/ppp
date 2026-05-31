@@ -18,6 +18,9 @@ export class OptimizationDataLoader extends BaseChapterDataLoader {
   async load(projectId: string): Promise<ChapterDataContext> {
     const variables: Record<string, string> = {};
 
+    // 保留原始行数据用于溯源
+    let rawNoteRows: Array<Record<string, unknown>> = [];
+
     try {
       // Load notes for aggregation
       const notes = await this.prisma.note.findMany({
@@ -31,6 +34,15 @@ export class OptimizationDataLoader extends BaseChapterDataLoader {
           serviceFee: true,
         },
       });
+
+      rawNoteRows = notes.map(n => ({
+        noteId: n.noteId,
+        impNum: n.impNum,
+        readNum: n.readNum,
+        engageNum: n.engageNum,
+        kolPrice: Number(n.kolPrice),
+        serviceFee: Number(n.serviceFee),
+      }));
 
       // Load KPI targets
       const kpiTargets = await this.prisma.kpiTarget.findMany({
@@ -135,26 +147,35 @@ export class OptimizationDataLoader extends BaseChapterDataLoader {
       console.warn(`[OptimizationDataLoader] Failed to load juguang_data: ${error}`);
     }
 
-    // 构建溯源数据
+    // 构建溯源数据 — 展示数据库原始行 + 计算公式
     const traceItems: TraceItem[] = [];
 
     if (variables['underperforming_metrics']) {
       try {
         const metrics = JSON.parse(variables['underperforming_metrics']);
+        // 展示 notes 原始行数据
         traceItems.push({
           traceId: 'ch9_underperforming',
           chapterNumber: 9,
-          label: '未达标指标',
+          label: '未达标指标(原始数据)',
           sourceTable: 'notes + kpi_targets',
-          sourceQuery: `SELECT metric_name, target_value FROM kpi_targets WHERE project_id = '${projectId}';`,
-          totalRows: metrics.length,
+          sourceQuery: `SELECT id AS note_id, imp_num, read_num, engage_num, kol_price, service_fee FROM notes WHERE project_id = '${projectId}';\nSELECT metric_name, target_value FROM kpi_targets WHERE project_id = '${projectId}';`,
+          totalRows: rawNoteRows.length,
           columns: [
-            { key: 'metric', label: '指标', type: 'string' },
-            { key: 'actual', label: '实际值', type: 'number' },
-            { key: 'target', label: '目标值', type: 'number' },
-            { key: 'completion', label: '完成率', type: 'string' },
+            { key: 'noteId', label: 'note_id', type: 'string' },
+            { key: 'impNum', label: 'imp_num', type: 'number' },
+            { key: 'readNum', label: 'read_num', type: 'number' },
+            { key: 'engageNum', label: 'engage_num', type: 'number' },
+            { key: 'kolPrice', label: 'kol_price', type: 'number' },
+            { key: 'serviceFee', label: 'service_fee', type: 'number' },
           ],
-          dataRows: metrics,
+          dataRows: rawNoteRows,
+          calculations: metrics.map((m: any) => ({
+            metric: `${m.metric}完成率`,
+            formula: 'SUM(实际值) / KPI目标 * 100',
+            inputs: { '实际值(SUM)': m.actual, 'KPI目标': m.target },
+            result: m.completion + '%',
+          })),
         });
       } catch { /* ignore parse errors */ }
     }
@@ -165,17 +186,23 @@ export class OptimizationDataLoader extends BaseChapterDataLoader {
         traceItems.push({
           traceId: 'ch9_content_performance',
           chapterNumber: 9,
-          label: '内容方向表现',
+          label: '内容方向(原始数据)',
           sourceTable: 'notes + business_annotations',
-          sourceQuery: `SELECT note_id, content_direction FROM business_annotations WHERE project_id = '${projectId}';`,
-          totalRows: perf.length,
+          sourceQuery: `SELECT n.id AS note_id, n.engage_num, n.kol_price, n.service_fee, ba.content_direction\nFROM notes n\nLEFT JOIN business_annotations ba ON n.note_id = ba.note_id\nWHERE n.project_id = '${projectId}';`,
+          totalRows: rawNoteRows.length,
           columns: [
-            { key: 'name', label: '内容方向', type: 'string' },
-            { key: 'count', label: '篇数', type: 'number' },
-            { key: 'avgEngagement', label: '平均互动', type: 'string' },
-            { key: 'cpe', label: 'CPE', type: 'string' },
+            { key: 'noteId', label: 'note_id', type: 'string' },
+            { key: 'engageNum', label: 'engage_num', type: 'number' },
+            { key: 'kolPrice', label: 'kol_price', type: 'number' },
+            { key: 'serviceFee', label: 'service_fee', type: 'number' },
           ],
-          dataRows: perf,
+          dataRows: rawNoteRows,
+          calculations: perf.map((p: any) => ({
+            metric: `${p.name} CPE`,
+            formula: 'SUM(kol_price + service_fee) / SUM(engage_num)',
+            inputs: { '篇数': p.count, '平均互动': p.avgEngagement },
+            result: p.cpe,
+          })),
         });
       } catch { /* ignore parse errors */ }
     }

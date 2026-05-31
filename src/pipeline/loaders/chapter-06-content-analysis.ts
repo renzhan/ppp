@@ -328,55 +328,82 @@ export class ContentAnalysisDataLoader extends BaseChapterDataLoader {
     variables['viral_metric'] = viralMetric === 'like_only' ? '千赞（赞≥1000）' : '千互（赞+藏+评≥1000）';
 
     // ── 11. 构建溯源数据 ──
+    // 溯源展示原始笔记数据行 + 分组聚合公式
     const traceItems: TraceItem[] = [];
 
-    // 内容方向分析表溯源
-    const directionRows = Array.from(byDirection.entries()).map(([name, items]) => {
-      const agg = { count: items.length, impNum: items.reduce((s, n) => s + n.impNum, 0), engagement: items.reduce((s, n) => s + n.engagement, 0), tiUserNum: items.reduce((s, n) => s + n.tiUserNum, 0), totalCost: items.reduce((s, n) => s + n.totalCost, 0), viralCount: items.filter((n) => n.isViral).length };
-      return { direction: name, count: agg.count, impressions: agg.impNum, engagement: agg.engagement, ti: agg.tiUserNum, cpe: agg.engagement > 0 ? (agg.totalCost / agg.engagement).toFixed(2) : '-', viralCount: agg.viralCount, viralRate: agg.count > 0 ? ((agg.viralCount / agg.count) * 100).toFixed(1) + '%' : '0%' };
-    });
+    // 内容方向分析表溯源 — 展示每篇笔记的原始数据（按内容方向标记）
+    const directionRawRows = enrichedNotes.slice(0, 200).map(n => ({
+      noteId: n.noteId,
+      kolNickName: n.kolNickName,
+      contentDirection: n.contentDirection,
+      impNum: n.impNum,
+      readNum: n.readNum,
+      engagement: n.engagement,
+      tiUserNum: n.tiUserNum,
+      totalCost: Number(n.totalCost.toFixed(2)),
+      isViral: n.isViral ? '是' : '否',
+    }));
     traceItems.push({
       traceId: 'ch6_by_direction',
       chapterNumber: 6,
-      label: '内容方向分析',
+      label: '内容方向分析(原始笔记数据)',
       sourceTable: 'notes + note_base + juguang_data',
-      sourceQuery: `SELECT note_id, content_direction FROM note_base WHERE project_id = '${projectId}';\nSELECT note_id, imp_num, like_num, fav_num, cmt_num FROM notes WHERE project_id = '${projectId}';`,
-      totalRows: directionRows.length,
+      sourceQuery: `SELECT n.note_id, n.imp_num, n.read_num, n.like_num, n.fav_num, n.cmt_num, n.share_num, nb.content_direction, nb.content_cost, j.fee, j.ti_user_num\nFROM notes n\nLEFT JOIN note_base nb ON n.note_id = nb.note_id AND nb.project_id = '${projectId}'\nLEFT JOIN (SELECT note_id, SUM(fee) fee, SUM(ti_user_num) ti_user_num FROM juguang_data WHERE project_id = '${projectId}' GROUP BY note_id) j ON n.note_id = j.note_id\nWHERE n.project_id = '${projectId}';`,
+      totalRows: enrichedNotes.length,
       columns: [
-        { key: 'direction', label: '内容方向', type: 'string' },
-        { key: 'count', label: '篇数', type: 'number' },
-        { key: 'impressions', label: '曝光量', type: 'number' },
-        { key: 'engagement', label: '互动量', type: 'number' },
-        { key: 'ti', label: 'TI人群', type: 'number' },
-        { key: 'cpe', label: 'CPE', type: 'string' },
-        { key: 'viralCount', label: '爆文数', type: 'number' },
-        { key: 'viralRate', label: '爆文率', type: 'string' },
+        { key: 'kolNickName', label: '达人', type: 'string' },
+        { key: 'contentDirection', label: '内容方向', type: 'string' },
+        { key: 'impNum', label: '曝光(原始)', type: 'number' },
+        { key: 'readNum', label: '阅读(原始)', type: 'number' },
+        { key: 'engagement', label: '互动(原始)', type: 'number' },
+        { key: 'tiUserNum', label: 'TI人群(原始)', type: 'number' },
+        { key: 'totalCost', label: '总费用(原始)', type: 'number' },
+        { key: 'isViral', label: '是否爆文', type: 'string' },
       ],
-      dataRows: directionRows,
+      dataRows: directionRawRows as unknown as Record<string, unknown>[],
+      calculations: [
+        { metric: '分组聚合', formula: 'GROUP BY content_direction', inputs: { '分组数': byDirection.size }, result: `${byDirection.size}个内容方向` },
+        { metric: 'CPE(每组)', formula: 'SUM(totalCost) / SUM(engagement)', inputs: {}, result: '按组聚合后计算' },
+        { metric: 'CPTI(每组)', formula: 'SUM(totalCost) / SUM(tiUserNum)', inputs: {}, result: '按组聚合后计算' },
+        { metric: '爆文率(每组)', formula: 'COUNT(isViral=true) / COUNT(*) * 100', inputs: { '爆文标准': viralMetric === 'like_only' ? '赞≥1000' : '赞+藏+评≥1000' }, result: '按组统计' },
+      ],
     });
 
-    // 达人层级分析表溯源
-    const tierRows = Array.from(byKolTier.entries()).map(([name, items]) => {
-      const agg = { count: items.length, impNum: items.reduce((s, n) => s + n.impNum, 0), engagement: items.reduce((s, n) => s + n.engagement, 0), totalCost: items.reduce((s, n) => s + n.totalCost, 0), viralCount: items.filter((n) => n.isViral).length };
-      return { tier: name, count: agg.count, impressions: agg.impNum, engagement: agg.engagement, cpe: agg.engagement > 0 ? (agg.totalCost / agg.engagement).toFixed(2) : '-', viralCount: agg.viralCount, viralRate: agg.count > 0 ? ((agg.viralCount / agg.count) * 100).toFixed(1) + '%' : '0%' };
-    });
+    // 达人层级分析表溯源 — 展示每篇笔记的原始数据（含粉丝数和层级标记）
+    const tierRawRows = enrichedNotes.slice(0, 200).map(n => ({
+      noteId: n.noteId,
+      kolNickName: n.kolNickName,
+      kolFanNum: n.kolFanNum,
+      kolTier: n.kolTier,
+      impNum: n.impNum,
+      readNum: n.readNum,
+      engagement: n.engagement,
+      totalCost: Number(n.totalCost.toFixed(2)),
+      isViral: n.isViral ? '是' : '否',
+    }));
     traceItems.push({
       traceId: 'ch6_by_kol_tier',
       chapterNumber: 6,
-      label: '达人层级分析',
+      label: '达人层级分析(原始笔记数据)',
       sourceTable: 'notes + review_configs.influencer_tiers',
-      sourceQuery: `SELECT note_id, kol_fan_num FROM notes WHERE project_id = '${projectId}';\nSELECT influencer_tiers FROM review_configs WHERE project_id = '${projectId}';`,
-      totalRows: tierRows.length,
+      sourceQuery: `SELECT n.note_id, n.kol_nick_name, n.kol_fan_num, n.imp_num, n.read_num, n.like_num, n.fav_num, n.cmt_num, n.share_num\nFROM notes n WHERE n.project_id = '${projectId}';\nSELECT influencer_tiers FROM review_configs WHERE project_id = '${projectId}' ORDER BY created_at DESC LIMIT 1;`,
+      totalRows: enrichedNotes.length,
       columns: [
-        { key: 'tier', label: '达人层级', type: 'string' },
-        { key: 'count', label: '篇数', type: 'number' },
-        { key: 'impressions', label: '曝光量', type: 'number' },
-        { key: 'engagement', label: '互动量', type: 'number' },
-        { key: 'cpe', label: 'CPE', type: 'string' },
-        { key: 'viralCount', label: '爆文数', type: 'number' },
-        { key: 'viralRate', label: '爆文率', type: 'string' },
+        { key: 'kolNickName', label: '达人', type: 'string' },
+        { key: 'kolFanNum', label: '粉丝数(原始)', type: 'number' },
+        { key: 'kolTier', label: '层级(按配置划分)', type: 'string' },
+        { key: 'impNum', label: '曝光(原始)', type: 'number' },
+        { key: 'engagement', label: '互动(原始)', type: 'number' },
+        { key: 'totalCost', label: '总费用(原始)', type: 'number' },
+        { key: 'isViral', label: '是否爆文', type: 'string' },
       ],
-      dataRows: tierRows,
+      dataRows: tierRawRows as unknown as Record<string, unknown>[],
+      calculations: [
+        { metric: '层级划分规则', formula: '按粉丝数区间分类', inputs: Object.fromEntries(influencerTiers.map(t => [t.name, `${t.fanRangeMin}~${t.fanRangeMax}`])), result: `${influencerTiers.length}个层级` },
+        { metric: '分组聚合', formula: 'GROUP BY kol_tier', inputs: { '分组数': byKolTier.size }, result: `${byKolTier.size}个层级` },
+        { metric: 'CPE(每组)', formula: 'SUM(totalCost) / SUM(engagement)', inputs: {}, result: '按组聚合后计算' },
+        { metric: '爆文率(每组)', formula: 'COUNT(isViral=true) / COUNT(*) * 100', inputs: {}, result: '按组统计' },
+      ],
     });
 
     return this.buildContext(variables, traceItems);
