@@ -290,7 +290,7 @@ export class PugongyingClient {
 
   // ── Comments ──
 
-  async fetchComments(noteIds: string[]): Promise<CommentData[]> {
+  async fetchComments(noteIds: string[], startDate: string, endDate: string): Promise<CommentData[]> {
     const allComments: CommentData[] = [];
     const CONCURRENCY = 5;
     const pending = [...noteIds];

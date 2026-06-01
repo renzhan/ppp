@@ -43,7 +43,7 @@ export interface DataPersistenceService {
   /** 千瓜数据（按 dataType 分片存储） */
   saveQianguaData(projectId: string, stats: QianguaStatsData, hotNotePublish: QianguaHotNotePublishData): Promise<void>;
   /** 查找项目基础信息 */
-  findProject(projectId: string): Promise<{ startDate: Date; endDate: Date; brand: string; category: string } | null>;
+  findProject(projectId: string): Promise<{ startDate: Date; endDate: Date; brand: string; category: string; executionStartDate: Date | null } | null>;
   /** 查找项目底表中的所有 noteId */
   findNoteIdsByProject(projectId: string): Promise<string[]>;
 }
@@ -366,10 +366,10 @@ export class PrismaDataPersistenceService implements DataPersistenceService {
     return rows.map((r) => r.noteId);
   }
 
-  async findProject(projectId: string): Promise<{ startDate: Date; endDate: Date; brand: string; category: string } | null> {
+  async findProject(projectId: string): Promise<{ startDate: Date; endDate: Date; brand: string; category: string; executionStartDate: Date | null } | null> {
     return prisma.project.findUnique({
       where: { id: projectId },
-      select: { startDate: true, endDate: true, brand: true, category: true },
+      select: { startDate: true, endDate: true, brand: true, category: true, executionStartDate: true },
     });
   }
 

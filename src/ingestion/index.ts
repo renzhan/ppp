@@ -11,7 +11,7 @@ import { PaichachaClient } from './paichacha-client.js';
 import { PrismaDataPersistenceService } from './persistence-service.js';
 import { SpreadsheetUploadService } from './spreadsheet-upload.js';
 import { envConfig } from '../config/env.js';
-import type { PugongyingNote, JuguangNote, LingxiData, CommentData, QianguaStatsData, QianguaHotNotePublishData } from '../shared/types.js';
+import type { PugongyingNote, JuguangNote, LingxiData, CommentData } from '../shared/types.js';
 
 // ---- Types ----
 
@@ -74,91 +74,72 @@ export class DataIngestionService {
    * Fetches both pugongying and juguang data, then persists to DB.
    *
    * @param projectId - The project to associate data with
-   * @param noteIds - The note IDs to fetch data for
+   * @param advertiserIds - 广告主 ID 列表(按说直接从项目查到的TODO)
+   * @param noteIds - 笔记 ID 列表（可选，未传时从底表自动获取）
    * @returns Result containing fetched data and any errors encountered
    */
-  async ingestFromAPI(projectId: string, noteIds?: string[]): Promise<APIIngestionResult> {
+  async ingestFromAPI(projectId: string, advertiserIds: number[], noteIds?: string[]): Promise<APIIngestionResult> {
     const errors: string[] = [];
     let pugongyingNotes: PugongyingNote[] = [];
     let juguangNotes: JuguangNote[] = [];
 
-    // 未传 noteIds 时，从底表自动获取
-    if (!noteIds || noteIds.length === 0) {
-      noteIds = await this.persistenceService.findNoteIdsByProject(projectId);
-    }
+    const resolvedNoteIds = noteIds ?? await this.persistenceService.findNoteIdsByProject(projectId);
 
     // 从项目配置读取参数
     const project = await this.persistenceService.findProject(projectId);
     if (!project) throw new Error(`项目不存在: ${projectId}`);
+    if (!project.executionStartDate) throw new Error(`项目缺少"开始执行日期"（executionStartDate），请先补充后再拉取数据`);
+
     const brandName = project.brand;
     const taxonomyNames = [project.category];
-    const startDate = new Date(project.startDate).toISOString().slice(0,10);
-    const endDate   = new Date(project.endDate).toISOString().slice(0,10);
-    // campaignStart 临时取项目周期中点，后续完善
-    const cs = new Date(startDate), ce = new Date(endDate);
-    const campaignStart = new Date((cs.getTime() + ce.getTime()) / 2).toISOString().slice(0,10);
+    // 平台数据均为 T+2 可见，查询截止日取两天前
+    const now = new Date();
+    now.setDate(now.getDate() - 2);
+    const dateBase = now.toISOString().slice(0, 10);
 
-    // 暂保留的硬编码参数
-    const TEST_PROJECT = {
-      juguangBrandName: '奈雪的茶-派芽1',
-      qianguaDays: 30,
-    };
+    const execStart = new Date(project.executionStartDate).toISOString().slice(0, 10);
+    const execEnd = new Date(project.endDate).toISOString().slice(0, 10);
+
+    // 统一截止日：T-2 与项目结束日取较小值（项目已结束则不再扩大范围）
+    const currentEnd = dateBase <= execEnd ? dateBase : execEnd;
+
+    // 灵犀需环比周期的日期计算（Case A/B 统一公式）
+    const periodDays = Math.ceil(
+      (new Date(currentEnd).getTime() - new Date(execStart).getTime()) / 86400000
+    );
+    const preEnd = new Date(new Date(execStart).getTime() - 86400000).toISOString().slice(0, 10);
+    const preStart = new Date(new Date(preEnd).getTime() - periodDays * 86400000 + 86400000).toISOString().slice(0, 10);
 
     // Fetch pugongying data
     try {
-      pugongyingNotes = await this.paichachaClient.fetchPugongyingData(noteIds);
+      pugongyingNotes = await this.paichachaClient.fetchPugongyingData(resolvedNoteIds);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       errors.push(`Failed to fetch pugongying data: ${message}`);
     }
 
-    // Fetch juguang data
+    // Fetch juguang data（当天数据）
     try {
-      juguangNotes = await this.paichachaClient.fetchJuguangData(
-        TEST_PROJECT.juguangBrandName, startDate, endDate,
-      );
+      juguangNotes = await this.paichachaClient.fetchJuguangData(advertiserIds, currentEnd, currentEnd);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       errors.push(`Failed to fetch juguang data: ${message}`);
     }
 
-    // Fetch lingxi data（参数后续由前端传入，当前写死联调用）
+    // Fetch lingxi data（需环比：brand_rank + move_analyse 使用投前投后对比）
     let lingxiData: LingxiData | undefined;
     try {
-      // 投后到今天，投前 = 投放前等长时段
-      const cs = new Date(campaignStart);
-      const today = new Date(); today.setHours(0,0,0,0);
-      const duration = Math.ceil((today.getTime() - cs.getTime()) / 86400000);
-      const preEnd = new Date(cs); preEnd.setDate(preEnd.getDate() - 1);
-      const preStart = new Date(preEnd); preStart.setDate(preStart.getDate() - duration);
-      const preStartDate = preStart.toISOString().slice(0, 10);
-      const preEndDate   = preEnd.toISOString().slice(0, 10);
-      const postEndDate = today.toISOString().slice(0,10);
       lingxiData = await this.paichachaClient.fetchLingxiData(
         brandName,
-        campaignStart,    // 投后 start = 投放开始
-        postEndDate,      // 投后 end   = 今天
+        execStart,          // 投后 start
+        currentEnd,         // 投后 end（min(today, projectEnd)）
         taxonomyNames,
-        preStartDate,
-        preEndDate,
+        preStart,            // 投前 start（等长周期）
+        preEnd,              // 投前 end（execStart 前一天）
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       errors.push(`Failed to fetch lingxi data: ${message}`);
-    }
-
-    // Fetch qiangua data（参数后续由前端传入，当前写死联调用）
-    let qianguaStats: QianguaStatsData | undefined;
-    let qianguaHotNotePublish: QianguaHotNotePublishData | undefined;
-    try {
-      const qianguaData = await this.paichachaClient.fetchQianguaData(
-        brandName, TEST_PROJECT.qianguaDays,
-      );
-      qianguaStats = qianguaData.stats;
-      qianguaHotNotePublish = qianguaData.hotNotePublish;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      errors.push(`Failed to fetch qiangua data: ${message}`);
     }
 
     // Merge: preserve isUnderwater / underwaterPrice from existing records
@@ -206,15 +187,6 @@ export class DataIngestionService {
       }
     }
 
-    if (qianguaStats && qianguaHotNotePublish) {
-      try {
-        await this.persistenceService.saveQianguaData(projectId, qianguaStats, qianguaHotNotePublish);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        errors.push(`Failed to persist qiangua data: ${message}`);
-      }
-    }
-
     return { pugongyingNotes, juguangNotes, errors };
   }
 
@@ -226,8 +198,17 @@ export class DataIngestionService {
     const errors: string[] = [];
     let commentData: CommentData[] = [];
 
+    // 读取项目获取日期范围：开始执行日期 ~ T-2（平台数据 T+2 可见）
+    const project = await this.persistenceService.findProject(projectId);
+    const now = new Date();
+    now.setDate(now.getDate() - 2);
+    const dateBase = now.toISOString().slice(0, 10);
+    const startDate = project?.executionStartDate
+      ? new Date(project.executionStartDate).toISOString().slice(0, 10)
+      : dateBase; // 无执行日期时 fallback 到 T-2
+
     try {
-      commentData = await this.paichachaClient.fetchCommentData(noteIds);
+      commentData = await this.paichachaClient.fetchCommentData(noteIds, startDate, dateBase);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       errors.push(`Failed to fetch comment data: ${message}`);

@@ -20,12 +20,12 @@ import type { QianguaClientConfig } from './qiangua-client.js';
  */
 export interface IPaichachaClient {
   fetchPugongyingData(noteIds: string[]): Promise<PugongyingNote[]>;
-  /** 获取聚光笔记层级离线报表（brandName + 日期范围） */
-  fetchJuguangData(brandName: string, startDate: string, endDate: string): Promise<JuguangNote[]>;
+  /** 获取聚光笔记层级离线报表 */
+  fetchJuguangData(advertiserIds: number[], startDate: string, endDate: string): Promise<JuguangNote[]>;
   /** 获取灵犀数据（brandName + keyword + taxonomyNames） */
   fetchLingxiData(brandName: string, startDate: string, endDate: string, taxonomyNames?: string | string[], preStartDate?: string, preEndDate?: string): Promise<LingxiData>;
-  /** 获取评论数据（全量评论，用于舆情分析） */
-  fetchCommentData(noteIds: string[]): Promise<CommentData[]>;
+  /** 获取评论数据（全量评论，用于舆情分析，按日期范围过滤） */
+  fetchCommentData(noteIds: string[], startDate: string, endDate: string): Promise<CommentData[]>;
   /** 获取千瓜数据（品牌数据卡片 + 爆文发布时间分布） */
   fetchQianguaData(brandName: string, days?: number): Promise<{ stats: QianguaStatsData; hotNotePublish: QianguaHotNotePublishData }>;
 }
@@ -87,13 +87,9 @@ export class PaichachaClient implements IPaichachaClient {
 
   // ── Juguang ──
 
-  async fetchJuguangData(
-    brandName: string,
-    startDate: string,
-    endDate: string,
-  ): Promise<JuguangNote[]> {
+  async fetchJuguangData(advertiserIds: number[], startDate: string, endDate: string): Promise<JuguangNote[]> {
     if (!this.juguangClient) throw new Error('Juguang client not configured');
-    return this.juguangClient.fetchJuguangData(brandName, startDate, endDate);
+    return this.juguangClient.fetchJuguangData(advertiserIds, startDate, endDate);
   }
 
   // ── Lingxi ──
@@ -105,9 +101,9 @@ export class PaichachaClient implements IPaichachaClient {
 
   // ── Comments ──
 
-  async fetchCommentData(noteIds: string[]): Promise<CommentData[]> {
+  async fetchCommentData(noteIds: string[], startDate: string, endDate: string): Promise<CommentData[]> {
     if (!this.pugongyingClient) throw new Error('Pugongying client not configured');
-    return this.pugongyingClient.fetchComments(noteIds);
+    return this.pugongyingClient.fetchComments(noteIds, startDate, endDate);
   }
 
   // ── Qiangua ──

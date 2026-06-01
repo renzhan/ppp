@@ -104,7 +104,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const result = await ingestionService.ingestFromAPI(projectId, noteIds);
+    const result = await ingestionService.ingestFromAPI(projectId, [], noteIds);
 
     // Calculate success/failure counts
     const total = noteIds.length;
