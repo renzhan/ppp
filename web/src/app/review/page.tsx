@@ -89,7 +89,7 @@ export default function ReviewListPage() {
                     <td className="whitespace-nowrap px-4 py-3">
                       <div className="flex items-center gap-2">
                         <Link
-                          href={`/review/${review.id}`}
+                          href={`/review/new?editId=${review.id}`}
                           className="inline-flex items-center gap-1 text-xs font-medium text-brand transition hover:underline"
                         >
                           <Pencil size={12} />

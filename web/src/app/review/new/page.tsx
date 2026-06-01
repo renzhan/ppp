@@ -117,7 +117,7 @@ function NewReviewPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const preselectedProjectId = searchParams.get('projectId') || '';
-
+  const editFromId = searchParams.get('editId') || '';
   // ─── Form State ──────────────────────────────────────────────────────────
   const [selectedProjectId, setSelectedProjectId] = useState(preselectedProjectId);
   const [projectSearch, setProjectSearch] = useState('');
@@ -233,6 +233,95 @@ function NewReviewPageContent() {
       }
     }
   }, [preselectedProjectId, projects]);
+
+  // ─── Edit Mode: Load existing review config ──────────────────────────────
+  const { data: editReview } = useQuery<{
+    id: string;
+    projectId: string;
+    benchmark: Record<string, number | null>;
+    influencerTiers: InfluencerTier[];
+    kpiTargets: Record<string, number | null>;
+    engagementMetric: string;
+    viralMetric: string;
+    modules: Record<string, unknown>;
+    launchPhases: LaunchPhase[];
+  }>({
+    queryKey: ['review-for-edit', editFromId],
+    queryFn: async () => {
+      const res = await fetch(`/api/reviews/${editFromId}`);
+      if (!res.ok) throw new Error('获取复盘配置失败');
+      return res.json();
+    },
+    enabled: !!editFromId,
+  });
+
+  // Pre-fill form when edit data is loaded
+  useEffect(() => {
+    if (!editReview) return;
+
+    setSelectedProjectId(editReview.projectId);
+
+    // Pre-fill benchmark
+    if (editReview.benchmark) {
+      const bm: BenchmarkData = { ctr: '', cpm: '', cpc: '', cpe: '', engagementRate: '' };
+      Object.entries(editReview.benchmark).forEach(([k, v]) => {
+        if (v != null && k in bm) (bm as any)[k] = String(v);
+      });
+      setBenchmark(bm);
+    }
+
+    // Pre-fill KPI targets
+    if (editReview.kpiTargets) {
+      const kpi: any = {};
+      Object.entries(editReview.kpiTargets).forEach(([k, v]) => {
+        kpi[k] = v != null ? String(v) : '';
+      });
+      setKpiTargets((prev) => ({ ...prev, ...kpi }));
+    }
+
+    // Pre-fill influencer tiers
+    if (editReview.influencerTiers?.length) {
+      setInfluencerTiers(editReview.influencerTiers);
+    }
+
+    // Pre-fill engagement/viral metric
+    if (editReview.engagementMetric) {
+      setEngagementMetric(editReview.engagementMetric as any);
+    }
+    if (editReview.viralMetric) {
+      setViralMetric(editReview.viralMetric as any);
+    }
+
+    // Pre-fill modules
+    if (editReview.modules) {
+      const mods: Record<string, boolean> = {};
+      Object.entries(editReview.modules).forEach(([k, v]) => {
+        if (k === 'contentCostCaliber') {
+          setContentCostCaliber(v as any);
+        } else if (k === 'trafficCostCaliber') {
+          setTrafficCostCaliber(v as any);
+        } else {
+          mods[k] = !!v;
+        }
+      });
+      if (Object.keys(mods).length > 0) setModules((prev) => ({ ...prev, ...mods }));
+    }
+
+    // Pre-fill launch phases
+    if (editReview.launchPhases?.length) {
+      setLaunchPhases(editReview.launchPhases);
+    }
+
+    // Auto-fill cascade filters
+    if (projects?.length) {
+      const project = projects.find((p) => p.id === editReview.projectId);
+      if (project) {
+        setFilterCategory(project.category || '');
+        setFilterBrand(project.brand || '');
+        setFilterBusinessLine(project.businessLine || '');
+      }
+    }
+  }, [editReview, projects]);
 
   // ─── Mutations ───────────────────────────────────────────────────────────
   const createReview = useMutation({
@@ -380,8 +469,8 @@ function NewReviewPageContent() {
   return (
     <div className="mx-auto max-w-4xl space-y-8 pb-12">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-gray-900">新建复盘</h1>
-        <p className="mt-1 text-sm text-gray-500">配置复盘参数，系统将基于笔记数据生成复盘报告</p>
+        <h1 className="text-2xl font-bold tracking-tight text-gray-900">{editFromId ? '编辑复盘' : '新建复盘'}</h1>
+        <p className="mt-1 text-sm text-gray-500">{editFromId ? '修改复盘参数，将基于新参数生成新的复盘报告' : '配置复盘参数，系统将基于笔记数据生成复盘报告'}</p>
       </div>
 
       {/* Section: 项目信息 */}
