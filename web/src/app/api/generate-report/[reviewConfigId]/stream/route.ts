@@ -80,13 +80,49 @@ export async function GET(
   // Validate
   const reviewConfig = await prisma.reviewConfig.findUnique({
     where: { id: reviewConfigId },
-    select: { id: true, projectId: true },
+    select: { id: true, projectId: true, status: true, reportContent: true },
   });
 
   if (!reviewConfig) {
     return new Response(JSON.stringify({ error: 'ReviewConfig not found' }), {
       status: 404,
       headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  // If report already exists (completed or partially generated), return existing content via SSE
+  // This prevents re-generation when user navigates away and comes back
+  const existingContent = reviewConfig.reportContent as { type?: string; chapters?: Array<{ id: string; title: string; number: number; content: string; traceIds?: unknown }> } | null;
+  if (existingContent?.type === 'chapters' && existingContent.chapters?.length) {
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      start(controller) {
+        const send = (data: Record<string, unknown>) => {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+        };
+        send({ type: 'start', totalChapters: existingContent.chapters!.length });
+        for (const chapter of existingContent.chapters!) {
+          send({ type: 'chapter', chapter });
+        }
+        send({ type: 'done', chapters: existingContent.chapters });
+        controller.close();
+      },
+    });
+
+    // Ensure status is completed
+    if (reviewConfig.status !== 'completed') {
+      await prisma.reviewConfig.update({
+        where: { id: reviewConfigId },
+        data: { status: 'completed' },
+      });
+    }
+
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        Connection: 'keep-alive',
+      },
     });
   }
 

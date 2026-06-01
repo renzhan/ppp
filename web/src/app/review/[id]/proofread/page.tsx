@@ -104,7 +104,7 @@ export default function ProofreadPage({ params }: { params: { id: string } }) {
           setActiveChapterId(data.reportContent.chapters[0].id);
           setPageStatus('ready');
         } else if (data.status === 'generating') {
-          // Connect to stream
+          // Status is generating but no content yet - connect to stream
           setPageStatus('generating');
           connectToStream();
         } else {
