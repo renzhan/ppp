@@ -26,7 +26,7 @@ export interface DataPersistenceService {
   savePugongyingNotes(projectId: string, notes: PugongyingNote[]): Promise<void>;
 
   /** Insert juguang records (no unique constraint, uses createMany) */
-  saveJuguangData(projectId: string, data: JuguangNote[]): Promise<void>;
+  saveJuguangData(projectId: string, data: JuguangNote[], reviewConfigId: string): Promise<void>;
 
   /** Insert lingxi records with data_type classification */
   saveLingxiData(projectId: string, data: LingxiData): Promise<void>;
@@ -194,13 +194,14 @@ export class PrismaDataPersistenceService implements DataPersistenceService {
    * Insert juguang records to PostgreSQL.
    * Uses createMany since there's no unique constraint on juguang_data.
    */
-  async saveJuguangData(projectId: string, data: JuguangNote[]): Promise<void> {
+  async saveJuguangData(projectId: string, data: JuguangNote[], reviewConfigId: string): Promise<void> {
     if (data.length === 0) return;
 
     await prisma.$transaction(async (tx) => {
       await tx.juguangData.createMany({
         data: data.map((record) => ({
           projectId,
+          reviewConfigId,
           noteId: record.noteId ?? null,
           placement: record.placement ?? null,
           targetsDetail: record.targetsDetail ?? null,

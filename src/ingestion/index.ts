@@ -143,9 +143,9 @@ export class DataIngestionService {
   }
 
   /**
-   * 采集聚光投流数据（需广告主 ID，由用户手动触发）。
+   * 采集聚光投流数据（需广告主 ID + 复盘 ID，由用户手动触发）。
    */
-  async ingestJuguangData(projectId: string, advertiserIds: number[]): Promise<JuguangDataResult> {
+  async ingestJuguangData(projectId: string, advertiserIds: number[], reviewConfigId: string): Promise<JuguangDataResult> {
     const ctx = await this.resolveProjectContext(projectId);
     const errors: string[] = [];
     let juguangNotes: JuguangNote[] = [];
@@ -159,7 +159,7 @@ export class DataIngestionService {
 
     if (juguangNotes.length > 0) {
       try {
-        await this.persistenceService.saveJuguangData(projectId, juguangNotes);
+        await this.persistenceService.saveJuguangData(projectId, juguangNotes, reviewConfigId);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         errors.push(`Failed to persist juguang data: ${message}`);
