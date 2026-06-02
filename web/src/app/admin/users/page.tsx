@@ -11,6 +11,34 @@ import {
   UserCheck,
   X,
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { FormField } from '@/components/ui/form-field';
+import { Input } from '@/components/ui/input';
+import { Loading } from '@/components/ui/loading';
+import {
+  listEmptyClass,
+  listErrorClass,
+  listTableHeadClass,
+  listTableHeaderRowClass,
+  listTableRowClass,
+  listTableWrapperClass,
+} from '@/components/ui/data-list';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+} from '@/components/ui/select';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { cn } from '@/lib/utils';
 
 interface User {
   id: string;
@@ -22,6 +50,18 @@ interface User {
   lastLoginAt: string | null;
   createdAt: string;
 }
+
+const ROLE_OPTIONS = [
+  { value: '组长', label: '组长' },
+  { value: 'AD', label: 'AD' },
+  { value: 'AM', label: 'AM' },
+  { value: '投手', label: '投手' },
+  { value: '执行', label: '执行' },
+  { value: 'admin', label: '管理员' },
+] as const;
+
+const selectTriggerClass =
+  'h-10 rounded-lg border-gray-300 bg-white text-gray-900 focus-visible:ring-brand/20';
 
 export default function AdminUsersPage() {
   const router = useRouter();
@@ -91,143 +131,140 @@ export default function AdminUsersPage() {
   };
 
   if (loading) {
-    return (
-      <div className="flex h-64 items-center justify-center">
-        <div className="text-gray-500">加载中...</div>
-      </div>
-    );
+    return <Loading size="lg" text="正在加载用户列表..." className="py-20" />;
   }
 
   return (
-    <div className="mx-auto max-w-6xl">
-      {/* Header */}
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">用户管理</h1>
-        <div className="flex gap-3">
-          <button
-            onClick={() => setShowImportModal(true)}
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-          >
-            <Upload size={16} />
-            批量导入
-          </button>
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="inline-flex items-center gap-2 rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-600"
-          >
-            <Plus size={16} />
-            添加用户
-          </button>
-        </div>
-      </div>
+      <div className="space-y-6">
 
-      {/* Message */}
-      {message && (
-        <div
-          className={`mb-4 rounded-lg px-4 py-3 text-sm ${
-            message.type === 'success'
-              ? 'bg-green-50 text-green-700'
-              : 'bg-red-50 text-red-600'
-          }`}
-        >
-          {message.text}
-        </div>
-      )}
 
-      {/* Table */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="border-b bg-gray-50">
-              <tr>
-                <th className="px-4 py-3 text-sm font-medium text-gray-600">用户名</th>
-                <th className="px-4 py-3 text-sm font-medium text-gray-600">显示名称</th>
-                <th className="px-4 py-3 text-sm font-medium text-gray-600">角色</th>
-                <th className="px-4 py-3 text-sm font-medium text-gray-600">状态</th>
-                <th className="px-4 py-3 text-sm font-medium text-gray-600">最后登录</th>
-                <th className="px-4 py-3 text-sm font-medium text-gray-600">操作</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {users.map((user) => (
-                <tr key={user.id} className="bg-white text-sm text-gray-900 border-b hover:bg-gray-50">
-                  <td className="px-4 py-3 font-medium">
-                    {user.username}
-                  </td>
-                  <td className="px-4 py-3 text-gray-600">
-                    {user.displayName || '-'}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                        user.role === 'admin'
-                          ? 'bg-purple-100 text-purple-700'
-                          : 'bg-brand-100 text-brand-700'
-                      }`}
-                    >
-                      {user.role === 'admin' ? '管理员' : user.role}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                        user.isActive
-                          ? 'bg-green-100 text-green-700'
-                          : 'bg-red-100 text-red-700'
-                      }`}
-                    >
-                      {user.isActive ? '正常' : '已禁用'}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-gray-500">
-                    {user.lastLoginAt
-                      ? new Date(user.lastLoginAt).toLocaleString('zh-CN')
-                      : '从未登录'}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => {
-                          setSelectedUser(user);
-                          setShowEditModal(true);
-                        }}
-                        className="rounded p-1.5 text-gray-500 hover:bg-gray-100 hover:text-brand"
-                        title="编辑"
-                      >
-                        <Edit2 size={15} />
-                      </button>
-                      <button
-                        onClick={() => {
-                          setSelectedUser(user);
-                          setShowResetModal(true);
-                        }}
-                        className="rounded p-1.5 text-gray-500 hover:bg-gray-100 hover:text-orange-600"
-                        title="重置密码"
-                      >
-                        <KeyRound size={15} />
-                      </button>
-                      <button
-                        onClick={() => handleToggleActive(user)}
-                        className={`rounded p-1.5 text-gray-500 hover:bg-gray-100 ${
-                          user.isActive ? 'hover:text-red-600' : 'hover:text-green-600'
-                        }`}
-                        title={user.isActive ? '禁用' : '启用'}
-                      >
-                        {user.isActive ? <UserX size={15} /> : <UserCheck size={15} />}
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="flex items-start justify-between space-y-0">
+          <div className="space-y-1">
+            <h1 className="text-2xl font-bold tracking-tight text-gray-900">用户管理</h1>
+            <p className="text-sm text-gray-500">管理系统账户，支持添加、编辑、禁用与批量导入。</p>
+          </div>
+         
+          <div className="flex shrink-0 gap-3">
+            <Button variant="secondary" size="sm" className="gap-2" onClick={() => setShowImportModal(true)}>
+              <Upload size={16} />
+              批量导入
+            </Button>
+            <Button variant="primary" size="sm" className="gap-2" onClick={() => setShowAddModal(true)}>
+              <Plus size={16} />
+              添加用户
+            </Button>
+          </div>
         </div>
-        {users.length === 0 && (
-          <div className="py-12 text-center text-gray-500">暂无用户</div>
-        )}
-      </div>
 
-      {/* Add User Modal */}
+        <div className="space-y-4">
+          {message && (
+            <div
+              className={cn(
+                'rounded-lg px-4 py-3 text-sm',
+                message.type === 'success'
+                  ? 'bg-green-50 text-green-700'
+                  : 'bg-red-50 text-red-600'
+              )}
+            >
+              {message.text}
+            </div>
+          )}
+
+          {users.length ? (
+            <div className={listTableWrapperClass}>
+              <Table className="text-sm">
+                <TableHeader>
+                  <TableRow className={listTableHeaderRowClass}>
+                    <TableHead className={listTableHeadClass}>用户名</TableHead>
+                    <TableHead className={listTableHeadClass}>显示名称</TableHead>
+                    <TableHead className={listTableHeadClass}>角色</TableHead>
+                    <TableHead className={listTableHeadClass}>状态</TableHead>
+                    <TableHead className={listTableHeadClass}>最后登录</TableHead>
+                    <TableHead className={listTableHeadClass}>操作</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {users.map((user, index) => (
+                    <TableRow key={user.id} className={listTableRowClass(index)}>
+                      <TableCell className="py-3 font-medium">{user.username}</TableCell>
+                      <TableCell className="py-3 text-gray-600">
+                        {user.displayName || '-'}
+                      </TableCell>
+                      <TableCell className="py-3">
+                        <span
+                          className={cn(
+                            'inline-flex rounded-full px-2 py-0.5 text-xs font-medium',
+                            user.role === 'admin'
+                              ? 'bg-purple-100 text-purple-700'
+                              : 'bg-brand-100 text-brand-700'
+                          )}
+                        >
+                          {user.role === 'admin' ? '管理员' : user.role}
+                        </span>
+                      </TableCell>
+                      <TableCell className="py-3">
+                        <span
+                          className={cn(
+                            'inline-flex rounded-full px-2 py-0.5 text-xs font-medium',
+                            user.isActive
+                              ? 'bg-green-100 text-green-700'
+                              : 'bg-red-100 text-red-700'
+                          )}
+                        >
+                          {user.isActive ? '正常' : '已禁用'}
+                        </span>
+                      </TableCell>
+                      <TableCell className="py-3 text-gray-500">
+                        {user.lastLoginAt
+                          ? new Date(user.lastLoginAt).toLocaleString('zh-CN')
+                          : '从未登录'}
+                      </TableCell>
+                      <TableCell className="py-3">
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={() => {
+                              setSelectedUser(user);
+                              setShowEditModal(true);
+                            }}
+                            title="编辑"
+                          >
+                            <Edit2 size={15} />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={() => {
+                              setSelectedUser(user);
+                              setShowResetModal(true);
+                            }}
+                            title="重置密码"
+                            className="hover:text-orange-600"
+                          >
+                            <KeyRound size={15} />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={() => handleToggleActive(user)}
+                            title={user.isActive ? '禁用' : '启用'}
+                            className={user.isActive ? 'hover:text-red-600' : 'hover:text-green-600'}
+                          >
+                            {user.isActive ? <UserX size={15} /> : <UserCheck size={15} />}
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          ) : (
+            <div className={listEmptyClass}>暂无用户</div>
+          )}
+        </div>
+      
       {showAddModal && (
         <AddUserModal
           onClose={() => setShowAddModal(false)}
@@ -239,7 +276,6 @@ export default function AdminUsersPage() {
         />
       )}
 
-      {/* Import Modal */}
       {showImportModal && (
         <ImportModal
           onClose={() => setShowImportModal(false)}
@@ -251,7 +287,6 @@ export default function AdminUsersPage() {
         />
       )}
 
-      {/* Edit Modal */}
       {showEditModal && selectedUser && (
         <EditUserModal
           user={selectedUser}
@@ -268,7 +303,6 @@ export default function AdminUsersPage() {
         />
       )}
 
-      {/* Reset Password Modal */}
       {showResetModal && selectedUser && (
         <ResetPasswordModal
           user={selectedUser}
@@ -288,11 +322,6 @@ export default function AdminUsersPage() {
   );
 }
 
-
-// ============================================================
-// Modal Components
-// ============================================================
-
 function ModalWrapper({
   title,
   onClose,
@@ -303,19 +332,65 @@ function ModalWrapper({
   children: React.ReactNode;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-2xl">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
-          <button
-            onClick={onClose}
-            className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-          >
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <Card className="w-full max-w-md shadow-2xl">
+        <CardHeader className="flex-row items-center justify-between space-y-0 pb-4">
+          <CardTitle className="text-lg">{title}</CardTitle>
+          <Button variant="ghost" size="icon-sm" onClick={onClose} aria-label="关闭">
             <X size={20} />
-          </button>
-        </div>
-        {children}
-      </div>
+          </Button>
+        </CardHeader>
+        <CardContent>{children}</CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function RoleSelect({
+  value,
+  onValueChange,
+}: {
+  value: string;
+  onValueChange: (value: string) => void;
+}) {
+  return (
+    <Select value={value} onValueChange={onValueChange}>
+      <SelectTrigger className={selectTriggerClass} />
+      <SelectContent>
+        {ROLE_OPTIONS.map((opt) => (
+          <SelectItem key={opt.value} value={opt.value}>
+            {opt.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
+function ModalError({ error }: { error: string }) {
+  if (!error) return null;
+  return <div className={cn(listErrorClass, 'mb-3 p-3')}>{error}</div>;
+}
+
+function ModalActions({
+  onClose,
+  loading,
+  submitLabel,
+  loadingLabel,
+}: {
+  onClose: () => void;
+  loading: boolean;
+  submitLabel: string;
+  loadingLabel: string;
+}) {
+  return (
+    <div className="flex justify-end gap-3 pt-2">
+      <Button type="button" variant="secondary" onClick={onClose}>
+        取消
+      </Button>
+      <Button type="submit" variant="primary" disabled={loading}>
+        {loading ? loadingLabel : submitLabel}
+      </Button>
     </div>
   );
 }
@@ -363,82 +438,46 @@ function AddUserModal({
 
   return (
     <ModalWrapper title="添加用户" onClose={onClose}>
-      {error && (
-        <div className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
-          {error}
-        </div>
-      )}
+      <ModalError error={error} />
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">
-            用户名 <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="text"
+        <FormField label="用户名 *" htmlFor="add-username">
+          <Input
+            id="add-username"
+            variant="form"
             value={form.username}
             onChange={(e) => setForm({ ...form, username: e.target.value })}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
             required
           />
-        </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">
-            显示名称
-          </label>
-          <input
-            type="text"
+        </FormField>
+        <FormField label="显示名称" htmlFor="add-displayName">
+          <Input
+            id="add-displayName"
+            variant="form"
             value={form.displayName}
             onChange={(e) => setForm({ ...form, displayName: e.target.value })}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
           />
-        </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">
-            角色
-          </label>
-          <select
-            value={form.role}
-            onChange={(e) => setForm({ ...form, role: e.target.value })}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
-          >
-            <option value="组长">组长</option>
-            <option value="AD">AD</option>
-            <option value="AM">AM</option>
-            <option value="投手">投手</option>
-            <option value="执行">执行</option>
-            <option value="admin">管理员</option>
-          </select>
-        </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">
-            初始密码 <span className="text-red-500">*</span>
-          </label>
-          <input
+        </FormField>
+        <FormField label="角色">
+          <RoleSelect value={form.role} onValueChange={(role) => setForm({ ...form, role })} />
+        </FormField>
+        <FormField label="初始密码 *" htmlFor="add-password">
+          <Input
+            id="add-password"
+            variant="form"
             type="text"
             value={form.password}
             onChange={(e) => setForm({ ...form, password: e.target.value })}
             placeholder="至少6位"
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
             required
             minLength={6}
           />
-        </div>
-        <div className="flex justify-end gap-3 pt-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-          >
-            取消
-          </button>
-          <button
-            type="submit"
-            disabled={loading}
-            className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-60"
-          >
-            {loading ? '创建中...' : '创建'}
-          </button>
-        </div>
+        </FormField>
+        <ModalActions
+          onClose={onClose}
+          loading={loading}
+          submitLabel="创建"
+          loadingLabel="创建中..."
+        />
       </form>
     </ModalWrapper>
   );
@@ -487,56 +526,25 @@ function EditUserModal({
 
   return (
     <ModalWrapper title={`编辑用户 - ${user.username}`} onClose={onClose}>
-      {error && (
-        <div className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
-          {error}
-        </div>
-      )}
+      <ModalError error={error} />
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">
-            显示名称
-          </label>
-          <input
-            type="text"
+        <FormField label="显示名称" htmlFor="edit-displayName">
+          <Input
+            id="edit-displayName"
+            variant="form"
             value={form.displayName}
             onChange={(e) => setForm({ ...form, displayName: e.target.value })}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
           />
-        </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">
-            角色
-          </label>
-          <select
-            value={form.role}
-            onChange={(e) => setForm({ ...form, role: e.target.value })}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
-          >
-            <option value="组长">组长</option>
-            <option value="AD">AD</option>
-            <option value="AM">AM</option>
-            <option value="投手">投手</option>
-            <option value="执行">执行</option>
-            <option value="admin">管理员</option>
-          </select>
-        </div>
-        <div className="flex justify-end gap-3 pt-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-          >
-            取消
-          </button>
-          <button
-            type="submit"
-            disabled={loading}
-            className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-60"
-          >
-            {loading ? '保存中...' : '保存'}
-          </button>
-        </div>
+        </FormField>
+        <FormField label="角色">
+          <RoleSelect value={form.role} onValueChange={(role) => setForm({ ...form, role })} />
+        </FormField>
+        <ModalActions
+          onClose={onClose}
+          loading={loading}
+          submitLabel="保存"
+          loadingLabel="保存中..."
+        />
       </form>
     </ModalWrapper>
   );
@@ -582,45 +590,27 @@ function ResetPasswordModal({
 
   return (
     <ModalWrapper title={`重置密码 - ${user.username}`} onClose={onClose}>
-      {error && (
-        <div className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
-          {error}
-        </div>
-      )}
+      <ModalError error={error} />
       <form onSubmit={handleSubmit} className="space-y-4">
-        <p className="text-sm text-gray-500">
-          重置后用户下次登录需要重新设置密码。
-        </p>
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">
-            新密码 <span className="text-red-500">*</span>
-          </label>
-          <input
+        <p className="text-sm text-gray-500">重置后用户下次登录需要重新设置密码。</p>
+        <FormField label="新密码 *" htmlFor="reset-password">
+          <Input
+            id="reset-password"
+            variant="form"
             type="text"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="至少6位"
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
             required
             minLength={6}
           />
-        </div>
-        <div className="flex justify-end gap-3 pt-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-          >
-            取消
-          </button>
-          <button
-            type="submit"
-            disabled={loading}
-            className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-60"
-          >
-            {loading ? '重置中...' : '确认重置'}
-          </button>
-        </div>
+        </FormField>
+        <ModalActions
+          onClose={onClose}
+          loading={loading}
+          submitLabel="确认重置"
+          loadingLabel="重置中..."
+        />
       </form>
     </ModalWrapper>
   );
@@ -663,20 +653,16 @@ function ImportModal({
         return;
       }
 
-      // Show import errors if any
       if (data.errors && data.errors.length > 0) {
         setImportErrors(data.errors);
       }
 
-      let msg = `导入完成：成功 ${data.imported} 个用户`;
-      if (data.errors && data.errors.length > 0) {
-        msg += `，${data.errors.length} 条错误`;
-      }
+      const msg = `导入完成：成功 ${data.imported} 个用户${
+        data.errors?.length ? `，${data.errors.length} 条错误` : ''
+      }`;
+
       if (!data.errors || data.errors.length === 0) {
         onSuccess(msg);
-      } else {
-        // Keep modal open to show errors, but show success count
-        setError('');
       }
     } catch {
       setError('网络错误');
@@ -687,11 +673,7 @@ function ImportModal({
 
   return (
     <ModalWrapper title="批量导入用户" onClose={onClose}>
-      {error && (
-        <div className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
-          {error}
-        </div>
-      )}
+      <ModalError error={error} />
       {importErrors.length > 0 && (
         <div className="mb-3 max-h-40 overflow-y-auto rounded-lg bg-orange-50 px-3 py-2 text-xs text-orange-700">
           <p className="mb-1 font-medium">导入错误：</p>
@@ -707,19 +689,15 @@ function ImportModal({
           <p>Excel文件(.xlsx)需包含列：用户名、显示名、角色</p>
           <p className="mt-1">有效角色值：组长、AD、AM、投手、执行</p>
           <p className="mt-1">系统将为每个用户自动生成初始密码，首次登录需修改密码。</p>
-          <a
-            href="/api/admin/import/users/template"
-            download
-            className="mt-2 inline-flex items-center gap-1 text-brand underline hover:text-brand-600"
-          >
-            下载导入模板
-          </a>
+          <Button variant="text-link" size="sm" className="mt-2 h-auto px-0 text-xs" asChild>
+            <a href="/api/admin/import/users/template" download>
+              下载导入模板
+            </a>
+          </Button>
         </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">
-            Excel文件 <span className="text-red-500">*</span>
-          </label>
-          <input
+        <FormField label="Excel文件 *">
+          <Input
+            variant="form"
             type="file"
             accept=".xlsx"
             onChange={(e) => {
@@ -727,25 +705,15 @@ function ImportModal({
               setError('');
               setImportErrors([]);
             }}
-            className="w-full text-sm text-gray-500 file:mr-4 file:rounded-lg file:border-0 file:bg-brand-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-brand-700 hover:file:bg-brand-100"
+            className="cursor-pointer file:mr-4 file:rounded-lg file:border-0 file:bg-brand-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-brand-700 hover:file:bg-brand-100"
           />
-        </div>
-        <div className="flex justify-end gap-3 pt-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-          >
-            取消
-          </button>
-          <button
-            type="submit"
-            disabled={loading}
-            className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-60"
-          >
-            {loading ? '导入中...' : '开始导入'}
-          </button>
-        </div>
+        </FormField>
+        <ModalActions
+          onClose={onClose}
+          loading={loading}
+          submitLabel="开始导入"
+          loadingLabel="导入中..."
+        />
       </form>
     </ModalWrapper>
   );

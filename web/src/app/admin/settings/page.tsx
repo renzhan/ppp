@@ -2,7 +2,15 @@
 
 import { useState, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Upload, Lock, Eye, EyeOff } from 'lucide-react';
+import { Upload, Lock } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { FormField } from '@/components/ui/form-field';
+import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/password-input';
+import { Loading } from '@/components/ui/loading';
+import { listErrorClass } from '@/components/ui/data-list';
+import { cn } from '@/lib/utils';
 
 interface ImportResult {
   imported: number;
@@ -12,17 +20,12 @@ interface ImportResult {
 
 export default function AdminSettingsPage() {
   return (
-    <div className="mx-auto max-w-4xl space-y-8">
-      {/* Header */}
-      <div>
+    <div className="space-y-6">
+      <div className="space-y-1">
         <h1 className="text-2xl font-bold tracking-tight text-gray-900">系统设置</h1>
-        <p className="mt-1 text-sm text-gray-500">管理项目底表导入和个人密码修改。</p>
+        <p className="text-sm text-gray-500">管理项目底表导入和个人密码修改。</p>
       </div>
-
-      {/* Project Base Table Import Section */}
       <ProjectBaseImportSection />
-
-      {/* Password Change Section */}
       <PasswordChangeSection />
     </div>
   );
@@ -36,7 +39,6 @@ function ProjectBaseImportSection() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFile = useCallback(async (file: File) => {
-    // Client-side validation: only .xlsx
     if (!file.name.toLowerCase().endsWith('.xlsx')) {
       setError('仅支持.xlsx格式文件');
       setResult(null);
@@ -76,130 +78,100 @@ function ProjectBaseImportSection() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      handleFile(file);
-    }
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
+    if (file) handleFile(file);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setDragOver(false);
     const file = e.dataTransfer.files?.[0];
-    if (file) {
-      handleFile(file);
-    }
+    if (file) handleFile(file);
   };
 
-  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    setDragOver(true);
-  };
-
-  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    setDragOver(false);
-  };
-
-  const handleClick = () => {
-    fileInputRef.current?.click();
-  };
+  const handleClick = () => fileInputRef.current?.click();
 
   return (
-    <section className="rounded-lg border bg-white p-6">
-      <div className="mb-4 flex items-center gap-2">
+    <Card>
+      <CardHeader className="flex-row items-center gap-2 space-y-0 pb-2">
         <Upload size={20} className="text-brand" />
-        <h2 className="text-lg font-semibold text-gray-900">项目底表导入</h2>
-      </div>
-      <p className="mb-4 text-sm text-gray-500">
-        上传 .xlsx 格式的项目底表文件，系统将解析品类、品牌、业务线等字段并生成级联选择器数据源。
-      </p>
+        <CardTitle className="text-lg">项目底表导入</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <CardDescription className="mt-0">
+          上传 .xlsx 格式的项目底表文件，系统将解析品类、品牌、业务线等字段并生成级联选择器数据源。
+        </CardDescription>
 
-      {/* Upload Area */}
-      <div
-        role="button"
-        tabIndex={0}
-        onClick={handleClick}
-        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleClick(); }}
-        onDrop={handleDrop}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        className={`
-          flex flex-col items-center justify-center rounded-lg border-2 border-dashed px-6 py-8
-          transition-colors cursor-pointer
-          ${dragOver
-            ? 'border-brand bg-brand-50'
-            : 'border-gray-300 bg-gray-50 hover:border-gray-400 hover:bg-white'
-          }
-          ${uploading ? 'pointer-events-none opacity-60' : ''}
-        `}
-      >
-        {uploading ? (
-          <div className="flex flex-col items-center gap-2">
-            <div className="h-6 w-6 animate-spin rounded-full border-2 border-gray-300 border-t-brand" />
-            <span className="text-sm text-gray-500">正在上传并解析...</span>
-          </div>
-        ) : (
-          <>
-            <svg
-              className="mb-2 h-10 w-10 text-gray-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1.5}
-                d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-              />
-            </svg>
-            <p className="text-sm text-gray-600">
-              拖拽文件到此处，或 <span className="font-medium text-brand">点击选择文件</span>
-            </p>
-            <p className="mt-1 text-xs text-gray-400">仅支持 .xlsx 格式</p>
-          </>
-        )}
-      </div>
-
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".xlsx"
-        onChange={handleInputChange}
-        className="hidden"
-        aria-label="上传项目底表"
-      />
-
-      {/* Success Result */}
-      {result && (
-        <div className="mt-4 rounded-lg bg-green-50 px-4 py-3" role="status" aria-live="polite">
-          <p className="text-sm font-medium text-green-700">
-            导入成功：导入 {result.imported} 个项目，创建 {result.treeNodesCreated} 个树节点
-          </p>
-          {result.errors.length > 0 && (
-            <div className="mt-2">
-              <p className="text-xs font-medium text-amber-700">以下行存在问题：</p>
-              <ul className="mt-1 list-inside list-disc text-xs text-amber-600">
-                {result.errors.map((err, idx) => (
-                  <li key={idx}>{err}</li>
-                ))}
-              </ul>
-            </div>
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={handleClick}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') handleClick();
+          }}
+          onDrop={handleDrop}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragOver(true);
+          }}
+          onDragLeave={(e) => {
+            e.preventDefault();
+            setDragOver(false);
+          }}
+          className={cn(
+            'flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed px-6 py-8 transition-colors',
+            dragOver ? 'border-brand bg-brand-50' : 'border-gray-300 bg-gray-50 hover:border-gray-400 hover:bg-white',
+            uploading && 'pointer-events-none opacity-60'
+          )}
+        >
+          {uploading ? (
+            <Loading size="sm" text="正在上传并解析..." />
+          ) : (
+            <>
+              <Upload className="mb-2 h-10 w-10 text-gray-400" strokeWidth={1.5} />
+              <p className="text-sm text-gray-600">
+                拖拽文件到此处，或{' '}
+                <span className="font-medium text-brand">点击选择文件</span>
+              </p>
+              <p className="mt-1 text-xs text-gray-400">仅支持 .xlsx 格式</p>
+            </>
           )}
         </div>
-      )}
 
-      {/* Error */}
-      {error && (
-        <div className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
-          {error}
-        </div>
-      )}
-    </section>
+        <Input
+          ref={fileInputRef}
+          type="file"
+          accept=".xlsx"
+          onChange={handleInputChange}
+          className="hidden"
+          aria-label="上传项目底表"
+        />
+
+        {result && (
+          <div className="rounded-lg bg-green-50 px-4 py-3" role="status" aria-live="polite">
+            <p className="text-sm font-medium text-green-700">
+              导入成功：导入 {result.imported} 个项目，创建 {result.treeNodesCreated} 个树节点
+            </p>
+            {result.errors.length > 0 && (
+              <div className="mt-2">
+                <p className="text-xs font-medium text-amber-700">以下行存在问题：</p>
+                <ul className="mt-1 list-inside list-disc text-xs text-amber-600">
+                  {result.errors.map((err, idx) => (
+                    <li key={idx}>{err}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+
+        {error && (
+          <div className={listErrorClass} role="alert">
+            {error}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -208,8 +180,6 @@ function PasswordChangeSection() {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
-  const [showNewPassword, setShowNewPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -219,7 +189,6 @@ function PasswordChangeSection() {
     setError('');
     setSuccess('');
 
-    // Client-side validation
     if (newPassword !== confirmPassword) {
       setError('两次输入的密码不一致');
       return;
@@ -251,10 +220,7 @@ function PasswordChangeSection() {
         setCurrentPassword('');
         setNewPassword('');
         setConfirmPassword('');
-        // Redirect to login after a short delay
-        setTimeout(() => {
-          router.push('/login');
-        }, 1500);
+        setTimeout(() => router.push('/login'), 1500);
       }
     } catch {
       setError('网络错误，请稍后重试');
@@ -264,114 +230,73 @@ function PasswordChangeSection() {
   };
 
   return (
-    <section className="rounded-lg border bg-white p-6">
-      <div className="mb-4 flex items-center gap-2">
+    <Card>
+      <CardHeader className="flex-row items-center gap-2 space-y-0 pb-2">
         <Lock size={20} className="text-brand" />
-        <h2 className="text-lg font-semibold text-gray-900">密码修改</h2>
-      </div>
-      <p className="mb-4 text-sm text-gray-500">
-        修改您的登录密码。修改成功后需要重新登录。
-      </p>
+        <CardTitle className="text-lg">密码修改</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <CardDescription className="mb-4 mt-0">
+          修改您的登录密码。修改成功后需要重新登录。
+        </CardDescription>
 
-      {/* Success Message */}
-      {success && (
-        <div className="mb-4 rounded-lg bg-green-50 px-4 py-3 text-sm text-green-700" role="status">
-          {success}
-        </div>
-      )}
+        {success && (
+          <div className="mb-4 rounded-lg bg-green-50 px-4 py-3 text-sm text-green-700" role="status">
+            {success}
+          </div>
+        )}
 
-      {/* Error Message */}
-      {error && (
-        <div className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
-          {error}
-        </div>
-      )}
+        {error && (
+          <div className={cn(listErrorClass, 'mb-4')} role="alert">
+            {error}
+          </div>
+        )}
 
-      <form onSubmit={handleSubmit} className="max-w-md space-y-4">
-        {/* Current Password */}
-        <div>
-          <label htmlFor="currentPassword" className="mb-1 block text-sm font-medium text-gray-700">
-            当前密码
-          </label>
-          <div className="relative">
-            <input
+        <form onSubmit={handleSubmit} className="max-w-md space-y-4">
+          <FormField label="当前密码" htmlFor="currentPassword">
+            <PasswordInput
               id="currentPassword"
-              type={showCurrentPassword ? 'text' : 'password'}
+              variant="form"
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
               placeholder="请输入当前密码"
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 pr-10 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
-              required
               autoComplete="current-password"
+              required
             />
-            <button
-              type="button"
-              onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-              aria-label={showCurrentPassword ? '隐藏密码' : '显示密码'}
-            >
-              {showCurrentPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-            </button>
-          </div>
-        </div>
+          </FormField>
 
-        {/* New Password */}
-        <div>
-          <label htmlFor="newPassword" className="mb-1 block text-sm font-medium text-gray-700">
-            新密码
-          </label>
-          <div className="relative">
-            <input
+          <FormField label="新密码" htmlFor="newPassword">
+            <PasswordInput
               id="newPassword"
-              type={showNewPassword ? 'text' : 'password'}
+              variant="form"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               placeholder="请输入新密码（至少6位）"
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 pr-10 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+              autoComplete="new-password"
               required
               minLength={6}
-              autoComplete="new-password"
             />
-            <button
-              type="button"
-              onClick={() => setShowNewPassword(!showNewPassword)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-              aria-label={showNewPassword ? '隐藏密码' : '显示密码'}
-            >
-              {showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-            </button>
-          </div>
-        </div>
+          </FormField>
 
-        {/* Confirm Password */}
-        <div>
-          <label htmlFor="confirmPassword" className="mb-1 block text-sm font-medium text-gray-700">
-            确认新密码
-          </label>
-          <input
-            id="confirmPassword"
-            type="password"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            placeholder="请再次输入新密码"
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
-            required
-            minLength={6}
-            autoComplete="new-password"
-          />
-        </div>
+          <FormField label="确认新密码" htmlFor="confirmPassword">
+            <Input
+              id="confirmPassword"
+              variant="form"
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="请再次输入新密码"
+              autoComplete="new-password"
+              required
+              minLength={6}
+            />
+          </FormField>
 
-        {/* Submit Button */}
-        <div className="pt-2">
-          <button
-            type="submit"
-            disabled={loading}
-            className="inline-flex items-center rounded-lg bg-brand px-5 py-2 text-sm font-medium text-white transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60"
-          >
+          <Button type="submit" variant="primary" disabled={loading}>
             {loading ? '修改中...' : '确认修改'}
-          </button>
-        </div>
-      </form>
-    </section>
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
   );
 }

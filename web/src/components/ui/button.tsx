@@ -32,6 +32,7 @@ const buttonVariants = cva(
         lg: 'h-11 px-8',
         submit: 'h-[44px] px-6',
         icon: 'h-10 w-10',
+        'icon-sm': 'h-8 w-8 min-w-8 p-0',
       },
     },
     defaultVariants: {
