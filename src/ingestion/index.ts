@@ -182,9 +182,9 @@ export class DataIngestionService {
     const brandName = project.brand;
     const taxonomyNames = [project.category];
 
-    // T+2
+    // T-1（下午 4 点爬取昨天数据）
     const now = new Date();
-    now.setDate(now.getDate() - 2);
+    now.setDate(now.getDate() - 1);
     const dateBase = now.toISOString().slice(0, 10);
 
     const execStart = new Date(project.executionStartDate).toISOString().slice(0, 10);

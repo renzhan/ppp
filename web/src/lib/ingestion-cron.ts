@@ -1,14 +1,14 @@
 /**
  * 数据预爬定时任务 - 进程内调度器
  *
- * 每天凌晨 2:00 自动遍历所有复盘中的项目，预爬蒲公英 + 灵犀数据。
+ * 每天下午 16:00 自动遍历所有复盘中的项目，预爬蒲公英 + 灵犀（T-1）数据。
  * 用户使用时数据已在库中，直接做增量即可。
  */
 
 import { prisma } from './prisma';
 import { DataIngestionService } from '@/ingestion/index';
 
-const CRON_HOUR = 2;
+const CRON_HOUR = 16;
 const CRON_MINUTE = 0;
 
 let cronTimer: ReturnType<typeof setTimeout> | null = null;
