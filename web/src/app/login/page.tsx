@@ -108,9 +108,7 @@ export default function LoginPage() {
                 />
                 <span className="text-sm text-gray-500">自动登录</span>
               </label>
-              <Button variant="text-link" className="text-gray-500" asChild>
-                <Link href="/change-password">修改密码</Link>
-              </Button>
+  
             </div>
 
             <Button
