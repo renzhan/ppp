@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
+import { DataIngestionService } from '@/ingestion/index';
 
 export async function GET(request: NextRequest) {
   try {
@@ -94,8 +95,10 @@ export async function POST(request: NextRequest) {
       kpiTargets,
       engagementMetric,
       viralMetric,
+      viralThreshold,
       modules,
       launchPhases,
+      advertiserIds,
     } = body;
 
     if (!projectId) {
@@ -125,6 +128,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Sanitize advertiserIds: filter to valid numeric strings, limit to 5
+    const sanitizedAdvertiserIds: string[] = Array.isArray(advertiserIds)
+      ? advertiserIds.filter((id: unknown) => typeof id === 'string' && /^\d+$/.test(id)).slice(0, 5)
+      : [];
+
     const reviewConfig = await prisma.reviewConfig.create({
       data: {
         projectId,
@@ -134,10 +142,25 @@ export async function POST(request: NextRequest) {
         kpiTargets: kpiTargets ?? {},
         engagementMetric: engagementMetric ?? 'exclude_follow',
         viralMetric: viralMetric ?? 'like_comment_share',
+        viralThreshold: viralThreshold != null ? Math.max(1, Number(viralThreshold)) : null,
         modules: modules ?? {},
         launchPhases: launchPhases ?? [],
+        advertiserIds: sanitizedAdvertiserIds,
       },
     });
+
+    // Trigger juguang data ingestion if advertiserIds is non-empty (fire-and-forget)
+    if (sanitizedAdvertiserIds.length > 0) {
+      try {
+        const ingestionService = new DataIngestionService();
+        // Convert string IDs to numbers as expected by ingestJuguangData
+        const numericAdvertiserIds = sanitizedAdvertiserIds.map((id) => Number(id));
+        await ingestionService.ingestJuguangData(projectId, numericAdvertiserIds, reviewConfig.id);
+      } catch (ingestionError) {
+        // Do not block response on ingestion failure — log error and continue
+        console.error('POST /api/reviews ingestion error (non-blocking):', ingestionError);
+      }
+    }
 
     return NextResponse.json(reviewConfig, { status: 201 });
   } catch (error) {

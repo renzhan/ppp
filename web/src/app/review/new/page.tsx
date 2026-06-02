@@ -144,8 +144,14 @@ function NewReviewPageContent() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [contentCostCaliber, setContentCostCaliber] = useState<'consumption' | 'settlement'>('consumption');
   const [trafficCostCaliber, setTrafficCostCaliber] = useState<'consumption' | 'settlement'>('consumption');
-  const [costCaliberType, setCostCaliberType] = useState<'content' | 'traffic'>('content');
+  const [viralThreshold, setViralThreshold] = useState<string>('1000');
   const [hasUnofficialCooperation, setHasUnofficialCooperation] = useState<boolean>(false);
+  const [executionPeriodStart, setExecutionPeriodStart] = useState('');
+  const [executionPeriodEnd, setExecutionPeriodEnd] = useState('');
+  const [historicalAcquisitionCost, setHistoricalAcquisitionCost] = useState('');
+  const [advertiserIds, setAdvertiserIds] = useState<string[]>([]);
+  const [advertiserIdInput, setAdvertiserIdInput] = useState('');
+  const [advertiserIdError, setAdvertiserIdError] = useState<string | null>(null);
 
   // ─── Data Fetching ───────────────────────────────────────────────────────
   // Fetch project info by projectId (from URL param or edit mode)
@@ -166,16 +172,7 @@ function NewReviewPageContent() {
     }
   }, [preselectedProjectId, editFromId, router]);
 
-  // Real-time cost calculation based on selected caliber
-  const { data: costData, isLoading: isCostLoading } = useQuery<{ contentCost: number; trafficCost: number; totalCost: number }>({
-    queryKey: ['project-cost', selectedProjectId, contentCostCaliber, trafficCostCaliber],
-    queryFn: async () => {
-      const res = await fetch(`/api/projects/${selectedProjectId}/cost?contentCaliber=${contentCostCaliber}&trafficCaliber=${trafficCostCaliber}`);
-      if (!res.ok) throw new Error('计算费用失败');
-      return res.json();
-    },
-    enabled: !!selectedProjectId,
-  });
+
 
   // ─── Edit Mode: Load existing review config ──────────────────────────────
   const { data: editReview } = useQuery<{
@@ -401,9 +398,15 @@ function NewReviewPageContent() {
       kpiTargets: parsedKpi,
       engagementMetric,
       viralMetric,
+      viralThreshold: viralThreshold ? parseInt(viralThreshold) : null,
       modules: { ...modules, contentCostCaliber, trafficCostCaliber },
       launchPhases,
       hasUnofficialCooperation,
+      executionPeriod: executionPeriodStart && executionPeriodEnd
+        ? { start: executionPeriodStart, end: executionPeriodEnd }
+        : null,
+      historicalAcquisitionCost: historicalAcquisitionCost ? parseFloat(historicalAcquisitionCost) : null,
+      advertiserIds: advertiserIds.filter(Boolean),
     });
   };
 
@@ -577,7 +580,7 @@ function NewReviewPageContent() {
             <NumberInput label="总阅读" value={kpiTargets.totalRead} onChange={(v) => setKpiTargets({ ...kpiTargets, totalRead: v })} />
             <NumberInput label="总互动" value={kpiTargets.totalEngagement} onChange={(v) => setKpiTargets({ ...kpiTargets, totalEngagement: v })} />
             <NumberInput label="爆文数" value={kpiTargets.viralPosts1k} onChange={(v) => setKpiTargets({ ...kpiTargets, viralPosts1k: v })} />
-            <NumberInput label="爆文率" value={kpiTargets.viralPosts10k} onChange={(v) => setKpiTargets({ ...kpiTargets, viralPosts10k: v })} />
+            <NumberInput label="爆文率(%)" value={kpiTargets.viralPosts10k} onChange={(v) => setKpiTargets({ ...kpiTargets, viralPosts10k: v })} />
           </div>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
             <NumberInput label="CPM" value={kpiTargets.cpm} onChange={(v) => setKpiTargets({ ...kpiTargets, cpm: v })} />
@@ -616,7 +619,7 @@ function NewReviewPageContent() {
           </div>
           <div>
             <label className="mb-2 block text-xs font-medium text-gray-600">爆文统计口径</label>
-            <div className="flex gap-4">
+            <div className="flex items-center gap-4">
               <RadioOption
                 name="viralMetric"
                 value="like_comment_share"
@@ -631,103 +634,66 @@ function NewReviewPageContent() {
                 onChange={() => setViralMetric('like_only')}
                 label="赞"
               />
+              <div className="ml-4 flex items-center gap-2">
+                <label className="text-xs font-medium text-gray-600 whitespace-nowrap">爆文阈值（赞数）</label>
+                <input
+                  type="number"
+                  min={1}
+                  value={viralThreshold}
+                  onChange={(e) => setViralThreshold(e.target.value)}
+                  placeholder="1000"
+                  className="w-28 rounded-sm border border-gray-300 px-3 h-10 text-sm text-gray-900 placeholder:text-gray-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+                />
+              </div>
             </div>
           </div>
         </div>
       </FormSection>
 
-      {/* Section: 金额口径与总费用 */}
-      <FormSection title="金额口径与总费用">
-        {/* 第一级：选择口径类型 */}
+      {/* Section: 金额口径 */}
+      <FormSection title="金额口径">
         <div className="space-y-4">
-          <div>
-            <label className="mb-2 block text-xs font-medium text-gray-600">选择金额口径</label>
+          {/* 内容金额口径 */}
+          <div className="rounded-md border border-gray-200 bg-gray-50 p-3">
+            <label className="mb-2 block text-xs font-medium text-gray-600">内容金额口径</label>
             <div className="flex gap-4">
               <RadioOption
-                name="costCaliberType"
-                value="content"
-                checked={costCaliberType === 'content'}
-                onChange={() => setCostCaliberType('content')}
-                label="内容金额口径"
+                name="contentCostCaliber"
+                value="consumption"
+                checked={contentCostCaliber === 'consumption'}
+                onChange={() => setContentCostCaliber('consumption')}
+                label="内容消耗金额（博主报价+平台服务费）"
               />
               <RadioOption
-                name="costCaliberType"
-                value="traffic"
-                checked={costCaliberType === 'traffic'}
-                onChange={() => setCostCaliberType('traffic')}
-                label="投流金额口径"
+                name="contentCostCaliber"
+                value="settlement"
+                checked={contentCostCaliber === 'settlement'}
+                onChange={() => setContentCostCaliber('settlement')}
+                label="内容结算金额"
               />
             </div>
           </div>
 
-          {/* 第二级：根据选择的口径类型，选择消耗/结算 */}
-          {costCaliberType === 'content' && (
-            <div className="ml-4 rounded-md border border-gray-200 bg-gray-50 p-3">
-              <label className="mb-2 block text-xs font-medium text-gray-600">内容金额口径</label>
-              <div className="flex gap-4">
-                <RadioOption
-                  name="contentCostCaliber"
-                  value="consumption"
-                  checked={contentCostCaliber === 'consumption'}
-                  onChange={() => setContentCostCaliber('consumption')}
-                  label="内容消耗金额（博主报价+平台服务费）"
-                />
-                <RadioOption
-                  name="contentCostCaliber"
-                  value="settlement"
-                  checked={contentCostCaliber === 'settlement'}
-                  onChange={() => setContentCostCaliber('settlement')}
-                  label="内容结算金额"
-                />
-              </div>
+          {/* 投流金额口径 */}
+          <div className="rounded-md border border-gray-200 bg-gray-50 p-3">
+            <label className="mb-2 block text-xs font-medium text-gray-600">投流金额口径</label>
+            <div className="flex gap-4">
+              <RadioOption
+                name="trafficCostCaliber"
+                value="consumption"
+                checked={trafficCostCaliber === 'consumption'}
+                onChange={() => setTrafficCostCaliber('consumption')}
+                label="投流消耗金额（聚光fee）"
+              />
+              <RadioOption
+                name="trafficCostCaliber"
+                value="settlement"
+                checked={trafficCostCaliber === 'settlement'}
+                onChange={() => setTrafficCostCaliber('settlement')}
+                label="投流结算金额"
+              />
             </div>
-          )}
-
-          {costCaliberType === 'traffic' && (
-            <div className="ml-4 rounded-md border border-gray-200 bg-gray-50 p-3">
-              <label className="mb-2 block text-xs font-medium text-gray-600">投流金额口径</label>
-              <div className="flex gap-4">
-                <RadioOption
-                  name="trafficCostCaliber"
-                  value="consumption"
-                  checked={trafficCostCaliber === 'consumption'}
-                  onChange={() => setTrafficCostCaliber('consumption')}
-                  label="投流消耗金额（聚光fee）"
-                />
-                <RadioOption
-                  name="trafficCostCaliber"
-                  value="settlement"
-                  checked={trafficCostCaliber === 'settlement'}
-                  onChange={() => setTrafficCostCaliber('settlement')}
-                  label="投流结算金额"
-                />
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* 总费用实时计算展示 */}
-        <div className="mt-4 rounded-md border border-brand-100 bg-brand-50 p-4">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-gray-700">总费用（实时计算）</span>
-            {!selectedProjectId ? (
-              <span className="text-sm text-gray-400">请先选择项目</span>
-            ) : isCostLoading ? (
-              <span className="text-sm text-gray-400">计算中...</span>
-            ) : costData ? (
-              <span className="text-lg font-bold text-brand-700">
-                ¥{costData.totalCost.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </span>
-            ) : (
-              <span className="text-sm text-gray-400">--</span>
-            )}
           </div>
-          {costData && selectedProjectId && (
-            <div className="mt-2 flex gap-6 text-xs text-gray-500">
-              <span>内容费用：¥{costData.contentCost.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-              <span>投流费用：¥{costData.trafficCost.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-            </div>
-          )}
         </div>
       </FormSection>
 
@@ -810,6 +776,98 @@ function NewReviewPageContent() {
               <Plus size={14} />
               添加阶段
             </button>
+          </div>
+        </FormSection>
+      )}
+
+      {/* Section: 广告主ID */}
+      {modules.launchAnalysis && (
+        <FormSection title="广告主ID">
+          <div className="space-y-3">
+            <div className="flex flex-wrap gap-2">
+              {advertiserIds.map((id, index) => (
+                <div
+                  key={index}
+                  className="flex items-center gap-1 rounded-md border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm text-gray-700"
+                >
+                  <span>{id}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAdvertiserIds(advertiserIds.filter((_, i) => i !== index));
+                      setAdvertiserIdError(null);
+                    }}
+                    className="ml-1 rounded p-0.5 text-gray-400 transition hover:bg-rose-50 hover:text-rose-500"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                placeholder="输入广告主ID（纯数字）"
+                value={advertiserIdInput}
+                onChange={(e) => {
+                  setAdvertiserIdInput(e.target.value);
+                  setAdvertiserIdError(null);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const value = advertiserIdInput.trim();
+                    if (!value) return;
+                    if (!/^\d+$/.test(value)) {
+                      setAdvertiserIdError('广告主ID必须为纯数字');
+                      return;
+                    }
+                    if (advertiserIds.includes(value)) {
+                      setAdvertiserIdError('广告主ID不能重复');
+                      return;
+                    }
+                    if (advertiserIds.length >= 5) {
+                      setAdvertiserIdError('最多添加5个广告主ID');
+                      return;
+                    }
+                    setAdvertiserIds([...advertiserIds, value]);
+                    setAdvertiserIdInput('');
+                    setAdvertiserIdError(null);
+                  }
+                }}
+                className="w-64 rounded-sm border border-gray-300 px-3 h-10 text-sm placeholder:text-gray-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  const value = advertiserIdInput.trim();
+                  if (!value) return;
+                  if (!/^\d+$/.test(value)) {
+                    setAdvertiserIdError('广告主ID必须为纯数字');
+                    return;
+                  }
+                  if (advertiserIds.includes(value)) {
+                    setAdvertiserIdError('广告主ID不能重复');
+                    return;
+                  }
+                  if (advertiserIds.length >= 5) {
+                    setAdvertiserIdError('最多添加5个广告主ID');
+                    return;
+                  }
+                  setAdvertiserIds([...advertiserIds, value]);
+                  setAdvertiserIdInput('');
+                  setAdvertiserIdError(null);
+                }}
+                className="inline-flex items-center gap-1 rounded-md border border-dashed border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600 transition hover:border-brand hover:text-brand"
+              >
+                <Plus size={14} />
+                添加
+              </button>
+            </div>
+            {advertiserIdError && (
+              <p className="text-xs text-rose-500">{advertiserIdError}</p>
+            )}
+            <p className="text-xs text-gray-400">最多 5 个广告主ID，用于拉取聚光投流数据</p>
           </div>
         </FormSection>
       )}

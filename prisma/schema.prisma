@@ -628,6 +628,8 @@ model ReviewConfig {
   planFileName     String?  @map("plan_file_name") @db.VarChar(500)
   reportContent    Json?    @map("report_content")
   presentationId   String?  @map("presentation_id") @db.VarChar(100)
+  viralThreshold   Int?     @map("viral_threshold")
+  advertiserIds    Json     @default("[]") @map("advertiser_ids")
   createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt        DateTime @default(now()) @map("updated_at") @db.Timestamptz()
 

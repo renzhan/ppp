@@ -22,6 +22,13 @@ vi.mock('@/lib/auth', () => ({
   getSession: vi.fn(),
 }));
 
+// Mock the ingestion service
+vi.mock('@/ingestion/index', () => ({
+  DataIngestionService: vi.fn().mockImplementation(() => ({
+    ingestJuguangData: vi.fn().mockResolvedValue(undefined),
+  })),
+}));
+
 import { GET, POST } from './route';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
@@ -242,8 +249,10 @@ describe('POST /api/reviews', () => {
         kpiTargets: body.kpiTargets,
         engagementMetric: 'include_follow',
         viralMetric: 'like_only',
+        viralThreshold: null,
         modules: body.modules,
         launchPhases: body.launchPhases,
+        advertiserIds: [],
       },
     });
   });
@@ -264,8 +273,10 @@ describe('POST /api/reviews', () => {
         kpiTargets: {},
         engagementMetric: 'exclude_follow',
         viralMetric: 'like_comment_share',
+        viralThreshold: null,
         modules: {},
         launchPhases: [],
+        advertiserIds: [],
       },
     });
   });
