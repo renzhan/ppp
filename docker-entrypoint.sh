@@ -21,4 +21,4 @@ fi
 
 echo "Starting Next.js..."
 cd /app/web
-exec node_modules/.bin/next start -p 3000
+exec node_modules/.bin/next start -p 3000 2>&1

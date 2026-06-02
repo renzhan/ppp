@@ -12,16 +12,21 @@ const COLUMN_MAP: Record<string, string> = {
   '博主昵称': 'kolNickName',
   '博主粉丝量': 'kolFanNum',
   '笔记链接': 'noteLink',
+  '笔记连接': 'noteLink',
   '笔记id': 'noteId',
   '合作形式': 'noteType',
+  '内容形式': 'noteType',
   '是否报备': 'isUnderwater',
   '内容方向': 'contentDirection',
   '达人类型': 'kolType',
   '对应SPU': 'spuName',
   '内容实际消耗金额': 'kolPrice',
+  '达人金额': 'kolPrice',
   '内容实际结算金额': 'serviceFee',
   '投流实际消耗': 'underwaterPrice',
+  '投流金额': 'underwaterPrice',
   '总费用': 'totalPlatformPrice',
+  '总消耗': 'totalPlatformPrice',
   '曝光量': 'impNum',
   '阅读量': 'readNum',
   '互动量': 'engageNum',
@@ -41,8 +46,11 @@ const COLUMN_MAP: Record<string, string> = {
   '自然流CPE': 'organicCpe',
   '自然流CPC': 'organicCpc',
   '展现量': 'heatImpNum',
+  '推广曝光量': 'heatImpNum',
   '点击量': 'heatReadNum',
+  '推广阅读量': 'heatReadNum',
   '投流互动量': 'heatEngageNum',
+  '推广互动量': 'heatEngageNum',
   '投流CTR': 'heatCtr',
   '投流CPM': 'heatCpm',
   '投流CPE': 'heatCpe',
@@ -72,6 +80,22 @@ const INT_FIELDS = new Set([
 const DECIMAL_FIELDS = new Set([
   'kolPrice', 'serviceFee', 'totalPlatformPrice', 'underwaterPrice',
 ]);
+
+/**
+ * Normalize a column header by stripping emoji prefixes, symbols, and parenthetical suffixes.
+ * e.g. "🔴笔记连接（必填）" → "笔记连接"
+ *      "🔴内容方向" → "内容方向"
+ */
+function normalizeHeader(header: string): string {
+  return header
+    // Remove emoji characters (common ranges)
+    .replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{27BF}\u{FE00}-\u{FE0F}\u{200D}]/gu, '')
+    // Remove leading/trailing whitespace and special chars
+    .replace(/^[\s🔴⭐️✅❌☑️●○◎★☆△▲▽▼◇◆□■※→←↑↓]+/u, '')
+    // Remove parenthetical suffixes like （必填）or (required)
+    .replace(/[（(][^）)]*[）)]$/g, '')
+    .trim();
+}
 
 /**
  * Parse a numeric value from a cell, returning 0 for invalid/empty values.
@@ -206,11 +230,13 @@ export async function POST(
       const raw = rawRows[i];
       const rowNum = i + 2; // Excel row number (1-indexed header + 1-indexed data)
 
-      // Map Chinese headers to field names
+      // Map Chinese headers to field names (with header normalization)
       const mapped: Record<string, unknown> = {};
-      for (const [chineseHeader, fieldName] of Object.entries(COLUMN_MAP)) {
-        if (raw[chineseHeader] !== undefined) {
-          mapped[fieldName] = raw[chineseHeader];
+      for (const [rawHeader, cellValue] of Object.entries(raw)) {
+        const normalized = normalizeHeader(rawHeader);
+        const fieldName = COLUMN_MAP[rawHeader] || COLUMN_MAP[normalized];
+        if (fieldName && cellValue !== undefined) {
+          mapped[fieldName] = cellValue;
         }
       }
 
