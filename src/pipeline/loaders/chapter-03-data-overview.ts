@@ -1,5 +1,6 @@
 import { PrismaClient } from '../../../generated/prisma';
 import { BaseChapterDataLoader, ChapterDataContext, TraceItem } from './types';
+import { normalizeBenchmarkValue, BenchmarkRange } from '../../shared/types';
 
 /**
  * Chapter 3 (Data Overview / 数据总览) Data Loader
@@ -52,7 +53,7 @@ export class DataOverviewDataLoader extends BaseChapterDataLoader {
     let contentCostCaliber = 'consumption';  // 默认消耗口径
     let trafficCostCaliber = 'consumption';  // 默认消耗口径
     let kpi: Record<string, number> = {};
-    let benchmark: Record<string, number> = {};
+    let benchmark: Record<string, unknown> = {};
 
     try {
       const reviewConfig = await this.prisma.reviewConfig.findFirst({
@@ -86,7 +87,7 @@ export class DataOverviewDataLoader extends BaseChapterDataLoader {
           kpi = reviewConfig.kpiTargets as Record<string, number>;
         }
         if (reviewConfig.benchmark && typeof reviewConfig.benchmark === 'object') {
-          benchmark = reviewConfig.benchmark as Record<string, number>;
+          benchmark = reviewConfig.benchmark as Record<string, unknown>;
         }
       }
     } catch (error) {
@@ -489,17 +490,34 @@ export class DataOverviewDataLoader extends BaseChapterDataLoader {
 
     // 大盘对比溯源 — 展示大盘配置原始值 + 计算公式
     if (Object.keys(benchmark).length > 0) {
+      const bmCtrR = normalizeBenchmarkValue(benchmark.ctr as number | BenchmarkRange | undefined);
+      const bmCpmR = normalizeBenchmarkValue(benchmark.cpm as number | BenchmarkRange | undefined);
+      const bmCpcR = normalizeBenchmarkValue(benchmark.cpc as number | BenchmarkRange | undefined);
+      const bmCpeR = normalizeBenchmarkValue(benchmark.cpe as number | BenchmarkRange | undefined);
+
       const benchmarkRawRows: Record<string, unknown>[] = [];
-      if (benchmark.ctr != null) benchmarkRawRows.push({ metric: 'CTR', benchmarkValue: benchmark.ctr, unit: '%' });
-      if (benchmark.cpm != null) benchmarkRawRows.push({ metric: 'CPM', benchmarkValue: benchmark.cpm, unit: '元' });
-      if (benchmark.cpc != null) benchmarkRawRows.push({ metric: 'CPC', benchmarkValue: benchmark.cpc, unit: '元' });
-      if (benchmark.cpe != null) benchmarkRawRows.push({ metric: 'CPE', benchmarkValue: benchmark.cpe, unit: '元' });
+      if (bmCtrR) benchmarkRawRows.push({ metric: 'CTR', benchmarkValue: `${bmCtrR.min}~${bmCtrR.max}`, unit: '%' });
+      if (bmCpmR) benchmarkRawRows.push({ metric: 'CPM', benchmarkValue: `${bmCpmR.min}~${bmCpmR.max}`, unit: '元' });
+      if (bmCpcR) benchmarkRawRows.push({ metric: 'CPC', benchmarkValue: `${bmCpcR.min}~${bmCpcR.max}`, unit: '元' });
+      if (bmCpeR) benchmarkRawRows.push({ metric: 'CPE', benchmarkValue: `${bmCpeR.min}~${bmCpeR.max}`, unit: '元' });
 
       const benchmarkCalcs = [];
-      if (benchmark.ctr) benchmarkCalcs.push({ metric: 'CTR差异', formula: '(实际CTR - 大盘CTR) / 大盘CTR * 100', inputs: { '实际CTR': Number(ctr.toFixed(2)), '大盘CTR': benchmark.ctr }, result: ((ctr - benchmark.ctr) / benchmark.ctr * 100).toFixed(1) + '%' });
-      if (benchmark.cpm) benchmarkCalcs.push({ metric: 'CPM差异', formula: '(1 - 实际CPM / 大盘CPM) * 100', inputs: { '实际CPM': Number(cpm.toFixed(2)), '大盘CPM': benchmark.cpm }, result: ((1 - cpm / benchmark.cpm) * 100).toFixed(1) + '%' });
-      if (benchmark.cpc) benchmarkCalcs.push({ metric: 'CPC差异', formula: '(1 - 实际CPC / 大盘CPC) * 100', inputs: { '实际CPC': Number(cpc.toFixed(2)), '大盘CPC': benchmark.cpc }, result: ((1 - cpc / benchmark.cpc) * 100).toFixed(1) + '%' });
-      if (benchmark.cpe) benchmarkCalcs.push({ metric: 'CPE差异', formula: '(1 - 实际CPE / 大盘CPE) * 100', inputs: { '实际CPE': Number(cpe.toFixed(2)), '大盘CPE': benchmark.cpe }, result: ((1 - cpe / benchmark.cpe) * 100).toFixed(1) + '%' });
+      if (bmCtrR) {
+        const mid = (bmCtrR.min + bmCtrR.max) / 2;
+        benchmarkCalcs.push({ metric: 'CTR差异', formula: '(实际CTR - 大盘中位) / 大盘中位 * 100', inputs: { '实际CTR': Number(ctr.toFixed(2)), '大盘CTR': `${bmCtrR.min}~${bmCtrR.max}` }, result: mid > 0 ? ((ctr - mid) / mid * 100).toFixed(1) + '%' : 'N/A' });
+      }
+      if (bmCpmR) {
+        const mid = (bmCpmR.min + bmCpmR.max) / 2;
+        benchmarkCalcs.push({ metric: 'CPM差异', formula: '(1 - 实际CPM / 大盘中位) * 100', inputs: { '实际CPM': Number(cpm.toFixed(2)), '大盘CPM': `${bmCpmR.min}~${bmCpmR.max}` }, result: mid > 0 ? ((1 - cpm / mid) * 100).toFixed(1) + '%' : 'N/A' });
+      }
+      if (bmCpcR) {
+        const mid = (bmCpcR.min + bmCpcR.max) / 2;
+        benchmarkCalcs.push({ metric: 'CPC差异', formula: '(1 - 实际CPC / 大盘中位) * 100', inputs: { '实际CPC': Number(cpc.toFixed(2)), '大盘CPC': `${bmCpcR.min}~${bmCpcR.max}` }, result: mid > 0 ? ((1 - cpc / mid) * 100).toFixed(1) + '%' : 'N/A' });
+      }
+      if (bmCpeR) {
+        const mid = (bmCpeR.min + bmCpeR.max) / 2;
+        benchmarkCalcs.push({ metric: 'CPE差异', formula: '(1 - 实际CPE / 大盘中位) * 100', inputs: { '实际CPE': Number(cpe.toFixed(2)), '大盘CPE': `${bmCpeR.min}~${bmCpeR.max}` }, result: mid > 0 ? ((1 - cpe / mid) * 100).toFixed(1) + '%' : 'N/A' });
+      }
 
       traceItems.push({
         traceId: 'ch3_benchmark_compare',

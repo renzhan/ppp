@@ -1,5 +1,6 @@
 import { PrismaClient } from '../../../generated/prisma';
 import { BaseChapterDataLoader, ChapterDataContext, TraceItem } from './types';
+import { normalizeBenchmarkValue, BenchmarkRange } from '../../shared/types';
 
 /**
  * Chapter 4 (项目亮点) Data Loader
@@ -41,7 +42,7 @@ export class HighlightsDataLoader extends BaseChapterDataLoader {
     let contentCostCaliber = 'consumption';
     let trafficCostCaliber = 'consumption';
     let kpi: Record<string, number> = {};
-    let benchmark: Record<string, number> = {};
+    let benchmark: Record<string, unknown> = {};
 
     try {
       const reviewConfig = await this.prisma.reviewConfig.findFirst({
@@ -64,7 +65,7 @@ export class HighlightsDataLoader extends BaseChapterDataLoader {
           kpi = reviewConfig.kpiTargets as Record<string, number>;
         }
         if (reviewConfig.benchmark && typeof reviewConfig.benchmark === 'object') {
-          benchmark = reviewConfig.benchmark as Record<string, number>;
+          benchmark = reviewConfig.benchmark as Record<string, unknown>;
         }
       }
     } catch (error) {
@@ -214,17 +215,22 @@ export class HighlightsDataLoader extends BaseChapterDataLoader {
     // ── 6. 大盘对比亮点（优于大盘的指标） ──
     const benchmarkHighlights: string[] = [];
 
-    if (benchmark.cpm && cpm > 0 && cpm < benchmark.cpm) {
-      benchmarkHighlights.push(`CPM：实际${cpm.toFixed(2)}，大盘${benchmark.cpm}，优于大盘${((1 - cpm / benchmark.cpm) * 100).toFixed(0)}%`);
+    const bmCpm = normalizeBenchmarkValue(benchmark.cpm as number | BenchmarkRange | undefined);
+    const bmCpc = normalizeBenchmarkValue(benchmark.cpc as number | BenchmarkRange | undefined);
+    const bmCpe = normalizeBenchmarkValue(benchmark.cpe as number | BenchmarkRange | undefined);
+    const bmCtr = normalizeBenchmarkValue(benchmark.ctr as number | BenchmarkRange | undefined);
+
+    if (bmCpm && cpm > 0 && cpm < bmCpm.min) {
+      benchmarkHighlights.push(`CPM：实际${cpm.toFixed(2)}，大盘${bmCpm.min}~${bmCpm.max}，优于大盘${((1 - cpm / bmCpm.min) * 100).toFixed(0)}%`);
     }
-    if (benchmark.cpc && cpc > 0 && cpc < benchmark.cpc) {
-      benchmarkHighlights.push(`CPC：实际${cpc.toFixed(2)}，大盘${benchmark.cpc}，优于大盘${((1 - cpc / benchmark.cpc) * 100).toFixed(0)}%`);
+    if (bmCpc && cpc > 0 && cpc < bmCpc.min) {
+      benchmarkHighlights.push(`CPC：实际${cpc.toFixed(2)}，大盘${bmCpc.min}~${bmCpc.max}，优于大盘${((1 - cpc / bmCpc.min) * 100).toFixed(0)}%`);
     }
-    if (benchmark.cpe && cpe > 0 && cpe < benchmark.cpe) {
-      benchmarkHighlights.push(`CPE：实际${cpe.toFixed(2)}，大盘${benchmark.cpe}，优于大盘${((1 - cpe / benchmark.cpe) * 100).toFixed(0)}%`);
+    if (bmCpe && cpe > 0 && cpe < bmCpe.min) {
+      benchmarkHighlights.push(`CPE：实际${cpe.toFixed(2)}，大盘${bmCpe.min}~${bmCpe.max}，优于大盘${((1 - cpe / bmCpe.min) * 100).toFixed(0)}%`);
     }
-    if (benchmark.ctr && ctr > 0 && ctr > benchmark.ctr) {
-      benchmarkHighlights.push(`CTR：实际${ctr.toFixed(2)}%，大盘${benchmark.ctr}%，优于大盘${((ctr / benchmark.ctr - 1) * 100).toFixed(0)}%`);
+    if (bmCtr && ctr > 0 && ctr > bmCtr.max) {
+      benchmarkHighlights.push(`CTR：实际${ctr.toFixed(2)}%，大盘${bmCtr.min}%~${bmCtr.max}%，优于大盘${((ctr / bmCtr.max - 1) * 100).toFixed(0)}%`);
     }
 
     variables['benchmark_highlights'] = benchmarkHighlights.length > 0
@@ -366,10 +372,10 @@ export class HighlightsDataLoader extends BaseChapterDataLoader {
         ],
         dataRows: rawNoteRows,
         calculations: [
-          { metric: 'CPM', formula: '总费用 / SUM(imp_num) * 1000', inputs: { '总费用': totalCost, 'SUM(imp_num)': totalImpressions, '大盘CPM': benchmark.cpm || 0 }, result: Number(cpm.toFixed(2)) },
-          { metric: 'CPC', formula: '总费用 / SUM(read_num)', inputs: { '总费用': totalCost, 'SUM(read_num)': totalReads, '大盘CPC': benchmark.cpc || 0 }, result: Number(cpc.toFixed(2)) },
-          { metric: 'CPE', formula: '总费用 / SUM(互动)', inputs: { '总费用': totalCost, 'SUM(互动)': totalEngagement, '大盘CPE': benchmark.cpe || 0 }, result: Number(cpe.toFixed(2)) },
-          { metric: 'CTR', formula: 'SUM(read_num) / SUM(imp_num) * 100', inputs: { 'SUM(read_num)': totalReads, 'SUM(imp_num)': totalImpressions, '大盘CTR': benchmark.ctr || 0 }, result: Number(ctr.toFixed(2)) },
+          { metric: 'CPM', formula: '总费用 / SUM(imp_num) * 1000', inputs: { '总费用': totalCost, 'SUM(imp_num)': totalImpressions, '大盘CPM': bmCpm ? `${bmCpm.min}~${bmCpm.max}` : 0 }, result: Number(cpm.toFixed(2)) },
+          { metric: 'CPC', formula: '总费用 / SUM(read_num)', inputs: { '总费用': totalCost, 'SUM(read_num)': totalReads, '大盘CPC': bmCpc ? `${bmCpc.min}~${bmCpc.max}` : 0 }, result: Number(cpc.toFixed(2)) },
+          { metric: 'CPE', formula: '总费用 / SUM(互动)', inputs: { '总费用': totalCost, 'SUM(互动)': totalEngagement, '大盘CPE': bmCpe ? `${bmCpe.min}~${bmCpe.max}` : 0 }, result: Number(cpe.toFixed(2)) },
+          { metric: 'CTR', formula: 'SUM(read_num) / SUM(imp_num) * 100', inputs: { 'SUM(read_num)': totalReads, 'SUM(imp_num)': totalImpressions, '大盘CTR': bmCtr ? `${bmCtr.min}~${bmCtr.max}` : 0 }, result: Number(ctr.toFixed(2)) },
         ],
       });
     }

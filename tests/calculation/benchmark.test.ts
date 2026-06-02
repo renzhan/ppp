@@ -17,16 +17,16 @@ describe('calculateBenchmarkComparison', () => {
       expect(result.label).toBe('劣于大盘');
     });
 
-    it('returns 0 diff and "劣于大盘" when actual equals benchmark', () => {
+    it('returns 0 diff and "持平大盘" when actual equals benchmark', () => {
       const result = calculateBenchmarkComparison(100, 100, false);
       expect(result.percentageDiff).toBe(0);
       expect(result.isBetterThanBenchmark).toBe(false);
-      expect(result.label).toBe('劣于大盘');
+      expect(result.label).toBe('持平大盘');
     });
 
     it('calculates correct percentage for fractional values', () => {
       const result = calculateBenchmarkComparison(150, 200, false);
-      expect(result.percentageDiff).toBe(-25);
+      expect(result.percentageDiff).toBeCloseTo(-25);
       expect(result.isBetterThanBenchmark).toBe(false);
       expect(result.label).toBe('劣于大盘');
     });
@@ -54,11 +54,11 @@ describe('calculateBenchmarkComparison', () => {
       expect(result.label).toBe('劣于大盘');
     });
 
-    it('returns 0 diff and "劣于大盘" when actual equals benchmark', () => {
+    it('returns 0 diff and "持平大盘" when actual equals benchmark', () => {
       const result = calculateBenchmarkComparison(100, 100, true);
       expect(result.percentageDiff).toBe(0);
       expect(result.isBetterThanBenchmark).toBe(false);
-      expect(result.label).toBe('劣于大盘');
+      expect(result.label).toBe('持平大盘');
     });
 
     it('calculates correct percentage for cost savings', () => {
@@ -96,6 +96,85 @@ describe('calculateBenchmarkComparison', () => {
       expect(result.percentageDiff).toBe(100);
       expect(result.isBetterThanBenchmark).toBe(true);
       expect(result.label).toBe('优于大盘');
+    });
+  });
+
+  describe('range-based comparison (new format { min, max })', () => {
+    describe('non-cost metrics with range', () => {
+      it('returns "劣于大盘" when actual < min', () => {
+        const result = calculateBenchmarkComparison(5, { min: 10, max: 20 }, false);
+        expect(result.isBetterThanBenchmark).toBe(false);
+        expect(result.label).toBe('劣于大盘');
+      });
+
+      it('returns "持平大盘" when actual is within [min, max]', () => {
+        const result = calculateBenchmarkComparison(15, { min: 10, max: 20 }, false);
+        expect(result.isBetterThanBenchmark).toBe(false);
+        expect(result.label).toBe('持平大盘');
+      });
+
+      it('returns "持平大盘" when actual equals min', () => {
+        const result = calculateBenchmarkComparison(10, { min: 10, max: 20 }, false);
+        expect(result.label).toBe('持平大盘');
+      });
+
+      it('returns "持平大盘" when actual equals max', () => {
+        const result = calculateBenchmarkComparison(20, { min: 10, max: 20 }, false);
+        expect(result.label).toBe('持平大盘');
+      });
+
+      it('returns "优于大盘" when actual > max', () => {
+        const result = calculateBenchmarkComparison(25, { min: 10, max: 20 }, false);
+        expect(result.isBetterThanBenchmark).toBe(true);
+        expect(result.label).toBe('优于大盘');
+      });
+    });
+
+    describe('cost metrics with range', () => {
+      it('returns "优于大盘" when actual < min (lower cost is better)', () => {
+        const result = calculateBenchmarkComparison(5, { min: 10, max: 20 }, true);
+        expect(result.isBetterThanBenchmark).toBe(true);
+        expect(result.label).toBe('优于大盘');
+      });
+
+      it('returns "持平大盘" when actual is within [min, max]', () => {
+        const result = calculateBenchmarkComparison(15, { min: 10, max: 20 }, true);
+        expect(result.isBetterThanBenchmark).toBe(false);
+        expect(result.label).toBe('持平大盘');
+      });
+
+      it('returns "劣于大盘" when actual > max (higher cost is worse)', () => {
+        const result = calculateBenchmarkComparison(25, { min: 10, max: 20 }, true);
+        expect(result.isBetterThanBenchmark).toBe(false);
+        expect(result.label).toBe('劣于大盘');
+      });
+    });
+
+    describe('backward compatibility (single number auto-converts to { min: value, max: value })', () => {
+      it('single number benchmark: actual above → 优于大盘 (non-cost)', () => {
+        const result = calculateBenchmarkComparison(120, 100, false);
+        expect(result.label).toBe('优于大盘');
+      });
+
+      it('single number benchmark: actual below → 劣于大盘 (non-cost)', () => {
+        const result = calculateBenchmarkComparison(80, 100, false);
+        expect(result.label).toBe('劣于大盘');
+      });
+
+      it('single number benchmark: actual equals → 持平大盘', () => {
+        const result = calculateBenchmarkComparison(100, 100, false);
+        expect(result.label).toBe('持平大盘');
+      });
+
+      it('single number benchmark: actual below → 优于大盘 (cost)', () => {
+        const result = calculateBenchmarkComparison(80, 100, true);
+        expect(result.label).toBe('优于大盘');
+      });
+
+      it('single number benchmark: actual above → 劣于大盘 (cost)', () => {
+        const result = calculateBenchmarkComparison(120, 100, true);
+        expect(result.label).toBe('劣于大盘');
+      });
     });
   });
 });

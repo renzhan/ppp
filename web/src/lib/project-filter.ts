@@ -10,15 +10,18 @@ export interface ProjectRecord {
   brand: string;
   category: string;
   businessLine: string | null;
-  startDate: Date | null;
+  executionStartDate: Date | null;
+  endDate: Date | null;
 }
 
 export interface ProjectFilters {
   category?: string;
   brand?: string;
   businessLine?: string;
-  dateFrom?: string; // ISO date string
-  dateTo?: string; // ISO date string
+  executionStartDateFrom?: string; // ISO date string
+  executionStartDateTo?: string; // ISO date string
+  endDateFrom?: string; // ISO date string
+  endDateTo?: string; // ISO date string
   search?: string; // case-insensitive contains on projectName or brand
 }
 
@@ -48,27 +51,51 @@ export function filterProjects(
       return false;
     }
 
-    // Date range: startDate >= dateFrom
-    if (filters.dateFrom && project.startDate) {
-      const from = new Date(filters.dateFrom);
-      if (project.startDate < from) {
+    // Execution start date range: executionStartDate >= executionStartDateFrom
+    if (filters.executionStartDateFrom && project.executionStartDate) {
+      const from = new Date(filters.executionStartDateFrom);
+      if (project.executionStartDate < from) {
         return false;
       }
     }
-    // If project has no startDate but dateFrom is set, exclude it
-    if (filters.dateFrom && !project.startDate) {
+    // If project has no executionStartDate but executionStartDateFrom is set, exclude it
+    if (filters.executionStartDateFrom && !project.executionStartDate) {
       return false;
     }
 
-    // Date range: startDate <= dateTo
-    if (filters.dateTo && project.startDate) {
-      const to = new Date(filters.dateTo);
-      if (project.startDate > to) {
+    // Execution start date range: executionStartDate <= executionStartDateTo
+    if (filters.executionStartDateTo && project.executionStartDate) {
+      const to = new Date(filters.executionStartDateTo);
+      if (project.executionStartDate > to) {
         return false;
       }
     }
-    // If project has no startDate but dateTo is set, exclude it
-    if (filters.dateTo && !project.startDate) {
+    // If project has no executionStartDate but executionStartDateTo is set, exclude it
+    if (filters.executionStartDateTo && !project.executionStartDate) {
+      return false;
+    }
+
+    // End date range: endDate >= endDateFrom
+    if (filters.endDateFrom && project.endDate) {
+      const from = new Date(filters.endDateFrom);
+      if (project.endDate < from) {
+        return false;
+      }
+    }
+    // If project has no endDate but endDateFrom is set, exclude it
+    if (filters.endDateFrom && !project.endDate) {
+      return false;
+    }
+
+    // End date range: endDate <= endDateTo
+    if (filters.endDateTo && project.endDate) {
+      const to = new Date(filters.endDateTo);
+      if (project.endDate > to) {
+        return false;
+      }
+    }
+    // If project has no endDate but endDateTo is set, exclude it
+    if (filters.endDateTo && !project.endDate) {
       return false;
     }
 

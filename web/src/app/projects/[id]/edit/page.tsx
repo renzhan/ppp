@@ -22,7 +22,8 @@ interface ProjectDetail {
   brand: string;
   category: string;
   businessLine: string | null;
-  startDate: string;
+  executionStartDate: string | null;
+  endDate: string | null;
   participants: string[];
   noteCount: number;
 }
@@ -30,7 +31,8 @@ interface ProjectDetail {
 interface FormState {
   cascade: CascadeSelectorValue;
   projectName: string;
-  startDate: string;
+  executionStartDate: string;
+  endDate: string;
   participants: string[];
 }
 
@@ -78,7 +80,8 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
           businessLine: project.businessLine || '',
         },
         projectName: project.projectName || '',
-        startDate: project.startDate ? project.startDate.slice(0, 10) : '',
+        executionStartDate: project.executionStartDate ? project.executionStartDate.slice(0, 10) : '',
+        endDate: project.endDate ? project.endDate.slice(0, 10) : '',
         participants: project.participants || [],
       });
     }
@@ -111,7 +114,8 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
           brand: form.cascade.brand,
           businessLine: form.cascade.businessLine || null,
           projectName: form.projectName,
-          startDate: form.startDate,
+          executionStartDate: form.executionStartDate || null,
+          endDate: form.endDate || null,
           participants: form.participants,
         }),
       });
@@ -215,13 +219,24 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
             {errors.projectName && <p className="text-xs text-rose-500">{errors.projectName}</p>}
           </div>
 
-          {/* 立项时间 */}
+          {/* 开始执行日期 */}
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-900">立项时间</label>
+            <label className="block text-sm font-medium text-gray-900">开始执行日期</label>
             <input
               type="date"
-              value={form.startDate}
-              onChange={(e) => setForm((prev) => prev ? { ...prev, startDate: e.target.value } : prev)}
+              value={form.executionStartDate}
+              onChange={(e) => setForm((prev) => prev ? { ...prev, executionStartDate: e.target.value } : prev)}
+              className="h-11 w-full rounded-lg border border-gray-200 px-3 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
+            />
+          </div>
+
+          {/* 项目结束日期 */}
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-gray-900">项目结束日期</label>
+            <input
+              type="date"
+              value={form.endDate}
+              onChange={(e) => setForm((prev) => prev ? { ...prev, endDate: e.target.value } : prev)}
               className="h-11 w-full rounded-lg border border-gray-200 px-3 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
             />
           </div>

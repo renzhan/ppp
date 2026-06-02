@@ -1,5 +1,6 @@
 import { PrismaClient } from '../../../generated/prisma';
 import { BaseChapterDataLoader, ChapterDataContext, TraceItem } from './types';
+import { normalizeBenchmarkValue, BenchmarkRange } from '../../shared/types';
 
 /**
  * Chapter 5 (综合分析 / 四象限分析) Data Loader
@@ -59,12 +60,17 @@ export class QuadrantAnalysisDataLoader extends BaseChapterDataLoader {
 
       if (reviewConfig) {
         if (reviewConfig.engagementMetric) engagementMetric = reviewConfig.engagementMetric as string;
-        const bm = reviewConfig.benchmark as Record<string, number> | null;
+        const bm = reviewConfig.benchmark as Record<string, unknown> | null;
         if (bm) {
-          benchmarkCpm = bm.cpm || 0;
-          benchmarkCpc = bm.cpc || 0;
-          benchmarkCpe = bm.cpe || 0;
-          benchmarkCtr = bm.ctr || 0;
+          const cpmRange = normalizeBenchmarkValue(bm.cpm as number | BenchmarkRange | undefined);
+          const cpcRange = normalizeBenchmarkValue(bm.cpc as number | BenchmarkRange | undefined);
+          const cpeRange = normalizeBenchmarkValue(bm.cpe as number | BenchmarkRange | undefined);
+          const ctrRange = normalizeBenchmarkValue(bm.ctr as number | BenchmarkRange | undefined);
+          // Use midpoint of range as the quadrant dividing line
+          benchmarkCpm = cpmRange ? (cpmRange.min + cpmRange.max) / 2 : 0;
+          benchmarkCpc = cpcRange ? (cpcRange.min + cpcRange.max) / 2 : 0;
+          benchmarkCpe = cpeRange ? (cpeRange.min + cpeRange.max) / 2 : 0;
+          benchmarkCtr = ctrRange ? (ctrRange.min + ctrRange.max) / 2 : 0;
         }
       }
     } catch (error) {

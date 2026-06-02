@@ -1,4 +1,5 @@
-import type { Highlight, ProjectMetrics, BenchmarkData, KPITargets } from '../shared/types';
+import type { Highlight, ProjectMetrics, BenchmarkData, KPITargets, BenchmarkRange } from '../shared/types';
+import { normalizeBenchmarkValue } from '../shared/types';
 
 /**
  * 亮点识别模块
@@ -41,7 +42,7 @@ function identifyKPIExceeded(metrics: ProjectMetrics, kpiTargets: KPITargets): H
     { key: 'impression', actual: metrics.totalImpressions, label: '曝光量' },
     { key: 'read', actual: metrics.totalReads, label: '阅读量' },
     { key: 'engagement', actual: metrics.totalEngagement, label: '互动量' },
-    { key: 'viralCount', actual: metrics.viralCount, label: '爆文数' },
+    { key: 'viralPosts1k', actual: metrics.viralCount, label: '爆文数' },
     { key: 'ctr', actual: metrics.ctr, label: 'CTR' },
   ];
 
@@ -94,8 +95,8 @@ function identifyKPIExceeded(metrics: ProjectMetrics, kpiTargets: KPITargets): H
 
 /**
  * 识别优于大盘的指标
- * 非成本类指标 (ctr, viralRate): actual > benchmark
- * 成本类指标 (cpm, cpc, cpe): actual < benchmark (lower is better)
+ * 非成本类指标 (ctr, viralRate): actual > max (区间上限)
+ * 成本类指标 (cpm, cpc, cpe): actual < min (区间下限，lower is better)
  */
 function identifyAboveBenchmark(metrics: ProjectMetrics, benchmarks: BenchmarkData): Highlight[] {
   const highlights: Highlight[] = [];
@@ -113,36 +114,42 @@ function identifyAboveBenchmark(metrics: ProjectMetrics, benchmarks: BenchmarkDa
     { key: 'cpe', actual: metrics.cpe, label: 'CPE' },
   ];
 
-  // Check non-cost benchmarks: actual > benchmark
+  // Check non-cost benchmarks: actual > max (above range upper bound)
   for (const { key, actual, label } of nonCostBenchmarks) {
-    const benchmark = benchmarks[key];
-    if (benchmark === undefined || benchmark === null) continue;
+    const rawBenchmark = benchmarks[key];
+    if (rawBenchmark === undefined || rawBenchmark === null) continue;
     if (actual === 'N/A') continue;
 
-    if (actual > benchmark) {
+    const range = normalizeBenchmarkValue(rawBenchmark);
+    if (!range) continue;
+
+    if (actual > range.max) {
       highlights.push({
         type: 'above_benchmark',
         metric: label,
         description: `${label}优于大盘基准`,
         value: actual,
-        comparison: benchmark,
+        comparison: range.max,
       });
     }
   }
 
-  // Check cost benchmarks: actual < benchmark (lower is better)
+  // Check cost benchmarks: actual < min (below range lower bound, lower is better)
   for (const { key, actual, label } of costBenchmarks) {
-    const benchmark = benchmarks[key];
-    if (benchmark === undefined || benchmark === null) continue;
+    const rawBenchmark = benchmarks[key];
+    if (rawBenchmark === undefined || rawBenchmark === null) continue;
     if (actual === 'N/A') continue;
 
-    if (actual < benchmark) {
+    const range = normalizeBenchmarkValue(rawBenchmark);
+    if (!range) continue;
+
+    if (actual < range.min) {
       highlights.push({
         type: 'above_benchmark',
         metric: label,
         description: `${label}优于大盘基准`,
         value: actual,
-        comparison: benchmark,
+        comparison: range.min,
       });
     }
   }

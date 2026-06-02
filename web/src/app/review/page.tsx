@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { Plus, Pencil, BookOpen } from 'lucide-react';
 import { Loading } from '@/components/ui/loading';
-import { formatDate } from '@/lib/project-meta';
+import { formatDateTime } from '@/lib/project-meta';
 
 interface ReviewItem {
   id: string;
@@ -65,9 +65,8 @@ export default function ReviewListPage() {
               <thead>
                 <tr className="border-b bg-gray-50 text-left">
                   <th className="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-600">项目名称</th>
-                  <th className="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-600">复盘者</th>
                   <th className="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-600">更新时间</th>
-                  <th className="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-600">状态</th>
+                  <th className="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-600">创建者</th>
                   <th className="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-600">操作</th>
                 </tr>
               </thead>
@@ -78,13 +77,10 @@ export default function ReviewListPage() {
                       {review.projectName}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3">
+                      {formatDateTime(review.updatedAt)}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3">
                       {review.createdByDisplayName || '-'}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3">
-                      {formatDate(review.updatedAt)}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3">
-                      <StatusBadge status={review.status} />
                     </td>
                     <td className="whitespace-nowrap px-4 py-3">
                       <div className="flex items-center gap-2">
@@ -119,18 +115,3 @@ export default function ReviewListPage() {
   );
 }
 
-function StatusBadge({ status }: { status: string }) {
-  const config: Record<string, { label: string; className: string }> = {
-    draft: { label: '草稿', className: 'bg-gray-100 text-gray-700' },
-    generating: { label: '生成中', className: 'bg-amber-100 text-amber-700' },
-    completed: { label: '已完成', className: 'bg-emerald-100 text-emerald-700' },
-  };
-
-  const { label, className } = config[status] ?? { label: status, className: 'bg-gray-100 text-gray-700' };
-
-  return (
-    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${className}`}>
-      {label}
-    </span>
-  );
-}

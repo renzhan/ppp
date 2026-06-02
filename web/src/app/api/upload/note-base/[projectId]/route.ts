@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import * as XLSX from 'xlsx';
 import { prisma, Prisma } from '@/lib/prisma';
+import { selectTargetSheet } from '@/lib/sheet-selector';
 
 /**
  * Column header mapping: Chinese headers → Note model field names.
@@ -146,15 +147,23 @@ export async function POST(
 
     // Parse xlsx
     const workbook = XLSX.read(buffer, { type: 'buffer' });
-    const sheetName = workbook.SheetNames[0];
-    if (!sheetName) {
+    if (workbook.SheetNames.length === 0) {
       return NextResponse.json(
         { error: '文件中没有工作表', code: 'PARSE_FAILED' },
         { status: 400 }
       );
     }
 
-    const sheet = workbook.Sheets[sheetName];
+    // Use selectTargetSheet to pick the correct sheet (handles multi-sheet files)
+    const sheetResult = selectTargetSheet(workbook.SheetNames);
+    if (!sheetResult.success) {
+      return NextResponse.json(
+        { error: sheetResult.error, code: 'SHEET_NOT_FOUND' },
+        { status: 400 }
+      );
+    }
+
+    const sheet = workbook.Sheets[sheetResult.sheetName!];
     const rawRows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(sheet, { defval: '' });
 
     if (rawRows.length === 0) {

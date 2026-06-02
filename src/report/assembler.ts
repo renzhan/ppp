@@ -5,13 +5,58 @@
  */
 
 import { getPrismaClient } from '../shared/db.js';
-import type { Report, ReportModule, Project } from '../shared/types.js';
+import type { Report, ReportModule, Project, BenchmarkRange } from '../shared/types.js';
+import { normalizeBenchmarkValue } from '../shared/types.js';
 
 /** Placeholder for missing/null data fields */
 const MISSING_DATA_PLACEHOLDER = '数据待补充';
 
 /**
- * The fixed module order for report assembly (12 modules).
+ * Format a BenchmarkRange as a display string (e.g., "10.59%~15.36%" or "10.59~15.36").
+ */
+function formatBenchmarkRange(range: BenchmarkRange, suffix: string = ''): string {
+  return `${range.min}${suffix}~${range.max}${suffix}`;
+}
+
+/**
+ * Normalize raw benchmark data (supports both old single-value and new range format)
+ * and produce template variables with _min, _max, and _range suffixes.
+ */
+function assembleBenchmarkTemplateVars(
+  rawBenchmark: Record<string, unknown> | null | undefined,
+): Record<string, unknown> {
+  if (!rawBenchmark || typeof rawBenchmark !== 'object') return {};
+
+  const result: Record<string, unknown> = {};
+
+  const metrics: Array<{ key: string; varPrefix: string; suffix: string }> = [
+    { key: 'ctr', varPrefix: 'benchmark_ctr', suffix: '%' },
+    { key: 'cpm', varPrefix: 'benchmark_cpm', suffix: '' },
+    { key: 'cpc', varPrefix: 'benchmark_cpc', suffix: '' },
+    { key: 'cpe', varPrefix: 'benchmark_cpe', suffix: '' },
+    { key: 'engagementRate', varPrefix: 'benchmark_engagement_rate', suffix: '%' },
+  ];
+
+  for (const { key, varPrefix, suffix } of metrics) {
+    const rawValue = rawBenchmark[key] as number | BenchmarkRange | undefined;
+    const range = normalizeBenchmarkValue(rawValue);
+    if (range) {
+      result[`${varPrefix}_min`] = range.min;
+      result[`${varPrefix}_max`] = range.max;
+      result[`${varPrefix}_range`] = formatBenchmarkRange(range, suffix);
+      // Keep backward-compatible single value (midpoint for display)
+      result[varPrefix] = range.min === range.max
+        ? `${range.min}${suffix}`
+        : formatBenchmarkRange(range, suffix);
+    }
+  }
+
+  return result;
+}
+
+/**
+ * The fixed module order for report assembly (10 modules).
+ * Removed: audience_assets (人群资产分析), competitor_benchmark (竞品/行业对标)
  */
 export const REPORT_MODULE_ORDER = [
   { moduleId: 'customer_info', title: '客户信息' },
@@ -20,10 +65,8 @@ export const REPORT_MODULE_ORDER = [
   { moduleId: 'highlights', title: '项目亮点' },
   { moduleId: 'content_analysis', title: '内容分析' },
   { moduleId: 'brand_voice', title: '品牌声量分析' },
-  { moduleId: 'audience_assets', title: '人群资产分析' },
   { moduleId: 'paid_traffic', title: '投流分析' },
   { moduleId: 'conversion_analysis', title: '小程序/转化分析' },
-  { moduleId: 'competitor_benchmark', title: '竞品/行业对标' },
   { moduleId: 'highlight_summary', title: '亮点总结' },
   { moduleId: 'optimization_suggestions', title: '优化建议' },
 ] as const;
@@ -48,7 +91,7 @@ export function fillPlaceholders(data: Record<string, unknown>): Record<string, 
 
 /**
  * Assemble a complete report for the given project.
- * Reads all related data from PostgreSQL and organizes it into the 12 fixed modules.
+ * Reads all related data from PostgreSQL and organizes it into the 10 fixed modules.
  */
 export async function assembleReport(projectId: string): Promise<Report> {
   const prisma = getPrismaClient();
@@ -191,11 +234,16 @@ function assembleModuleData(
           isCostMetric: target.isCostMetric,
         };
       }
+      // Assemble benchmark template variables (min, max, range) from manual inputs
+      const benchmarkRaw = ctx.manualInputs.get('benchmark') as Record<string, unknown> | null | undefined;
+      const benchmarkVars = assembleBenchmarkTemplateVars(benchmarkRaw);
       return {
         noteCount: ctx.notes.length > 0 ? ctx.notes.length : null,
         kpiTargets: Object.keys(kpiTargetMap).length > 0 ? kpiTargetMap : null,
         calculatedMetrics: ctx.calculatedMetrics.get('overview') ?? null,
         benchmarkComparison: ctx.calculatedMetrics.get('benchmark_comparison') ?? null,
+        benchmarkData: benchmarkRaw ?? null,
+        ...benchmarkVars,
       };
     }
 
@@ -243,7 +291,10 @@ function assembleModuleData(
         componentMetrics: ctx.calculatedMetrics.get('component_conversion') ?? null,
       };
 
-    case 'competitor_benchmark':
+    case 'competitor_benchmark': {
+      // Assemble benchmark template variables (min, max, range) from manual inputs
+      const competitorBenchmarkRaw = ctx.manualInputs.get('benchmark') as Record<string, unknown> | null | undefined;
+      const competitorBenchmarkVars = assembleBenchmarkTemplateVars(competitorBenchmarkRaw);
       return {
         competitors: ctx.competitorData.length > 0
           ? ctx.competitorData.map((c) => ({
@@ -251,8 +302,10 @@ function assembleModuleData(
               metrics: c.metrics,
             }))
           : null,
-        benchmarkData: ctx.manualInputs.get('benchmark') ?? null,
+        benchmarkData: competitorBenchmarkRaw ?? null,
+        ...competitorBenchmarkVars,
       };
+    }
 
     case 'highlight_summary':
       return {

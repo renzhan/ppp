@@ -33,7 +33,8 @@ fallback_text: "数据总览内容生成失败，请重试。"
 | 总曝光 | {{kpi_impression}} | {{total_impressions}} | {{impression_completion}}% |
 | 总阅读 | {{kpi_read}} | {{total_reads}} | {{read_completion}}% |
 | 总互动 | {{kpi_engagement}} | {{total_engagement}} | {{engagement_completion}}% |
-| 爆文率 | {{kpi_viral_rate}}% | {{viral_rate}}%（{{viral_count}}篇爆文） | {{viral_rate_completion}}% |
+| 爆文数 | — | {{viral_count}}篇 | — |
+| 爆文率 | {{kpi_viral_rate}}% | {{viral_rate}}% | {{viral_rate_completion}}% |
 | CPM | {{kpi_cpm}} | {{cpm}} | {{cpm_completion}}% |
 | CPC | {{kpi_cpc}} | {{cpc}} | {{cpc_completion}}% |
 | CPE | {{kpi_cpe}} | {{cpe}} | {{cpe_completion}}% |

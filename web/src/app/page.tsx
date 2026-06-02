@@ -42,8 +42,10 @@ export default function ProjectListPage() {
     category: '',
     brand: '',
     businessLine: '',
-    dateFrom: '',
-    dateTo: '',
+    executionStartDateFrom: '',
+    executionStartDateTo: '',
+    endDateFrom: '',
+    endDateTo: '',
   });
   const [page, setPage] = useState(1);
   const pageSize = 20;
@@ -82,8 +84,10 @@ export default function ProjectListPage() {
     if (filters.category) params.set('category', filters.category);
     if (filters.brand) params.set('brand', filters.brand);
     if (filters.businessLine) params.set('businessLine', filters.businessLine);
-    if (filters.dateFrom) params.set('dateFrom', filters.dateFrom);
-    if (filters.dateTo) params.set('dateTo', filters.dateTo);
+    if (filters.executionStartDateFrom) params.set('executionStartDateFrom', filters.executionStartDateFrom);
+    if (filters.executionStartDateTo) params.set('executionStartDateTo', filters.executionStartDateTo);
+    if (filters.endDateFrom) params.set('endDateFrom', filters.endDateFrom);
+    if (filters.endDateTo) params.set('endDateTo', filters.endDateTo);
     return params.toString();
   }, [filters, search, page]);
 
@@ -102,8 +106,10 @@ export default function ProjectListPage() {
       category: '',
       brand: '',
       businessLine: '',
-      dateFrom: '',
-      dateTo: '',
+      executionStartDateFrom: '',
+      executionStartDateTo: '',
+      endDateFrom: '',
+      endDateTo: '',
     });
     setPage(1);
   };
@@ -131,7 +137,7 @@ export default function ProjectListPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-gray-900">项目管理</h1>
-          <p className="mt-1 text-sm text-gray-500">管理所有项目，支持按品类、品牌、业务线、项目名称和立项日期筛选。</p>
+          <p className="mt-1 text-sm text-gray-500">管理所有项目，支持按品类、品牌、业务线、项目名称和日期筛选。</p>
         </div>
         <Link
           href="/projects/new"
@@ -206,22 +212,22 @@ export default function ProjectListPage() {
             </div>
           </div>
 
-          {/* Date Range */}
+          {/* Execution Start Date Range */}
           <div className="min-w-[140px]">
-            <label className="mb-1 block text-xs text-gray-500">立项开始日期</label>
+            <label className="mb-1 block text-xs text-gray-500">开始执行日期</label>
             <input
               type="date"
-              value={filters.dateFrom}
-              onChange={(e) => { setFilters((prev) => ({ ...prev, dateFrom: e.target.value })); setPage(1); }}
+              value={filters.executionStartDateFrom}
+              onChange={(e) => { setFilters((prev) => ({ ...prev, executionStartDateFrom: e.target.value })); setPage(1); }}
               className="h-10 w-full rounded-sm border border-gray-300 px-3 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
             />
           </div>
           <div className="min-w-[140px]">
-            <label className="mb-1 block text-xs text-gray-500">立项结束日期</label>
+            <label className="mb-1 block text-xs text-gray-500">项目结束日期</label>
             <input
               type="date"
-              value={filters.dateTo}
-              onChange={(e) => { setFilters((prev) => ({ ...prev, dateTo: e.target.value })); setPage(1); }}
+              value={filters.endDateFrom}
+              onChange={(e) => { setFilters((prev) => ({ ...prev, endDateFrom: e.target.value })); setPage(1); }}
               className="h-10 w-full rounded-sm border border-gray-300 px-3 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
             />
           </div>

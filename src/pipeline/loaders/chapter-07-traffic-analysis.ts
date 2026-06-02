@@ -1,5 +1,6 @@
 import { PrismaClient } from '../../../generated/prisma';
 import { BaseChapterDataLoader, ChapterDataContext, TraceItem } from './types';
+import { normalizeBenchmarkValue, BenchmarkRange } from '../../shared/types';
 
 /**
  * 聚光 placement 字段编码 → 中文名称映射
@@ -39,6 +40,8 @@ export class TrafficAnalysisDataLoader extends BaseChapterDataLoader {
     'traffic_overview', 'traffic_by_note', 'search_data',
     'audience_growth', 'benchmark_comparison',
     'ad_type_analysis', 'targeting_analysis', 'keyword_analysis',
+    'benchmark_ctr_range', 'benchmark_cpm_range', 'benchmark_cpc_range',
+    'benchmark_cpe_range', 'benchmark_engagement_rate_range',
   ];
 
   constructor(prisma: InstanceType<typeof PrismaClient>) {
@@ -49,7 +52,7 @@ export class TrafficAnalysisDataLoader extends BaseChapterDataLoader {
     const variables: Record<string, string> = {};
 
     // ── 0. 加载大盘均值 ──
-    let benchmark: Record<string, number> = {};
+    let benchmarkRaw: Record<string, unknown> = {};
     try {
       const reviewConfig = await this.prisma.reviewConfig.findFirst({
         where: { projectId },
@@ -57,7 +60,7 @@ export class TrafficAnalysisDataLoader extends BaseChapterDataLoader {
         orderBy: { createdAt: 'desc' },
       });
       if (reviewConfig?.benchmark && typeof reviewConfig.benchmark === 'object') {
-        benchmark = reviewConfig.benchmark as Record<string, number>;
+        benchmarkRaw = reviewConfig.benchmark as Record<string, unknown>;
       }
     } catch (error) {
       console.warn(`[TrafficAnalysisDataLoader] Failed to load review_configs: ${error}`);
@@ -169,22 +172,60 @@ export class TrafficAnalysisDataLoader extends BaseChapterDataLoader {
     variables['cpi'] = cpi.toFixed(2);
 
     // ── 3. 大盘对比 ──
+    // Normalize benchmark values to range format and output range template variables
+    const benchmarkMetrics: Array<{ key: string; varPrefix: string; suffix: string }> = [
+      { key: 'ctr', varPrefix: 'benchmark_ctr', suffix: '%' },
+      { key: 'cpm', varPrefix: 'benchmark_cpm', suffix: '' },
+      { key: 'cpc', varPrefix: 'benchmark_cpc', suffix: '' },
+      { key: 'cpe', varPrefix: 'benchmark_cpe', suffix: '' },
+      { key: 'engagementRate', varPrefix: 'benchmark_engagement_rate', suffix: '%' },
+    ];
+
+    for (const { key, varPrefix, suffix } of benchmarkMetrics) {
+      const range = normalizeBenchmarkValue(benchmarkRaw[key] as number | BenchmarkRange | undefined);
+      if (range) {
+        variables[`${varPrefix}_range`] = range.min === range.max
+          ? `${range.min}${suffix}`
+          : `${range.min}${suffix}~${range.max}${suffix}`;
+      }
+    }
+
     const comparisons: string[] = [];
-    if (benchmark.cpm && paidCpm > 0) {
-      const diff = ((1 - paidCpm / benchmark.cpm) * 100).toFixed(0);
-      comparisons.push(`CPM：实际${paidCpm.toFixed(2)} vs 大盘${benchmark.cpm}（${paidCpm < benchmark.cpm ? '优于' : '劣于'}大盘${Math.abs(Number(diff))}%）`);
+    const cpmRange = normalizeBenchmarkValue(benchmarkRaw.cpm as number | BenchmarkRange | undefined);
+    if (cpmRange && paidCpm > 0) {
+      const rangeLabel = cpmRange.min === cpmRange.max ? `${cpmRange.min}` : `${cpmRange.min}~${cpmRange.max}`;
+      let verdict: string;
+      if (paidCpm < cpmRange.min) verdict = '优于大盘';
+      else if (paidCpm > cpmRange.max) verdict = '劣于大盘';
+      else verdict = '持平大盘';
+      comparisons.push(`CPM：实际${paidCpm.toFixed(2)} vs 大盘${rangeLabel}（${verdict}）`);
     }
-    if (benchmark.cpc && paidCpc > 0) {
-      const diff = ((1 - paidCpc / benchmark.cpc) * 100).toFixed(0);
-      comparisons.push(`CPC：实际${paidCpc.toFixed(2)} vs 大盘${benchmark.cpc}（${paidCpc < benchmark.cpc ? '优于' : '劣于'}大盘${Math.abs(Number(diff))}%）`);
+    const cpcRange = normalizeBenchmarkValue(benchmarkRaw.cpc as number | BenchmarkRange | undefined);
+    if (cpcRange && paidCpc > 0) {
+      const rangeLabel = cpcRange.min === cpcRange.max ? `${cpcRange.min}` : `${cpcRange.min}~${cpcRange.max}`;
+      let verdict: string;
+      if (paidCpc < cpcRange.min) verdict = '优于大盘';
+      else if (paidCpc > cpcRange.max) verdict = '劣于大盘';
+      else verdict = '持平大盘';
+      comparisons.push(`CPC：实际${paidCpc.toFixed(2)} vs 大盘${rangeLabel}（${verdict}）`);
     }
-    if (benchmark.cpe && paidCpe > 0) {
-      const diff = ((1 - paidCpe / benchmark.cpe) * 100).toFixed(0);
-      comparisons.push(`CPE：实际${paidCpe.toFixed(2)} vs 大盘${benchmark.cpe}（${paidCpe < benchmark.cpe ? '优于' : '劣于'}大盘${Math.abs(Number(diff))}%）`);
+    const cpeRange = normalizeBenchmarkValue(benchmarkRaw.cpe as number | BenchmarkRange | undefined);
+    if (cpeRange && paidCpe > 0) {
+      const rangeLabel = cpeRange.min === cpeRange.max ? `${cpeRange.min}` : `${cpeRange.min}~${cpeRange.max}`;
+      let verdict: string;
+      if (paidCpe < cpeRange.min) verdict = '优于大盘';
+      else if (paidCpe > cpeRange.max) verdict = '劣于大盘';
+      else verdict = '持平大盘';
+      comparisons.push(`CPE：实际${paidCpe.toFixed(2)} vs 大盘${rangeLabel}（${verdict}）`);
     }
-    if (benchmark.ctr && paidCtr > 0) {
-      const diff = ((paidCtr / benchmark.ctr - 1) * 100).toFixed(0);
-      comparisons.push(`CTR：实际${paidCtr.toFixed(2)}% vs 大盘${benchmark.ctr}%（${paidCtr > benchmark.ctr ? '优于' : '劣于'}大盘${Math.abs(Number(diff))}%）`);
+    const ctrRange = normalizeBenchmarkValue(benchmarkRaw.ctr as number | BenchmarkRange | undefined);
+    if (ctrRange && paidCtr > 0) {
+      const rangeLabel = ctrRange.min === ctrRange.max ? `${ctrRange.min}%` : `${ctrRange.min}%~${ctrRange.max}%`;
+      let verdict: string;
+      if (paidCtr > ctrRange.max) verdict = '优于大盘';
+      else if (paidCtr < ctrRange.min) verdict = '劣于大盘';
+      else verdict = '持平大盘';
+      comparisons.push(`CTR：实际${paidCtr.toFixed(2)}% vs 大盘${rangeLabel}（${verdict}）`);
     }
     variables['benchmark_comparison'] = comparisons.length > 0 ? comparisons.join('\n') : '暂无大盘对比数据';
 

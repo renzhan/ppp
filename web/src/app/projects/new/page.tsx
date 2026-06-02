@@ -26,7 +26,6 @@ interface ImportedProject {
 interface FormState {
   cascade: CascadeSelectorValue;
   projectName: string;
-  startDate: string;
   executionStartDate: string;
   endDate: string;
   participants: string[];
@@ -34,17 +33,11 @@ interface FormState {
 
 type FormErrors = Record<string, string>;
 
-function getTodayString(): string {
-  const now = new Date();
-  return now.toISOString().slice(0, 10);
-}
-
 export default function NewProjectPage() {
   const router = useRouter();
   const [form, setForm] = useState<FormState>({
     cascade: { category: '', brand: '', businessLine: '' },
     projectName: '',
-    startDate: getTodayString(),
     executionStartDate: '',
     endDate: '',
     participants: [],
@@ -155,7 +148,6 @@ export default function NewProjectPage() {
           brand: form.cascade.brand,
           businessLine: form.cascade.businessLine || null,
           projectName: form.projectName,
-          startDate: form.startDate,
           executionStartDate: form.executionStartDate || null,
           endDate: form.endDate || null,
           createdBy: currentUser?.id,
@@ -204,7 +196,6 @@ export default function NewProjectPage() {
     if (!form.cascade.category) nextErrors.category = '请选择品类';
     if (!form.cascade.brand) nextErrors.brand = '请选择品牌';
     if (!form.projectName.trim()) nextErrors.projectName = '请输入项目名称';
-    if (!form.startDate) nextErrors.startDate = '请选择立项时间';
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
   };
@@ -407,23 +398,6 @@ export default function NewProjectPage() {
                 </div>
               )}
             </div>
-          </div>
-
-          {/* 立项时间 */}
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-900">
-              立项时间 <span className="text-rose-500">*</span>
-            </label>
-            <input
-              type="date"
-              value={form.startDate}
-              onChange={(e) => {
-                setForm((prev) => ({ ...prev, startDate: e.target.value }));
-                setErrors((prev) => { const n = { ...prev }; delete n.startDate; return n; });
-              }}
-              className="h-11 w-full rounded-lg border border-gray-200 px-3 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
-            />
-            {errors.startDate && <p className="text-xs text-rose-500">{errors.startDate}</p>}
           </div>
 
           {/* 开始执行日期 */}

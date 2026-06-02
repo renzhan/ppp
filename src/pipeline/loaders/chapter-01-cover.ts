@@ -1,5 +1,6 @@
 import { PrismaClient } from '../../../generated/prisma';
 import { BaseChapterDataLoader, ChapterDataContext } from './types';
+import { normalizeBenchmarkValue, BenchmarkRange } from '../../shared/types';
 
 /**
  * Chapter 1 (项目管理 / Cover) Data Loader
@@ -69,12 +70,16 @@ export class CoverDataLoader extends BaseChapterDataLoader {
         }
 
         // 大盘均值
-        const benchmark = reviewConfig.benchmark as Record<string, number> | null;
+        const benchmark = reviewConfig.benchmark as Record<string, unknown> | null;
         if (benchmark) {
-          if (benchmark['ctr'] !== undefined) variables['benchmark_ctr'] = String(benchmark['ctr']);
-          if (benchmark['cpm'] !== undefined) variables['benchmark_cpm'] = String(benchmark['cpm']);
-          if (benchmark['cpc'] !== undefined) variables['benchmark_cpc'] = String(benchmark['cpc']);
-          if (benchmark['cpe'] !== undefined) variables['benchmark_cpe'] = String(benchmark['cpe']);
+          const ctrR = normalizeBenchmarkValue(benchmark['ctr'] as number | BenchmarkRange | undefined);
+          const cpmR = normalizeBenchmarkValue(benchmark['cpm'] as number | BenchmarkRange | undefined);
+          const cpcR = normalizeBenchmarkValue(benchmark['cpc'] as number | BenchmarkRange | undefined);
+          const cpeR = normalizeBenchmarkValue(benchmark['cpe'] as number | BenchmarkRange | undefined);
+          if (ctrR) variables['benchmark_ctr'] = ctrR.min === ctrR.max ? String(ctrR.min) : `${ctrR.min}~${ctrR.max}`;
+          if (cpmR) variables['benchmark_cpm'] = cpmR.min === cpmR.max ? String(cpmR.min) : `${cpmR.min}~${cpmR.max}`;
+          if (cpcR) variables['benchmark_cpc'] = cpcR.min === cpcR.max ? String(cpcR.min) : `${cpcR.min}~${cpcR.max}`;
+          if (cpeR) variables['benchmark_cpe'] = cpeR.min === cpeR.max ? String(cpeR.min) : `${cpeR.min}~${cpeR.max}`;
         }
       }
     } catch (error) {

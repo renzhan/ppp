@@ -141,3 +141,19 @@ export function formatDate(value: string | Date | null | undefined): string {
 export function formatDateRange(startDate: string | Date, endDate: string | Date): string {
   return `${formatDate(startDate)} - ${formatDate(endDate)}`;
 }
+
+function pad(n: number): string {
+  return n.toString().padStart(2, '0');
+}
+
+/**
+ * 格式化日期时间字符串，输出精确到秒。
+ * 输出格式：YYYY-MM-DD HH:mm:ss（如 2025-01-15 14:30:25）
+ */
+export function formatDateTime(dateStr: string): string {
+  const date = new Date(dateStr);
+  if (Number.isNaN(date.getTime())) {
+    return '-';
+  }
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}

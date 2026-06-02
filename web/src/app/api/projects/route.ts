@@ -30,8 +30,10 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status');
     const search = searchParams.get('search');
     const businessLine = searchParams.get('businessLine');
-    const dateFrom = searchParams.get('dateFrom');
-    const dateTo = searchParams.get('dateTo');
+    const executionStartDateFrom = searchParams.get('executionStartDateFrom');
+    const executionStartDateTo = searchParams.get('executionStartDateTo');
+    const endDateFrom = searchParams.get('endDateFrom');
+    const endDateTo = searchParams.get('endDateTo');
     const createdBy = searchParams.get('createdBy');
     const isImported = searchParams.get('isImported');
 
@@ -58,13 +60,22 @@ export async function GET(request: NextRequest) {
     if (businessLine) {
       where.businessLine = businessLine;
     }
-    if (dateFrom || dateTo) {
-      where.startDate = {};
-      if (dateFrom) {
-        where.startDate.gte = new Date(dateFrom);
+    if (executionStartDateFrom || executionStartDateTo) {
+      where.executionStartDate = {};
+      if (executionStartDateFrom) {
+        where.executionStartDate.gte = new Date(executionStartDateFrom);
       }
-      if (dateTo) {
-        where.startDate.lte = new Date(dateTo);
+      if (executionStartDateTo) {
+        where.executionStartDate.lte = new Date(executionStartDateTo);
+      }
+    }
+    if (endDateFrom || endDateTo) {
+      where.endDate = {};
+      if (endDateFrom) {
+        where.endDate.gte = new Date(endDateFrom);
+      }
+      if (endDateTo) {
+        where.endDate.lte = new Date(endDateTo);
       }
     }
     if (createdBy) {
@@ -148,7 +159,9 @@ export async function POST(request: Request) {
     const createdBy = typeof body.createdBy === 'string' ? body.createdBy.trim() : '';
     const participants = Array.isArray(body.participants) ? body.participants.filter((p: unknown) => typeof p === 'string') : [];
 
-    // Support direct startDate field (new form) or launchPhases (legacy form)
+    // Support new form (executionStartDate/endDate), direct startDate (legacy new form), or launchPhases (legacy form)
+    const hasExecutionDates = (typeof body.executionStartDate === 'string' && body.executionStartDate.trim()) ||
+                              (typeof body.endDate === 'string' && body.endDate.trim());
     const hasDirectStartDate = typeof body.startDate === 'string' && body.startDate.trim();
     const hasLaunchPhases = body.launchPhases || body.projectType;
 
@@ -156,6 +169,37 @@ export async function POST(request: Request) {
     if (!category) missingFields.category = 'category is required';
     if (!brand) missingFields.brand = 'brand is required';
     if (!projectName) missingFields.projectName = 'projectName is required';
+
+    // New form (v2): executionStartDate + endDate, no startDate/projectType/launchPhases required
+    if (hasExecutionDates && !hasDirectStartDate && !hasLaunchPhases) {
+      if (Object.keys(missingFields).length > 0) {
+        return NextResponse.json(
+          { error: 'Missing required fields', fields: missingFields },
+          { status: 400 }
+        );
+      }
+
+      const executionStartDate = body.executionStartDate ? new Date(body.executionStartDate) : null;
+      const endDate = body.endDate ? new Date(body.endDate) : null;
+
+      // Use executionStartDate as startDate for backward compat with DB schema
+      const project = await prisma.project.create({
+        data: {
+          category,
+          brand,
+          businessLine: businessLine || null,
+          spuName: spuName || null,
+          projectName,
+          startDate: executionStartDate ?? new Date(),
+          endDate: endDate ?? executionStartDate ?? new Date(),
+          executionStartDate,
+          createdBy: createdBy || null,
+          participants,
+        },
+      });
+
+      return NextResponse.json(project, { status: 201 });
+    }
 
     // Legacy form requires projectType and launchPhases
     if (hasLaunchPhases && !hasDirectStartDate) {
@@ -234,11 +278,8 @@ export async function POST(request: Request) {
       return NextResponse.json(project, { status: 201 });
     }
 
-    // New form: direct startDate, no projectType/launchPhases required
-    if (!hasDirectStartDate) {
-      missingFields.startDate = 'startDate is required';
-    }
-
+    // New form (legacy v1): direct startDate, no projectType/launchPhases required
+    // Also handles case where no dates are provided at all (all optional)
     if (Object.keys(missingFields).length > 0) {
       return NextResponse.json(
         { error: 'Missing required fields', fields: missingFields },
@@ -246,13 +287,38 @@ export async function POST(request: Request) {
       );
     }
 
-    const startDate = new Date(body.startDate.trim());
-    if (Number.isNaN(startDate.getTime())) {
-      return NextResponse.json(
-        { error: 'Invalid startDate', fields: { startDate: 'startDate must be a valid date' } },
-        { status: 400 }
-      );
+    // If startDate is provided (legacy new form), use it
+    if (hasDirectStartDate) {
+      const startDate = new Date(body.startDate.trim());
+      if (Number.isNaN(startDate.getTime())) {
+        return NextResponse.json(
+          { error: 'Invalid startDate', fields: { startDate: 'startDate must be a valid date' } },
+          { status: 400 }
+        );
+      }
+
+      const project = await prisma.project.create({
+        data: {
+          category,
+          brand,
+          businessLine: businessLine || null,
+          spuName: spuName || null,
+          projectName,
+          projectType: projectType || undefined,
+          startDate,
+          endDate: body.endDate ? new Date(body.endDate) : startDate,
+          executionStartDate: body.executionStartDate ? new Date(body.executionStartDate) : null,
+          createdBy: createdBy || null,
+          participants,
+        },
+      });
+
+      return NextResponse.json(project, { status: 201 });
     }
+
+    // Fallback: no dates provided at all — create with defaults
+    const executionStartDate = body.executionStartDate ? new Date(body.executionStartDate) : null;
+    const endDate = body.endDate ? new Date(body.endDate) : null;
 
     const project = await prisma.project.create({
       data: {
@@ -261,10 +327,9 @@ export async function POST(request: Request) {
         businessLine: businessLine || null,
         spuName: spuName || null,
         projectName,
-        projectType: projectType || undefined,
-        startDate,
-        endDate: body.endDate ? new Date(body.endDate) : startDate,
-        executionStartDate: body.executionStartDate ? new Date(body.executionStartDate) : null,
+        startDate: executionStartDate ?? new Date(),
+        endDate: endDate ?? executionStartDate ?? new Date(),
+        executionStartDate,
         createdBy: createdBy || null,
         participants,
       },

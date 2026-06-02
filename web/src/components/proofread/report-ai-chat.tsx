@@ -178,7 +178,7 @@ export function ReportAiChat({
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-3 space-y-3">
         {messages.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-8 text-center">
+          <div className="flex flex-col items-center py-4 text-center">
             <MessageCircle size={28} className="mb-2 text-gray-200" />
             <p className="text-[11px] text-gray-400">
               AI 审校助手<br />
@@ -220,7 +220,7 @@ export function ReportAiChat({
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(inputValue); } }}
-            placeholder="输入指令重新生成当前模块内容..."
+            placeholder="输入指令查询数据或修改当前模块内容..."
             disabled={isLoading}
             className={cn(
               'w-full rounded-lg border border-gray-300 bg-amber-50 px-3 py-2.5 pr-10 text-xs',

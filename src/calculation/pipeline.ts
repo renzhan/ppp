@@ -18,8 +18,10 @@ import type {
   ComponentData,
   ProjectMetrics,
   BenchmarkData,
+  BenchmarkRange,
   KPITargets,
 } from '../shared/types.js';
+import { normalizeBenchmarkValue } from '../shared/types.js';
 import type { JuguangAggregated } from './metrics.js';
 import {
   calculateProjectTotalCost,
@@ -130,8 +132,17 @@ export async function runCalculationPipeline(projectId: string): Promise<void> {
   results.set('viral', { ...viralResults, viralNoteIds: viralNotes });
 
   // --- KPI Completion ---
+  // Removed KPI metrics (no longer calculated): searchIndex, socSov, audienceSpuTotal, audienceSpuTi
+  const removedKpiMetrics = new Set(['searchIndex', 'socSov', 'audienceSpuTotal', 'audienceSpuTi']);
+  const totalNotes = notes.length;
+
   const kpiResults: Record<string, unknown> = {};
   for (const target of kpiTargets) {
+    // Skip removed KPI metrics
+    if (removedKpiMetrics.has(target.metricName)) {
+      continue;
+    }
+
     let actualValue: number | 'N/A' = 0;
     switch (target.metricName) {
       case 'impression':
@@ -144,6 +155,14 @@ export async function runCalculationPipeline(projectId: string): Promise<void> {
         actualValue = totalEngagement;
         break;
       case 'viralCount':
+        actualValue = viralResults.viralCount;
+        break;
+      case 'viralPosts10k':
+        // 爆文率: percentage-based calculation (viralCount / totalNotes * 100)
+        actualValue = totalNotes > 0 ? (viralResults.viralCount / totalNotes) * 100 : 0;
+        break;
+      case 'viralPosts1k':
+        // 爆文数: generic viral post count (no longer tied to "千赞" threshold concept)
         actualValue = viralResults.viralCount;
         break;
       case 'cpm':
@@ -263,12 +282,14 @@ export async function runCalculationPipeline(projectId: string): Promise<void> {
   });
   const benchmarkData: BenchmarkData = {};
   for (const input of benchmarkInputs) {
-    const content = input.dataContent as Record<string, number>;
-    if (content.cpm !== undefined) benchmarkData.cpm = content.cpm;
-    if (content.cpc !== undefined) benchmarkData.cpc = content.cpc;
-    if (content.cpe !== undefined) benchmarkData.cpe = content.cpe;
-    if (content.ctr !== undefined) benchmarkData.ctr = content.ctr;
-    if (content.viralRate !== undefined) benchmarkData.viralRate = content.viralRate;
+    const content = input.dataContent as Record<string, unknown>;
+    // Support both old format (single number) and new format ({ min, max })
+    if (content.cpm !== undefined) benchmarkData.cpm = parseBenchmarkField(content.cpm);
+    if (content.cpc !== undefined) benchmarkData.cpc = parseBenchmarkField(content.cpc);
+    if (content.cpe !== undefined) benchmarkData.cpe = parseBenchmarkField(content.cpe);
+    if (content.ctr !== undefined) benchmarkData.ctr = parseBenchmarkField(content.ctr);
+    if (content.viralRate !== undefined) benchmarkData.viralRate = parseBenchmarkField(content.viralRate);
+    if (content.engagementRate !== undefined) benchmarkData.engagementRate = parseBenchmarkField(content.engagementRate);
   }
 
   const benchmarkResults: Record<string, unknown> = {};
@@ -288,6 +309,14 @@ export async function runCalculationPipeline(projectId: string): Promise<void> {
     benchmarkResults['viralRate'] = calculateBenchmarkComparison(
       viralResults.viralRate,
       benchmarkData.viralRate,
+      false
+    );
+  }
+  if (benchmarkData.engagementRate !== undefined) {
+    const engagementRate = totalImpressions > 0 ? (totalEngagement / totalImpressions) * 100 : 0;
+    benchmarkResults['engagementRate'] = calculateBenchmarkComparison(
+      engagementRate,
+      benchmarkData.engagementRate,
       false
     );
   }
@@ -384,4 +413,24 @@ async function writeMetricsToDb(
       data: records,
     });
   }
+}
+
+/**
+ * Parse a benchmark field value from DB.
+ * Supports both old format (single number) and new format ({ min, max }).
+ * Old format is automatically converted to { min: value, max: value }.
+ */
+function parseBenchmarkField(value: unknown): number | BenchmarkRange {
+  if (typeof value === 'number') {
+    return value;
+  }
+  if (typeof value === 'object' && value !== null && 'min' in value && 'max' in value) {
+    return { min: Number((value as Record<string, unknown>).min), max: Number((value as Record<string, unknown>).max) };
+  }
+  // Fallback: try to parse as number
+  const num = Number(value);
+  if (!isNaN(num)) {
+    return num;
+  }
+  return 0;
 }

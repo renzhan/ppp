@@ -44,6 +44,9 @@ const MAX_CONTENT_LENGTH = 2000;
 /** Static chapters that don't call LLM */
 const STATIC_CHAPTERS = new Set([1, 10]);
 
+/** Chapters to generate (chapter 8 人群资产 removed per requirement 7.1) */
+const CHAPTER_NUMBERS = [1, 2, 3, 4, 5, 6, 7, 9, 10];
+
 /**
  * ReportPipelineOrchestrator orchestrates the full report generation pipeline.
  *
@@ -77,8 +80,8 @@ export class ReportPipelineOrchestrator {
 
     // Semaphore-based concurrency control (max 5 concurrent)
     const CONCURRENCY = 5;
-    const chapterNumbers = Array.from({ length: 10 }, (_, i) => i + 1);
-    const chapters: ChapterResult[] = new Array(10);
+    const chapterNumbers = CHAPTER_NUMBERS;
+    const chapters: ChapterResult[] = new Array(chapterNumbers.length);
 
     const semaphore = { count: 0, queue: [] as (() => void)[] };
 
@@ -110,7 +113,7 @@ export class ReportPipelineOrchestrator {
       })
     );
 
-    console.log(`[ReportPipeline] all chapters generated: ${chapters.filter(c => c.status === 'generated').length}/10 succeeded`);
+    console.log(`[ReportPipeline] all chapters generated: ${chapters.filter(c => c.status === 'generated').length}/${chapterNumbers.length} succeeded`);
 
     // Mark status as completed
     await this.prisma.reviewConfig.update({

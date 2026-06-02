@@ -420,6 +420,11 @@ describe('Chapter Data Loaders Integration', () => {
             { fee: 2000, impression: 80000, click: 8000, interaction: 2000, iUserNum: 300, tiUserNum: 80 },
           ]),
         },
+        reviewConfig: {
+          findFirst: vi.fn(async () => ({
+            benchmark: { ctr: { min: 2, max: 5 }, cpm: { min: 20, max: 35 }, cpc: { min: 0.5, max: 1.5 }, cpe: { min: 2, max: 6 }, engagementRate: { min: 3, max: 8 } },
+          })),
+        },
       } as any;
 
       const loader = new TrafficAnalysisDataLoader(mockPrisma);
@@ -442,6 +447,13 @@ describe('Chapter Data Loaders Integration', () => {
       expect(parseFloat(result.variables['paid_cpm']!)).toBeCloseTo(23.08, 1);
       // CPC = 3000/13000 ≈ 0.23
       expect(parseFloat(result.variables['paid_cpc']!)).toBeCloseTo(0.23, 1);
+
+      // Verify benchmark range variables
+      expect(result.variables['benchmark_ctr_range']).toBe('2%~5%');
+      expect(result.variables['benchmark_cpm_range']).toBe('20~35');
+      expect(result.variables['benchmark_cpc_range']).toBe('0.5~1.5');
+      expect(result.variables['benchmark_cpe_range']).toBe('2~6');
+      expect(result.variables['benchmark_engagement_rate_range']).toBe('3%~8%');
 
       expect(result.missingFields).toHaveLength(0);
     });
