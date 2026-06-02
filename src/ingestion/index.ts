@@ -11,15 +11,16 @@ import { PaichachaClient } from './paichacha-client.js';
 import { PrismaDataPersistenceService } from './persistence-service.js';
 import { SpreadsheetUploadService } from './spreadsheet-upload.js';
 import { envConfig } from '../config/env.js';
-import type { PugongyingNote, JuguangNote, LingxiData, CommentData, QianguaStatsData, QianguaHotNotePublishData } from '../shared/types.js';
+import type { PugongyingNote, JuguangNote, LingxiData, CommentData } from '../shared/types.js';
 
 // ---- Types ----
 
-/**
- * Result of an API ingestion operation
- */
-export interface APIIngestionResult {
+export interface BaseDataResult {
   pugongyingNotes: PugongyingNote[];
+  errors: string[];
+}
+
+export interface JuguangDataResult {
   juguangNotes: JuguangNote[];
   errors: string[];
 }
@@ -70,93 +71,39 @@ export class DataIngestionService {
   }
 
   /**
-   * Ingest data from Pugongying & Juguang APIs for a given project.
-   * Fetches both pugongying and juguang data, then persists to DB.
-   *
-   * @param projectId - The project to associate data with
-   * @param noteIds - The note IDs to fetch data for
-   * @returns Result containing fetched data and any errors encountered
+   * 预爬基础数据：蒲公英笔记 + 灵犀（品牌资产）。
+   * 每天凌晨定时调用，用户使用时数据已在库中。
    */
-  async ingestFromAPI(projectId: string, noteIds: string[]): Promise<APIIngestionResult> {
-
-      
-    // ---- 测试项目配置（后续由前端项目配置替换）----
-    const TEST_PROJECT = {
-      brandName: '爷爷不泡茶',
-      keyword: '酸奶',
-      taxonomyNames: ['方便速食'],
-      juguangBrandName: '奈雪的茶-派芽1',
-      // start=项目开始日期, end=项目结束日期, campaignStart=投放开始日期
-      dateRange: { start: '2026-04-01', end: '2026-05-27' },
-      campaignStart: '2026-04-27',
-      qianguaDays: 30,
-    };
-
+  async ingestBaseData(projectId: string): Promise<BaseDataResult> {
+    const ctx = await this.resolveProjectContext(projectId);
     const errors: string[] = [];
-    let pugongyingNotes: PugongyingNote[] = [];
-    let juguangNotes: JuguangNote[] = [];
 
-    // Fetch pugongying data
+    // 蒲公英笔记
+    let pugongyingNotes: PugongyingNote[] = [];
     try {
-      pugongyingNotes = await this.paichachaClient.fetchPugongyingData(noteIds);
+      pugongyingNotes = await this.paichachaClient.fetchPugongyingData(ctx.noteIds);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       errors.push(`Failed to fetch pugongying data: ${message}`);
     }
 
-    // Fetch juguang data
-    try {
-      juguangNotes = await this.paichachaClient.fetchJuguangData(
-        TEST_PROJECT.juguangBrandName,
-        TEST_PROJECT.dateRange.start,
-        TEST_PROJECT.dateRange.end,
-      );
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      errors.push(`Failed to fetch juguang data: ${message}`);
-    }
-
-    // Fetch lingxi data（参数后续由前端传入，当前写死联调用）
+    // 灵犀
     let lingxiData: LingxiData | undefined;
     try {
-      // 投后到今天，投前 = 投放前等长时段
-      const cs = new Date(TEST_PROJECT.campaignStart);
-      const today = new Date(); today.setHours(0,0,0,0);
-      const duration = Math.ceil((today.getTime() - cs.getTime()) / 86400000);
-      const preEnd = new Date(cs); preEnd.setDate(preEnd.getDate() - 1);
-      const preStart = new Date(preEnd); preStart.setDate(preStart.getDate() - duration);
-      const preStartDate = preStart.toISOString().slice(0, 10);
-      const preEndDate   = preEnd.toISOString().slice(0, 10);
-      const postEndDate = today.toISOString().slice(0,10);
       lingxiData = await this.paichachaClient.fetchLingxiData(
-        TEST_PROJECT.brandName,
-        TEST_PROJECT.keyword,
-        TEST_PROJECT.campaignStart,  // 投后 start = 投放开始
-        postEndDate,                  // 投后 end   = 今天
-        TEST_PROJECT.taxonomyNames,
-        preStartDate,
-        preEndDate,
+        ctx.brandName,
+        ctx.execStart,
+        ctx.currentEnd,
+        ctx.taxonomyNames,
+        ctx.preStart,
+        ctx.preEnd,
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       errors.push(`Failed to fetch lingxi data: ${message}`);
     }
 
-    // Fetch qiangua data（参数后续由前端传入，当前写死联调用）
-    let qianguaStats: QianguaStatsData | undefined;
-    let qianguaHotNotePublish: QianguaHotNotePublishData | undefined;
-    try {
-      const qianguaData = await this.paichachaClient.fetchQianguaData(
-        TEST_PROJECT.brandName, TEST_PROJECT.qianguaDays,
-      );
-      qianguaStats = qianguaData.stats;
-      qianguaHotNotePublish = qianguaData.hotNotePublish;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      errors.push(`Failed to fetch qiangua data: ${message}`);
-    }
-
-    // Merge: preserve isUnderwater / underwaterPrice from existing records
+    // 保留已有水下/水下价格
     if (pugongyingNotes.length > 0) {
       try {
         const existing = await this.persistenceService.findPugongyingNoteIds(projectId, pugongyingNotes.map((n) => n.noteId));
@@ -169,26 +116,17 @@ export class DataIngestionService {
           }
         }
       } catch {
-        // If lookup fails, proceed with API values (false / 0)
+        // lookup 失败就用 API 值
       }
     }
 
-    // Persist successfully fetched data
+    // 持久化
     if (pugongyingNotes.length > 0) {
       try {
         await this.persistenceService.savePugongyingNotes(projectId, pugongyingNotes);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         errors.push(`Failed to persist pugongying data: ${message}`);
-      }
-    }
-
-    if (juguangNotes.length > 0) {
-      try {
-        await this.persistenceService.saveJuguangData(projectId, juguangNotes);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        errors.push(`Failed to persist juguang data: ${message}`);
       }
     }
 
@@ -201,28 +139,86 @@ export class DataIngestionService {
       }
     }
 
-    if (qianguaStats && qianguaHotNotePublish) {
-      try {
-        await this.persistenceService.saveQianguaData(projectId, qianguaStats, qianguaHotNotePublish);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        errors.push(`Failed to persist qiangua data: ${message}`);
-      }
-    }
-
-    return { pugongyingNotes, juguangNotes, errors };
+    return { pugongyingNotes, errors };
   }
 
   /**
-   * 评论数据采集（全量替换，用于舆情分析）
-   * Phase 1 — 与 ingestFromAPI 平级，按需独立调用
+   * 采集聚光投流数据（需广告主 ID + 复盘 ID，由用户手动触发）。
+   */
+  async ingestJuguangData(projectId: string, advertiserIds: number[], reviewConfigId: string): Promise<JuguangDataResult> {
+    const ctx = await this.resolveProjectContext(projectId);
+    const errors: string[] = [];
+    let juguangNotes: JuguangNote[] = [];
+
+    try {
+      juguangNotes = await this.paichachaClient.fetchJuguangData(advertiserIds, ctx.currentEnd, ctx.currentEnd);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      errors.push(`Failed to fetch juguang data: ${message}`);
+    }
+
+    if (juguangNotes.length > 0) {
+      try {
+        await this.persistenceService.saveJuguangData(projectId, juguangNotes, reviewConfigId);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        errors.push(`Failed to persist juguang data: ${message}`);
+      }
+    }
+
+    return { juguangNotes, errors };
+  }
+
+  /**
+   * 批量获取蒲公英笔记原始数据（不做字段映射，不入库）。
+   */
+  async fetchRawPugongyingNotes(noteIds: string[]) {
+    return this.paichachaClient.fetchRawNotes(noteIds);
+  }
+
+  // ── private helpers ──
+
+  /** 解析项目参数 + 计算统一日期，供各采集方法复用 */
+  private async resolveProjectContext(projectId: string) {
+    const noteIds = await this.persistenceService.findNoteIdsByProject(projectId);
+
+    const project = await this.persistenceService.findProject(projectId);
+    if (!project) throw new Error(`项目不存在: ${projectId}`);
+    if (!project.executionStartDate) throw new Error(`项目缺少"开始执行日期"（executionStartDate），请先补充后再拉取数据`);
+
+    const brandName = project.brand;
+    const taxonomyNames = [project.category];
+
+    // T-1（下午 4 点爬取昨天数据）
+    const now = new Date();
+    now.setDate(now.getDate() - 1);
+    const dateBase = now.toISOString().slice(0, 10);
+
+    const execStart = new Date(project.executionStartDate).toISOString().slice(0, 10);
+    const execEnd = new Date(project.endDate).toISOString().slice(0, 10);
+
+    const currentEnd = dateBase <= execEnd ? dateBase : execEnd;
+
+    const periodDays = Math.ceil(
+      (new Date(currentEnd).getTime() - new Date(execStart).getTime()) / 86400000
+    );
+    const preEnd = new Date(new Date(execStart).getTime() - 86400000).toISOString().slice(0, 10);
+    const preStart = new Date(new Date(preEnd).getTime() - periodDays * 86400000 + 86400000).toISOString().slice(0, 10);
+
+    return { noteIds, brandName, taxonomyNames, execStart, execEnd, currentEnd, preStart, preEnd };
+  }
+
+  /**
+   * 评论数据采集（全量替换，用于舆情分析）。
+   * Phase 1 — 与 ingestBaseData 平级，按需独立调用
    */
   async ingestComments(projectId: string, noteIds: string[]): Promise<{ count: number; errors: string[] }> {
+    const ctx = await this.resolveProjectContext(projectId);
     const errors: string[] = [];
     let commentData: CommentData[] = [];
 
     try {
-      commentData = await this.paichachaClient.fetchCommentData(noteIds);
+      commentData = await this.paichachaClient.fetchCommentData(noteIds, ctx.execStart, ctx.currentEnd);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       errors.push(`Failed to fetch comment data: ${message}`);

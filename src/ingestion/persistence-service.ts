@@ -26,7 +26,7 @@ export interface DataPersistenceService {
   savePugongyingNotes(projectId: string, notes: PugongyingNote[]): Promise<void>;
 
   /** Insert juguang records (no unique constraint, uses createMany) */
-  saveJuguangData(projectId: string, data: JuguangNote[]): Promise<void>;
+  saveJuguangData(projectId: string, data: JuguangNote[], reviewConfigId: string): Promise<void>;
 
   /** Insert lingxi records with data_type classification */
   saveLingxiData(projectId: string, data: LingxiData): Promise<void>;
@@ -42,6 +42,10 @@ export interface DataPersistenceService {
   saveComments(projectId: string, data: CommentData[]): Promise<void>;
   /** 千瓜数据（按 dataType 分片存储） */
   saveQianguaData(projectId: string, stats: QianguaStatsData, hotNotePublish: QianguaHotNotePublishData): Promise<void>;
+  /** 查找项目基础信息 */
+  findProject(projectId: string): Promise<{ startDate: Date; endDate: Date; brand: string; category: string; executionStartDate: Date | null } | null>;
+  /** 查找项目底表中的所有 noteId */
+  findNoteIdsByProject(projectId: string): Promise<string[]>;
 }
 
 /**
@@ -190,13 +194,14 @@ export class PrismaDataPersistenceService implements DataPersistenceService {
    * Insert juguang records to PostgreSQL.
    * Uses createMany since there's no unique constraint on juguang_data.
    */
-  async saveJuguangData(projectId: string, data: JuguangNote[]): Promise<void> {
+  async saveJuguangData(projectId: string, data: JuguangNote[], reviewConfigId: string): Promise<void> {
     if (data.length === 0) return;
 
     await prisma.$transaction(async (tx) => {
       await tx.juguangData.createMany({
         data: data.map((record) => ({
           projectId,
+          reviewConfigId,
           noteId: record.noteId ?? null,
           placement: record.placement ?? null,
           targetsDetail: record.targetsDetail ?? null,
@@ -216,7 +221,6 @@ export class PrismaDataPersistenceService implements DataPersistenceService {
           acp: record.acp,
           cpm: record.cpm,
           cpi: record.cpi,
-          targetDetail: record.targetDetail ?? null,
         })),
       });
     });
@@ -351,6 +355,22 @@ export class PrismaDataPersistenceService implements DataPersistenceService {
         where: { projectId, noteId: { in: noteIds }, commentId: { notIn: [...incomingIds] }, isActive: true },
         data: { isActive: false },
       });
+    });
+  }
+
+  async findNoteIdsByProject(projectId: string): Promise<string[]> {
+    const rows = await prisma.noteBase.findMany({
+      where: { projectId },
+      select: { noteId: true },
+      distinct: ['noteId'],
+    });
+    return rows.map((r) => r.noteId);
+  }
+
+  async findProject(projectId: string): Promise<{ startDate: Date; endDate: Date; brand: string; category: string; executionStartDate: Date | null } | null> {
+    return prisma.project.findUnique({
+      where: { id: projectId },
+      select: { startDate: true, endDate: true, brand: true, category: true, executionStartDate: true },
     });
   }
 

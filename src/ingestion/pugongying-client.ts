@@ -204,6 +204,16 @@ export class PugongyingClient {
     return allNotes;
   }
 
+  /** 批量获取笔记原始数据（不做字段映射，不入库） */
+  async fetchRawNotes(noteIds: string[]): Promise<RawPugongyingNote[]> {
+    if (noteIds.length === 0) return [];
+    const allRows: RawPugongyingNote[] = [];
+    for (const batch of chunkArray(noteIds, BATCH_SIZE)) {
+      allRows.push(...(await this.fetchNoteBatch(batch)));
+    }
+    return allRows;
+  }
+
   // ── API calls ──
 
   private async fetchNoteBatch(noteIds: string[]): Promise<RawPugongyingNote[]> {
@@ -290,7 +300,7 @@ export class PugongyingClient {
 
   // ── Comments ──
 
-  async fetchComments(noteIds: string[]): Promise<CommentData[]> {
+  async fetchComments(noteIds: string[], startDate: string, endDate: string): Promise<CommentData[]> {
     const allComments: CommentData[] = [];
     const CONCURRENCY = 5;
     const pending = [...noteIds];

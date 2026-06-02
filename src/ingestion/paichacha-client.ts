@@ -7,7 +7,7 @@
 
 import type { PugongyingNote, JuguangNote, LingxiData, CommentData, QianguaStatsData, QianguaHotNotePublishData } from '../shared/types.js';
 import { PugongyingClient } from './pugongying-client.js';
-import type { PugongyingClientConfig } from './pugongying-client.js';
+import type { PugongyingClientConfig, RawPugongyingNote } from './pugongying-client.js';
 import { JuguangClient } from './juguang-client.js';
 import type { JuguangClientConfig } from './juguang-client.js';
 import { LingxiClient } from './lingxi-client.js';
@@ -20,12 +20,14 @@ import type { QianguaClientConfig } from './qiangua-client.js';
  */
 export interface IPaichachaClient {
   fetchPugongyingData(noteIds: string[]): Promise<PugongyingNote[]>;
-  /** 获取聚光笔记层级离线报表（brandName + 日期范围） */
-  fetchJuguangData(brandName: string, startDate: string, endDate: string): Promise<JuguangNote[]>;
+  /** 批量获取笔记原始数据（不做字段映射） */
+  fetchRawNotes(noteIds: string[]): Promise<RawPugongyingNote[]>;
+  /** 获取聚光笔记层级离线报表 */
+  fetchJuguangData(advertiserIds: number[], startDate: string, endDate: string): Promise<JuguangNote[]>;
   /** 获取灵犀数据（brandName + keyword + taxonomyNames） */
-  fetchLingxiData(brandName: string, keyword: string, startDate: string, endDate: string, taxonomyNames?: string | string[], preStartDate?: string, preEndDate?: string): Promise<LingxiData>;
-  /** 获取评论数据（全量评论，用于舆情分析） */
-  fetchCommentData(noteIds: string[]): Promise<CommentData[]>;
+  fetchLingxiData(brandName: string, startDate: string, endDate: string, taxonomyNames?: string | string[], preStartDate?: string, preEndDate?: string): Promise<LingxiData>;
+  /** 获取评论数据（全量评论，用于舆情分析，按日期范围过滤） */
+  fetchCommentData(noteIds: string[], startDate: string, endDate: string): Promise<CommentData[]>;
   /** 获取千瓜数据（品牌数据卡片 + 爆文发布时间分布） */
   fetchQianguaData(brandName: string, days?: number): Promise<{ stats: QianguaStatsData; hotNotePublish: QianguaHotNotePublishData }>;
 }
@@ -80,6 +82,11 @@ export class PaichachaClient implements IPaichachaClient {
 
   // ── Pugongying ──
 
+  async fetchRawNotes(noteIds: string[]): Promise<RawPugongyingNote[]> {
+    if (!this.pugongyingClient) throw new Error('Pugongying client not configured');
+    return this.pugongyingClient.fetchRawNotes(noteIds);
+  }
+
   async fetchPugongyingData(noteIds: string[]): Promise<PugongyingNote[]> {
     if (!this.pugongyingClient) throw new Error('Pugongying client not configured');
     return this.pugongyingClient.fetchPugongyingData(noteIds);
@@ -87,27 +94,23 @@ export class PaichachaClient implements IPaichachaClient {
 
   // ── Juguang ──
 
-  async fetchJuguangData(
-    brandName: string,
-    startDate: string,
-    endDate: string,
-  ): Promise<JuguangNote[]> {
+  async fetchJuguangData(advertiserIds: number[], startDate: string, endDate: string): Promise<JuguangNote[]> {
     if (!this.juguangClient) throw new Error('Juguang client not configured');
-    return this.juguangClient.fetchJuguangData(brandName, startDate, endDate);
+    return this.juguangClient.fetchJuguangData(advertiserIds, startDate, endDate);
   }
 
   // ── Lingxi ──
 
-  async fetchLingxiData(brandName: string, keyword: string, startDate: string, endDate: string, taxonomyNames?: string | string[], preStartDate?: string, preEndDate?: string): Promise<LingxiData> {
+  async fetchLingxiData(brandName: string, startDate: string, endDate: string, taxonomyNames?: string | string[], preStartDate?: string, preEndDate?: string): Promise<LingxiData> {
     if (!this.lingxiClient) throw new Error('Lingxi client not configured');
-    return this.lingxiClient.fetchLingxiData(brandName, keyword, startDate, endDate, taxonomyNames, preStartDate, preEndDate);
+    return this.lingxiClient.fetchLingxiData(brandName, startDate, endDate, taxonomyNames, preStartDate, preEndDate);
   }
 
   // ── Comments ──
 
-  async fetchCommentData(noteIds: string[]): Promise<CommentData[]> {
+  async fetchCommentData(noteIds: string[], startDate: string, endDate: string): Promise<CommentData[]> {
     if (!this.pugongyingClient) throw new Error('Pugongying client not configured');
-    return this.pugongyingClient.fetchComments(noteIds);
+    return this.pugongyingClient.fetchComments(noteIds, startDate, endDate);
   }
 
   // ── Qiangua ──

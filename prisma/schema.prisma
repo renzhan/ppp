@@ -184,13 +184,15 @@ model JuguangData {
   acp                   Decimal  @default(0) @db.Decimal(12, 2)
   cpm                   Decimal  @default(0) @db.Decimal(12, 2)
   cpi                   Decimal  @default(0) @db.Decimal(12, 2)
-  targetDetail          String?  @map("target_detail") @db.VarChar(100)
+  reviewConfigId        String?  @map("review_config_id") @db.Uuid
   createdAt             DateTime? @default(now()) @map("created_at") @db.Timestamptz()
 
   // Relations
-  project Project @relation(fields: [projectId], references: [id])
+  project      Project        @relation(fields: [projectId], references: [id])
+  reviewConfig ReviewConfig?  @relation(fields: [reviewConfigId], references: [id])
 
   @@index([projectId])
+  @@index([reviewConfigId])
   @@map("juguang_data")
 }
 
@@ -630,8 +632,9 @@ model ReviewConfig {
   updatedAt        DateTime @default(now()) @map("updated_at") @db.Timestamptz()
 
   // Relations
-  project    Project          @relation(fields: [projectId], references: [id])
-  traceItems ReportTraceItem[]
+  project     Project          @relation(fields: [projectId], references: [id])
+  traceItems  ReportTraceItem[]
+  juguangData JuguangData[]
 
   @@index([projectId])
   @@index([createdBy])

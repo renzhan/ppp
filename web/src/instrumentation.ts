@@ -10,5 +10,7 @@ export async function register() {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
     const { startSentimentCron } = await import('./lib/sentiment-cron');
     startSentimentCron();
+    const { startIngestionCron } = await import('./lib/ingestion-cron');
+    startIngestionCron();
   }
 }
