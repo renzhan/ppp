@@ -2,22 +2,17 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { usePathname } from 'next/navigation';
-import { User, Menu } from 'lucide-react';
+import { Menu, PanelLeft, PanelLeftClose } from 'lucide-react';
 import { Sidebar } from './sidebar';
 
-// Pages that should NOT show the sidebar
 const NO_SHELL_PATHS = ['/login', '/change-password'];
 
-// Breakpoints
 const BP_XL = 1280;
 const BP_MD = 768;
+const HEADER_HEIGHT = 'h-[66px]';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const [userName, setUserName] = useState<string | null>(null);
-
-  // Responsive sidebar state
-  // 'expanded' = full sidebar, 'collapsed' = icon-only, 'hidden' = off-screen (mobile)
   const [sidebarMode, setSidebarMode] = useState<'expanded' | 'collapsed' | 'hidden'>('expanded');
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -41,18 +36,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, [updateSidebarMode]);
 
   useEffect(() => {
-    fetch('/api/auth/me')
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.user) {
-          setUserName(data.user.displayName || data.user.username);
-        }
-      })
-      .catch(() => {});
-  }, []);
-
-  // Close mobile sidebar on route change
-  useEffect(() => {
     setMobileOpen(false);
   }, [pathname]);
 
@@ -68,57 +51,64 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const sidebarCollapsed = sidebarMode === 'collapsed';
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      {/* Mobile overlay backdrop */}
-      {showHamburger && mobileOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-black/30 transition-opacity duration-200"
-          onClick={() => setMobileOpen(false)}
-          aria-hidden="true"
-        />
-      )}
-
-      {/* Sidebar: always visible on md+, overlay on mobile */}
-      <div
-        className={
-          showHamburger
-            ? `fixed inset-y-0 left-0 z-50 transition-transform duration-200 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`
-            : 'relative'
-        }
+    <div className="flex h-screen flex-col overflow-hidden bg-[#f1f1f1]">
+      {/* 顶部通栏：100% 页面宽度 */}
+      <header
+        className={`relative z-30 flex ${HEADER_HEIGHT} w-full shrink-0 items-center gap-4 border-b border-gray-200/80 shadow-sm bg-white`}
       >
-        <Sidebar collapsed={sidebarCollapsed} onToggleCollapse={() => {
-          if (sidebarMode === 'expanded') {
-            setSidebarMode('collapsed');
-          } else if (sidebarMode === 'collapsed') {
-            setSidebarMode('expanded');
-          }
-        }} />
-      </div>
+        {showHamburger && (
+          <button
+            type="button"
+            onClick={() => setMobileOpen(!mobileOpen)}
+            className="rounded-md p-1.5 text-gray-600 transition-colors hover:bg-gray-100"
+            aria-label="打开导航菜单"
+          >
+            <Menu size={22} />
+          </button>
+        )}
+        <img src="/images/logo.jpg" alt="元派盘盘" className="h-[66px] object-contain" />
+        {!showHamburger && (
+          <button
+            type="button"
+            onClick={() => {
+              if (sidebarMode === 'expanded') {
+                setSidebarMode('collapsed');
+              } else if (sidebarMode === 'collapsed') {
+                setSidebarMode('expanded');
+              }
+            }}
+            className="rounded-md p-1.5 text-[#999999] transition-colors hover:bg-gray-100 hover:text-gray-600"
+            aria-label={sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'}
+          >
+            {sidebarCollapsed ? (
+              <PanelLeft size={18} strokeWidth={1.75} />
+            ) : (
+              <PanelLeftClose size={18} strokeWidth={1.75} />
+            )}
+          </button>
+        )}
+      </header>
 
-      <div className="flex flex-1 flex-col overflow-hidden">
-        {/* Top bar with user info */}
-        <header className="flex h-14 shrink-0 items-center justify-between border-b border-gray-200 px-6">
-          <div className="flex items-center">
-            {showHamburger && (
-              <button
-                onClick={() => setMobileOpen(!mobileOpen)}
-                className="rounded p-1.5 text-gray-600 hover:bg-gray-100"
-                aria-label="打开导航菜单"
-              >
-                <Menu size={22} />
-              </button>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-100">
-              <User size={16} className="text-gray-500" />
-            </div>
-            {userName && (
-              <span className="text-sm text-gray-700">{userName}</span>
-            )}
-          </div>
-        </header>
-        <main className="flex-1 overflow-y-auto p-6">{children}</main>
+      <div className="relative flex min-h-0 flex-1 overflow-hidden">
+        {showHamburger && mobileOpen && (
+          <div
+            className="fixed inset-0 top-14 z-40 bg-black/30 transition-opacity duration-200"
+            onClick={() => setMobileOpen(false)}
+            aria-hidden="true"
+          />
+        )}
+
+        <div
+          className={
+            showHamburger
+              ? `fixed bottom-0 left-0 top-14 z-50 transition-transform duration-200 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`
+              : 'relative h-full shrink-0'
+          }
+        >
+          <Sidebar collapsed={sidebarCollapsed} />
+        </div>
+
+        <main className="min-w-0 flex-1 overflow-y-auto bg-[#F3F4F6] p-6">{children}</main>
       </div>
     </div>
   );

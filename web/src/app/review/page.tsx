@@ -1,10 +1,31 @@
 'use client';
 
+import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
-import { Plus, Pencil, BookOpen } from 'lucide-react';
+import { Plus, Pencil, BookOpen, Search } from 'lucide-react';
 import { Loading } from '@/components/ui/loading';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  listEmptyClass,
+  listErrorClass,
+  listTableHeadClass,
+  listTableHeaderRowClass,
+  listTableRowClass,
+  listTableWrapperClass,
+} from '@/components/ui/data-list';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { formatDate } from '@/lib/project-meta';
+import { cn } from '@/lib/utils';
 
 interface ReviewItem {
   id: string;
@@ -25,6 +46,8 @@ interface ReviewsResponse {
 }
 
 export default function ReviewListPage() {
+  const [search, setSearch] = useState('');
+
   const { data, isLoading, isError, error } = useQuery<ReviewsResponse>({
     queryKey: ['reviews'],
     queryFn: async () => {
@@ -34,88 +57,119 @@ export default function ReviewListPage() {
     },
   });
 
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-gray-900">复盘系统</h1>
-          <p className="mt-1 text-sm text-gray-500">管理所有复盘记录，查看复盘报告和进入审校台。</p>
-        </div>
-        <Link
-          href="/review/new"
-          className="inline-flex h-10 items-center gap-2 rounded-md bg-brand px-5 text-sm font-medium text-white transition hover:bg-brand-600"
-        >
-          <Plus size={16} />
-          开始新的复盘
-        </Link>
-      </div>
+  const filteredItems = useMemo(() => {
+    const items = data?.items ?? [];
+    const keyword = search.trim().toLowerCase();
+    if (!keyword) return items;
+    return items.filter(
+      (item) =>
+        item.projectName.toLowerCase().includes(keyword) ||
+        (item.createdByDisplayName ?? '').toLowerCase().includes(keyword)
+    );
+  }, [data?.items, search]);
 
-      {/* Table */}
-      {isLoading ? (
-        <Loading size="lg" text="正在加载复盘列表..." className="py-20" />
-      ) : isError ? (
-        <div className="rounded-lg border border-rose-200 bg-rose-50 p-6 text-sm text-rose-600">
-          {(error as Error).message || '获取复盘列表失败'}
+  return (
+    <Card>
+      <CardHeader className="flex-row items-start justify-between space-y-0">
+        <div className="space-y-1">
+          <CardTitle className='text-md'>复盘系统</CardTitle>
+          <CardDescription>管理所有复盘记录，查看复盘报告和进入审校台。</CardDescription>
         </div>
-      ) : data?.items.length ? (
-        <div className="bg-white rounded-lg border border-gray-200">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-gray-50 text-left">
-                  <th className="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-600">项目名称</th>
-                  <th className="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-600">复盘者</th>
-                  <th className="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-600">更新时间</th>
-                  <th className="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-600">状态</th>
-                  <th className="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-600">操作</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {data.items.map((review) => (
-                  <tr key={review.id} className="bg-white text-sm text-gray-900 border-b transition hover:bg-gray-50">
-                    <td className="max-w-[200px] truncate px-4 py-3 font-medium">
+        <Button variant="primary" size="sm" className="shrink-0 gap-2" asChild>
+          <Link href="/review/new">
+            <Plus size={16} />
+            开始新的复盘
+          </Link>
+        </Button>
+      </CardHeader>
+
+      <CardContent className="space-y-4">
+        <div className="relative max-w-sm">
+          <Search
+            size={16}
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+            aria-hidden
+          />
+          <Input
+            variant="filter"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="搜索项目名称或复盘者"
+            className="pl-9"
+          />
+        </div>
+
+        {isLoading ? (
+          <Loading size="lg" text="正在加载复盘列表..." className="py-16" />
+        ) : isError ? (
+          <div className={listErrorClass}>{(error as Error).message || '获取复盘列表失败'}</div>
+        ) : filteredItems.length ? (
+          <div className={listTableWrapperClass}>
+            <Table className="text-sm">
+              <TableHeader>
+                <TableRow className={listTableHeaderRowClass}>
+                  <TableHead className={listTableHeadClass}>项目名称</TableHead>
+                  <TableHead className={listTableHeadClass}>复盘者</TableHead>
+                  <TableHead className={listTableHeadClass}>更新时间</TableHead>
+                  <TableHead className={listTableHeadClass}>状态</TableHead>
+                  <TableHead className={listTableHeadClass}>操作</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredItems.map((review, index) => (
+                  <TableRow key={review.id} className={listTableRowClass(index)}>
+                    <TableCell className="max-w-[240px] truncate py-3 font-medium text-gray-900">
                       {review.projectName}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3">
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap py-3">
                       {review.createdByDisplayName || '-'}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3">
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap py-3">
                       {formatDate(review.updatedAt)}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3">
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap py-3">
                       <StatusBadge status={review.status} />
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <Link
-                          href={`/review/new?editId=${review.id}`}
-                          className="inline-flex items-center gap-1 text-xs font-medium text-brand transition hover:underline"
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap py-3">
+                      <div className="flex items-center gap-3">
+                        <Button
+                          variant="text-link"
+                          size="sm"
+                          className="h-auto gap-1 px-0 text-xs"
+                          asChild
                         >
-                          <Pencil size={12} />
-                          编辑
-                        </Link>
-                        <Link
-                          href={`/review/${review.id}/proofread`}
-                          className="inline-flex items-center gap-1 text-xs font-medium text-brand transition hover:underline"
+                          <Link href={`/review/new?editId=${review.id}`}>
+                            <Pencil size={12} />
+                            编辑
+                          </Link>
+                        </Button>
+                        <Button
+                          variant="text-link"
+                          size="sm"
+                          className="h-auto gap-1 px-0 text-xs"
+                          asChild
                         >
-                          <BookOpen size={12} />
-                          审校台
-                        </Link>
+                          <Link href={`/review/${review.id}/proofread`}>
+                            <BookOpen size={12} />
+                            审校台
+                          </Link>
+                        </Button>
                       </div>
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
-        </div>
-      ) : (
-        <div className="rounded-lg border bg-white px-6 py-16 text-center text-sm text-gray-500">
-          暂无复盘记录，点击"开始新的复盘"创建第一个复盘。
-        </div>
-      )}
-    </div>
+        ) : (
+          <div className={listEmptyClass}>
+            {search.trim()
+              ? '未找到匹配的复盘记录'
+              : '暂无复盘记录，点击「开始新的复盘」创建第一个复盘。'}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -126,10 +180,15 @@ function StatusBadge({ status }: { status: string }) {
     completed: { label: '已完成', className: 'bg-emerald-100 text-emerald-700' },
   };
 
-  const { label, className } = config[status] ?? { label: status, className: 'bg-gray-100 text-gray-700' };
+  const { label, className } = config[status] ?? {
+    label: status,
+    className: 'bg-gray-100 text-gray-700',
+  };
 
   return (
-    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${className}`}>
+    <span
+      className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium', className)}
+    >
       {label}
     </span>
   );
