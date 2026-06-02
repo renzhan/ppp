@@ -169,6 +169,13 @@ export class DataIngestionService {
     return { juguangNotes, errors };
   }
 
+  /**
+   * 批量获取蒲公英笔记原始数据（不做字段映射，不入库）。
+   */
+  async fetchRawPugongyingNotes(noteIds: string[]) {
+    return this.paichachaClient.fetchRawNotes(noteIds);
+  }
+
   // ── private helpers ──
 
   /** 解析项目参数 + 计算统一日期，供各采集方法复用 */

@@ -7,7 +7,7 @@
 
 import type { PugongyingNote, JuguangNote, LingxiData, CommentData, QianguaStatsData, QianguaHotNotePublishData } from '../shared/types.js';
 import { PugongyingClient } from './pugongying-client.js';
-import type { PugongyingClientConfig } from './pugongying-client.js';
+import type { PugongyingClientConfig, RawPugongyingNote } from './pugongying-client.js';
 import { JuguangClient } from './juguang-client.js';
 import type { JuguangClientConfig } from './juguang-client.js';
 import { LingxiClient } from './lingxi-client.js';
@@ -20,6 +20,8 @@ import type { QianguaClientConfig } from './qiangua-client.js';
  */
 export interface IPaichachaClient {
   fetchPugongyingData(noteIds: string[]): Promise<PugongyingNote[]>;
+  /** 批量获取笔记原始数据（不做字段映射） */
+  fetchRawNotes(noteIds: string[]): Promise<RawPugongyingNote[]>;
   /** 获取聚光笔记层级离线报表 */
   fetchJuguangData(advertiserIds: number[], startDate: string, endDate: string): Promise<JuguangNote[]>;
   /** 获取灵犀数据（brandName + keyword + taxonomyNames） */
@@ -79,6 +81,11 @@ export class PaichachaClient implements IPaichachaClient {
   }
 
   // ── Pugongying ──
+
+  async fetchRawNotes(noteIds: string[]): Promise<RawPugongyingNote[]> {
+    if (!this.pugongyingClient) throw new Error('Pugongying client not configured');
+    return this.pugongyingClient.fetchRawNotes(noteIds);
+  }
 
   async fetchPugongyingData(noteIds: string[]): Promise<PugongyingNote[]> {
     if (!this.pugongyingClient) throw new Error('Pugongying client not configured');
