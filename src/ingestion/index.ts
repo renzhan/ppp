@@ -15,11 +15,12 @@ import type { PugongyingNote, JuguangNote, LingxiData, CommentData } from '../sh
 
 // ---- Types ----
 
-/**
- * Result of an API ingestion operation
- */
-export interface APIIngestionResult {
+export interface BaseDataResult {
   pugongyingNotes: PugongyingNote[];
+  errors: string[];
+}
+
+export interface JuguangDataResult {
   juguangNotes: JuguangNote[];
   errors: string[];
 }
@@ -70,79 +71,39 @@ export class DataIngestionService {
   }
 
   /**
-   * Ingest data from Pugongying & Juguang APIs for a given project.
-   * Fetches both pugongying and juguang data, then persists to DB.
-   *
-   * @param projectId - The project to associate data with
-   * @param advertiserIds - 广告主 ID 列表(按说直接从项目查到的TODO)
-   * @param noteIds - 笔记 ID 列表（可选，未传时从底表自动获取）
-   * @returns Result containing fetched data and any errors encountered
+   * 预爬基础数据：蒲公英笔记 + 灵犀（品牌资产）。
+   * 每天凌晨定时调用，用户使用时数据已在库中。
    */
-  async ingestFromAPI(projectId: string, advertiserIds: number[], noteIds?: string[]): Promise<APIIngestionResult> {
+  async ingestBaseData(projectId: string): Promise<BaseDataResult> {
+    const ctx = await this.resolveProjectContext(projectId);
     const errors: string[] = [];
+
+    // 蒲公英笔记
     let pugongyingNotes: PugongyingNote[] = [];
-    let juguangNotes: JuguangNote[] = [];
-
-    const resolvedNoteIds = noteIds ?? await this.persistenceService.findNoteIdsByProject(projectId);
-
-    // 从项目配置读取参数
-    const project = await this.persistenceService.findProject(projectId);
-    if (!project) throw new Error(`项目不存在: ${projectId}`);
-    if (!project.executionStartDate) throw new Error(`项目缺少"开始执行日期"（executionStartDate），请先补充后再拉取数据`);
-
-    const brandName = project.brand;
-    const taxonomyNames = [project.category];
-    // 平台数据均为 T+2 可见，查询截止日取两天前
-    const now = new Date();
-    now.setDate(now.getDate() - 2);
-    const dateBase = now.toISOString().slice(0, 10);
-
-    const execStart = new Date(project.executionStartDate).toISOString().slice(0, 10);
-    const execEnd = new Date(project.endDate).toISOString().slice(0, 10);
-
-    // 统一截止日：T-2 与项目结束日取较小值（项目已结束则不再扩大范围）
-    const currentEnd = dateBase <= execEnd ? dateBase : execEnd;
-
-    // 灵犀需环比周期的日期计算（Case A/B 统一公式）
-    const periodDays = Math.ceil(
-      (new Date(currentEnd).getTime() - new Date(execStart).getTime()) / 86400000
-    );
-    const preEnd = new Date(new Date(execStart).getTime() - 86400000).toISOString().slice(0, 10);
-    const preStart = new Date(new Date(preEnd).getTime() - periodDays * 86400000 + 86400000).toISOString().slice(0, 10);
-
-    // Fetch pugongying data
     try {
-      pugongyingNotes = await this.paichachaClient.fetchPugongyingData(resolvedNoteIds);
+      pugongyingNotes = await this.paichachaClient.fetchPugongyingData(ctx.noteIds);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       errors.push(`Failed to fetch pugongying data: ${message}`);
     }
 
-    // Fetch juguang data（当天数据）
-    try {
-      juguangNotes = await this.paichachaClient.fetchJuguangData(advertiserIds, currentEnd, currentEnd);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      errors.push(`Failed to fetch juguang data: ${message}`);
-    }
-
-    // Fetch lingxi data（需环比：brand_rank + move_analyse 使用投前投后对比）
+    // 灵犀
     let lingxiData: LingxiData | undefined;
     try {
       lingxiData = await this.paichachaClient.fetchLingxiData(
-        brandName,
-        execStart,          // 投后 start
-        currentEnd,         // 投后 end（min(today, projectEnd)）
-        taxonomyNames,
-        preStart,            // 投前 start（等长周期）
-        preEnd,              // 投前 end（execStart 前一天）
+        ctx.brandName,
+        ctx.execStart,
+        ctx.currentEnd,
+        ctx.taxonomyNames,
+        ctx.preStart,
+        ctx.preEnd,
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       errors.push(`Failed to fetch lingxi data: ${message}`);
     }
 
-    // Merge: preserve isUnderwater / underwaterPrice from existing records
+    // 保留已有水下/水下价格
     if (pugongyingNotes.length > 0) {
       try {
         const existing = await this.persistenceService.findPugongyingNoteIds(projectId, pugongyingNotes.map((n) => n.noteId));
@@ -155,26 +116,17 @@ export class DataIngestionService {
           }
         }
       } catch {
-        // If lookup fails, proceed with API values (false / 0)
+        // lookup 失败就用 API 值
       }
     }
 
-    // Persist successfully fetched data
+    // 持久化
     if (pugongyingNotes.length > 0) {
       try {
         await this.persistenceService.savePugongyingNotes(projectId, pugongyingNotes);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         errors.push(`Failed to persist pugongying data: ${message}`);
-      }
-    }
-
-    if (juguangNotes.length > 0) {
-      try {
-        await this.persistenceService.saveJuguangData(projectId, juguangNotes);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        errors.push(`Failed to persist juguang data: ${message}`);
       }
     }
 
@@ -187,28 +139,79 @@ export class DataIngestionService {
       }
     }
 
-    return { pugongyingNotes, juguangNotes, errors };
+    return { pugongyingNotes, errors };
   }
 
   /**
-   * 评论数据采集（全量替换，用于舆情分析）
-   * Phase 1 — 与 ingestFromAPI 平级，按需独立调用
+   * 采集聚光投流数据（需广告主 ID，由用户手动触发）。
    */
-  async ingestComments(projectId: string, noteIds: string[]): Promise<{ count: number; errors: string[] }> {
+  async ingestJuguangData(projectId: string, advertiserIds: number[]): Promise<JuguangDataResult> {
+    const ctx = await this.resolveProjectContext(projectId);
     const errors: string[] = [];
-    let commentData: CommentData[] = [];
+    let juguangNotes: JuguangNote[] = [];
 
-    // 读取项目获取日期范围：开始执行日期 ~ T-2（平台数据 T+2 可见）
+    try {
+      juguangNotes = await this.paichachaClient.fetchJuguangData(advertiserIds, ctx.currentEnd, ctx.currentEnd);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      errors.push(`Failed to fetch juguang data: ${message}`);
+    }
+
+    if (juguangNotes.length > 0) {
+      try {
+        await this.persistenceService.saveJuguangData(projectId, juguangNotes);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        errors.push(`Failed to persist juguang data: ${message}`);
+      }
+    }
+
+    return { juguangNotes, errors };
+  }
+
+  // ── private helpers ──
+
+  /** 解析项目参数 + 计算统一日期，供各采集方法复用 */
+  private async resolveProjectContext(projectId: string) {
+    const noteIds = await this.persistenceService.findNoteIdsByProject(projectId);
+
     const project = await this.persistenceService.findProject(projectId);
+    if (!project) throw new Error(`项目不存在: ${projectId}`);
+    if (!project.executionStartDate) throw new Error(`项目缺少"开始执行日期"（executionStartDate），请先补充后再拉取数据`);
+
+    const brandName = project.brand;
+    const taxonomyNames = [project.category];
+
+    // T+2
     const now = new Date();
     now.setDate(now.getDate() - 2);
     const dateBase = now.toISOString().slice(0, 10);
-    const startDate = project?.executionStartDate
-      ? new Date(project.executionStartDate).toISOString().slice(0, 10)
-      : dateBase; // 无执行日期时 fallback 到 T-2
+
+    const execStart = new Date(project.executionStartDate).toISOString().slice(0, 10);
+    const execEnd = new Date(project.endDate).toISOString().slice(0, 10);
+
+    const currentEnd = dateBase <= execEnd ? dateBase : execEnd;
+
+    const periodDays = Math.ceil(
+      (new Date(currentEnd).getTime() - new Date(execStart).getTime()) / 86400000
+    );
+    const preEnd = new Date(new Date(execStart).getTime() - 86400000).toISOString().slice(0, 10);
+    const preStart = new Date(new Date(preEnd).getTime() - periodDays * 86400000 + 86400000).toISOString().slice(0, 10);
+
+    return { noteIds, brandName, taxonomyNames, execStart, execEnd, currentEnd, preStart, preEnd };
+  }
+
+  /**
+   * 评论数据采集（全量替换，用于舆情分析）。
+   * Phase 1 — 与 ingestBaseData 平级，按需独立调用
+   */
+  async ingestComments(projectId: string, noteIds: string[]): Promise<{ count: number; errors: string[] }> {
+    const ctx = await this.resolveProjectContext(projectId);
+    const errors: string[] = [];
+    let commentData: CommentData[] = [];
 
     try {
-      commentData = await this.paichachaClient.fetchCommentData(noteIds, startDate, dateBase);
+      commentData = await this.paichachaClient.fetchCommentData(noteIds, ctx.execStart, ctx.currentEnd);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       errors.push(`Failed to fetch comment data: ${message}`);
