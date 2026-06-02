@@ -69,11 +69,12 @@ export default function ReviewListPage() {
   }, [data?.items, search]);
 
   return (
-    <Card>
-      <CardHeader className="flex-row items-start justify-between space-y-0">
+    <div className="space-y-6">
+
+      <div className="flex items-start justify-between space-y-0">
         <div className="space-y-1">
-          <CardTitle className='text-md'>复盘系统</CardTitle>
-          <CardDescription>管理所有复盘记录，查看复盘报告和进入审校台。</CardDescription>
+          <h1 className="text-2xl font-bold tracking-tight text-gray-900">复盘系统</h1>
+          <p className="text-sm text-gray-500">管理所有复盘记录，查看复盘报告和进入审校台。</p>
         </div>
         <Button variant="primary" size="sm" className="shrink-0 gap-2" asChild>
           <Link href="/review/new">
@@ -81,9 +82,9 @@ export default function ReviewListPage() {
             开始新的复盘
           </Link>
         </Button>
-      </CardHeader>
+      </div>
 
-      <CardContent className="space-y-4">
+      <div className="space-y-4">
         <div className="relative max-w-sm">
           <Search
             size={16}
@@ -168,8 +169,8 @@ export default function ReviewListPage() {
               : '暂无复盘记录，点击「开始新的复盘」创建第一个复盘。'}
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 

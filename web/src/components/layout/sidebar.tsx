@@ -19,8 +19,8 @@ const navItems = [
   { href: '/review', label: '复盘系统', icon: History },
   { href: '/planning', label: '策划系统', icon: Waypoints },
   { href: '/sentiment', label: '舆情系统', icon: MessageCircle },
-  { href: '/admin/users', label: '账户管理', suffix: '（仅管理员）', icon: UserRound, adminOnly: true },
-  { href: '/admin/settings', label: '系统设置', suffix: '（仅管理员）', icon: Settings, adminOnly: true },
+  { href: '/admin/users', label: '账户管理', icon: UserRound, adminOnly: true },
+  { href: '/admin/settings', label: '系统设置', icon: Settings, adminOnly: true },
 ] as const;
 
 interface SidebarProps {
@@ -62,10 +62,7 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
                   pathname.startsWith(item.href + '/') ||
                   pathname.startsWith(item.href + '?');
             const Icon = item.icon;
-            const displayLabel =
-              'suffix' in item && item.suffix && !collapsed
-                ? `${item.label}${item.suffix}`
-                : item.label;
+            const displayLabel = item.label;
 
             return (
               <Link

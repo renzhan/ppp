@@ -153,20 +153,23 @@ export default function ProjectListPage() {
   const totalPages = data?.totalPages ?? 1;
 
   return (
-    <Card>
-      <CardHeader className="flex-row items-start justify-between space-y-0 items-center">
-        <div className="space-y-1">
-          <CardTitle className='text-md'>项目基础信息</CardTitle>
-        </div>
-        <Button variant="primary" size="sm" className="shrink-0 gap-1 px-4" asChild>
-          <Link href="/projects/new">
-            <Plus size={16} />
-            新建
-          </Link>
-        </Button>
-      </CardHeader>
+    <div className="space-y-6">
 
-      <CardContent className="space-y-4">
+
+      <div className="flex items-start justify-between space-y-0">
+
+          <h1 className="text-2xl font-bold tracking-tight text-gray-900">项目基础信息</h1>
+
+
+          <Button variant="primary" size="sm" className="shrink-0 gap-1 px-4" asChild>
+            <Link href="/projects/new">
+              <Plus size={16} />
+              新建
+            </Link>
+          </Button>
+      </div>
+
+      <div className="space-y-4">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <FilterField label="品类：">
             <Select value={filters.category} onValueChange={handleCategoryChange}>
@@ -347,7 +350,7 @@ export default function ProjectListPage() {
         ) : (
           <div className={listEmptyClass}>暂无项目数据</div>
         )}
-      </CardContent>
+      </div>
 
       {data?.items.length ? (
         <CardFooter className="flex flex-wrap items-center justify-between gap-3">
@@ -394,7 +397,7 @@ export default function ProjectListPage() {
           </div>
         </CardFooter>
       ) : null}
-    </Card>
+    </div>
   );
 }
 

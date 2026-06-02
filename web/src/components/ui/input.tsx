@@ -13,6 +13,8 @@ const inputVariants = cva(
           'h-[42px] rounded-xl border-gray-300 bg-white text-gray-900 placeholder:text-gray-400 focus-visible:ring-brand/20',
         filter:
           'h-9 rounded border-gray-200 bg-white text-gray-900 placeholder:text-gray-400 focus-visible:ring-brand/25',
+        form:
+          'h-10 rounded-lg border-gray-300 bg-white text-gray-900 placeholder:text-gray-400 focus-visible:ring-brand/20',
       },
     },
     defaultVariants: {
