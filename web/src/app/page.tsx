@@ -331,35 +331,7 @@ export default function ProjectListPage() {
                         <Button variant="text-link" size="sm" className="h-auto px-0 text-xs" asChild>
                           <Link href={`/projects/${project.id}/edit`}>编辑</Link>
                         </Button>
-                        <Button
-                          variant="text-link"
-                          size="sm"
-                          className="h-auto px-0 text-xs"
-                          onClick={async () => {
-                            try {
-                              const res = await fetch(`/api/export/raw-notes/${project.id}`, { method: 'POST' });
-                              if (!res.ok) {
-                                const err = await res.json().catch(() => ({ error: '导出失败' }));
-                                alert(err.error || '导出失败');
-                                return;
-                              }
-                              const blob = await res.blob();
-                              const contentDisposition = res.headers.get('Content-Disposition') || '';
-                              const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
-                              const filename = filenameMatch ? decodeURIComponent(filenameMatch[1]) : `${project.projectName}_导出.xlsx`;
-                              const url = URL.createObjectURL(blob);
-                              const a = document.createElement('a');
-                              a.href = url;
-                              a.download = filename;
-                              a.click();
-                              URL.revokeObjectURL(url);
-                            } catch {
-                              alert('导出失败，请稍后重试');
-                            }
-                          }}
-                        >
-                          导出
-                        </Button>
+                        {/* 导出按钮暂时隐藏，待联调完成后启用 */}
                         <Button variant="text-link" size="sm" className="h-auto px-0 text-xs" asChild>
                           <Link href={`/review/new?projectId=${project.id}`}>复盘</Link>
                         </Button>
