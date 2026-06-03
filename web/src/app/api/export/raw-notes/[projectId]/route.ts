@@ -53,7 +53,7 @@ export async function POST(
     const filename = generateExportFilename(project.projectName);
 
     // Return as file download
-    return new NextResponse(buffer, {
+    return new NextResponse(new Uint8Array(buffer), {
       status: 200,
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
