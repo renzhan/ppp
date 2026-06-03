@@ -123,6 +123,15 @@ export default function ProofreadPage({ params }: { params: { id: string } }) {
         if (data.reportContent?.type === 'chapters' && data.reportContent.chapters?.length) {
           setChapters(data.reportContent.chapters);
           setActiveChapterId(data.reportContent.chapters[0].id);
+          // Initialize chapterStatuses from loaded chapters (all completed)
+          setChapterStatuses(
+            data.reportContent.chapters.map((ch: ChapterData) => ({
+              id: ch.id,
+              title: ch.title,
+              number: ch.number,
+              status: 'completed' as const,
+            }))
+          );
           if (data.status === 'completed') {
             setPageStatus('ready');
           } else {
