@@ -1,13 +1,21 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
-import { Loader2, X, ChevronDown } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
+import Link from 'next/link';
 import { PageHeader } from '@/components/layout/page-header';
 import { CascadeSelector, CascadeSelectorValue } from '@/components/form/cascade-selector';
 import { NoteBaseUploader } from '@/components/form/note-base-uploader';
 import { NoteBaseTable } from '@/components/form/note-base-table';
+import { ParticipantMultiSelect } from '@/components/form/participant-multi-select';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { FilterField } from '@/components/ui/filter-field';
+import { Input } from '@/components/ui/input';
+import { Loading } from '@/components/ui/loading';
+import { listErrorClass } from '@/components/ui/data-list';
 
 interface User {
   id: string;
@@ -22,8 +30,8 @@ interface ProjectDetail {
   brand: string;
   category: string;
   businessLine: string | null;
-  executionStartDate: string | null;
-  endDate: string | null;
+  startDate: string;
+  createdBy: string | null;
   participants: string[];
   noteCount: number;
 }
@@ -31,8 +39,7 @@ interface ProjectDetail {
 interface FormState {
   cascade: CascadeSelectorValue;
   projectName: string;
-  executionStartDate: string;
-  endDate: string;
+  startDate: string;
   participants: string[];
 }
 
@@ -44,11 +51,7 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
   const queryClient = useQueryClient();
   const [form, setForm] = useState<FormState | null>(null);
   const [errors, setErrors] = useState<FormErrors>({});
-  const [showParticipantDropdown, setShowParticipantDropdown] = useState(false);
-  const [participantSearch, setParticipantSearch] = useState('');
-  const participantRef = useRef<HTMLDivElement>(null);
 
-  // Fetch project detail
   const { data: project, isLoading: projectLoading } = useQuery<ProjectDetail>({
     queryKey: ['project', projectId],
     queryFn: async () => {
@@ -58,7 +61,6 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
     },
   });
 
-  // Fetch all users for participant selector
   const { data: usersData } = useQuery<{ users: User[] }>({
     queryKey: ['all-users'],
     queryFn: async () => {
@@ -70,7 +72,6 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
 
   const allUsers = usersData?.users ?? [];
 
-  // Initialize form when project loads
   useEffect(() => {
     if (project && !form) {
       setForm({
@@ -80,28 +81,17 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
           businessLine: project.businessLine || '',
         },
         projectName: project.projectName || '',
-        executionStartDate: project.executionStartDate ? project.executionStartDate.slice(0, 10) : '',
-        endDate: project.endDate ? project.endDate.slice(0, 10) : '',
+        startDate: project.startDate ? project.startDate.slice(0, 10) : '',
         participants: project.participants || [],
       });
     }
   }, [project, form]);
 
-  // Available participants
-  const availableParticipants = useMemo(() => {
-    return allUsers;
-  }, [allUsers]);
-
-  // Close dropdown on outside click
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (participantRef.current && !participantRef.current.contains(e.target as Node)) {
-        setShowParticipantDropdown(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  const creatorName = useMemo(() => {
+    if (!project?.createdBy) return '-';
+    const user = allUsers.find((u) => u.id === project.createdBy);
+    return user?.displayName || user?.username || project.createdBy;
+  }, [project?.createdBy, allUsers]);
 
   const updateProjectMutation = useMutation({
     mutationFn: async () => {
@@ -114,8 +104,7 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
           brand: form.cascade.brand,
           businessLine: form.cascade.businessLine || null,
           projectName: form.projectName,
-          executionStartDate: form.executionStartDate || null,
-          endDate: form.endDate || null,
+          startDate: form.startDate,
           participants: form.participants,
         }),
       });
@@ -145,234 +134,125 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
   };
 
   const handleCascadeChange = (value: CascadeSelectorValue) => {
-    setForm((prev) => prev ? { ...prev, cascade: value } : prev);
-    setErrors((prev) => { const n = { ...prev }; delete n.category; delete n.brand; return n; });
-  };
-
-  const toggleParticipant = (userId: string) => {
-    setForm((prev) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        participants: prev.participants.includes(userId)
-          ? prev.participants.filter((id) => id !== userId)
-          : [...prev.participants, userId],
-      };
+    setForm((prev) => (prev ? { ...prev, cascade: value } : prev));
+    setErrors((prev) => {
+      const n = { ...prev };
+      delete n.category;
+      delete n.brand;
+      return n;
     });
-  };
-
-  const removeParticipant = (userId: string) => {
-    setForm((prev) => {
-      if (!prev) return prev;
-      return { ...prev, participants: prev.participants.filter((id) => id !== userId) };
-    });
-  };
-
-  const getDisplayName = (userId: string) => {
-    const user = allUsers.find((u) => u.id === userId);
-    return user?.displayName || user?.username || userId;
   };
 
   if (projectLoading || !form) {
-    return (
-      <div className="flex h-64 items-center justify-center">
-        <div className="text-gray-500">加载中...</div>
-      </div>
-    );
+    return <Loading size="lg" text="正在加载项目信息..." className="py-20" />;
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
-      <PageHeader
-        title="编辑项目"
-        description={project?.projectName || ''}
-        backHref="/"
-      />
+    <div className="space-y-6">
+      <PageHeader title="编辑项目" description={project?.projectName || ''} backHref="/" />
 
-      <div className="rounded-lg border bg-white px-8 py-10 shadow-sm">
-        <div className="mx-auto max-w-3xl space-y-8">
-          {/* 品类/品牌/业务线 */}
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-900">
-              品类 / 品牌 / 业务线 <span className="text-rose-500">*</span>
-            </label>
+
+        <div className="space-y-6 ">
+      
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <CascadeSelector value={form.cascade} onChange={handleCascadeChange} />
-            {(errors.category || errors.brand) && (
-              <p className="text-xs text-rose-500">{errors.category || errors.brand}</p>
-            )}
+            <FilterField label="项目名称：">
+              <Input
+                variant="filter"
+                value={form.projectName}
+                onChange={(e) => {
+                  setForm((prev) => (prev ? { ...prev, projectName: e.target.value } : prev));
+                  setErrors((prev) => {
+                    const n = { ...prev };
+                    delete n.projectName;
+                    return n;
+                  });
+                }}
+                placeholder="请输入"
+              />
+            </FilterField>
           </div>
-
-          {/* 项目名称 */}
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-900">
-              项目名称 <span className="text-rose-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={form.projectName}
-              onChange={(e) => {
-                setForm((prev) => prev ? { ...prev, projectName: e.target.value } : prev);
-                setErrors((prev) => { const n = { ...prev }; delete n.projectName; return n; });
-              }}
-              className="h-11 w-full rounded-lg border border-gray-200 px-3 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
-            />
-            {errors.projectName && <p className="text-xs text-rose-500">{errors.projectName}</p>}
-          </div>
-
-          {/* 开始执行日期 */}
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-900">开始执行日期</label>
-            <input
-              type="date"
-              value={form.executionStartDate}
-              onChange={(e) => setForm((prev) => prev ? { ...prev, executionStartDate: e.target.value } : prev)}
-              className="h-11 w-full rounded-lg border border-gray-200 px-3 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
-            />
-          </div>
-
-          {/* 项目结束日期 */}
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-900">项目结束日期</label>
-            <input
-              type="date"
-              value={form.endDate}
-              onChange={(e) => setForm((prev) => prev ? { ...prev, endDate: e.target.value } : prev)}
-              className="h-11 w-full rounded-lg border border-gray-200 px-3 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
-            />
-          </div>
-
-          {/* 参与者 */}
-          <div className="space-y-2" ref={participantRef}>
-            <label className="block text-sm font-medium text-gray-900">参与者</label>
-            <div className="relative">
-              <div
-                onClick={() => setShowParticipantDropdown(!showParticipantDropdown)}
-                className="flex min-h-[44px] w-full cursor-pointer flex-wrap items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-sm transition hover:border-gray-300"
-              >
-                {form.participants.length === 0 && (
-                  <span className="text-gray-400">点击选择参与者</span>
-                )}
-                {form.participants.map((userId) => (
-                  <span
-                    key={userId}
-                    className="inline-flex items-center gap-1 rounded-md bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand"
-                  >
-                    {getDisplayName(userId)}
-                    <button
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); removeParticipant(userId); }}
-                      className="ml-0.5 rounded-full p-0.5 transition hover:bg-brand-100"
-                    >
-                      <X size={12} />
-                    </button>
-                  </span>
-                ))}
-                <ChevronDown size={16} className="ml-auto text-gray-400" />
-              </div>
-              {showParticipantDropdown && (
-                <div className="absolute z-10 mt-1 max-h-60 w-full overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg">
-                  <div className="border-b px-3 py-2">
-                    <input
-                      type="text"
-                      value={participantSearch}
-                      onChange={(e) => setParticipantSearch(e.target.value)}
-                      placeholder="搜索姓名..."
-                      className="h-8 w-full rounded border border-gray-200 px-2 text-sm outline-none focus:border-brand focus:ring-1 focus:ring-brand/20"
-                      autoFocus
-                    />
-                  </div>
-                  <div className="max-h-48 overflow-y-auto">
-                  {availableParticipants.filter((u) => {
-                    if (!participantSearch.trim()) return true;
-                    const q = participantSearch.toLowerCase();
-                    return (u.displayName || '').toLowerCase().includes(q) || u.username.toLowerCase().includes(q);
-                  }).length === 0 ? (
-                    <div className="px-3 py-2 text-sm text-gray-400">无匹配用户</div>
-                  ) : (
-                    availableParticipants.filter((u) => {
-                      if (!participantSearch.trim()) return true;
-                      const q = participantSearch.toLowerCase();
-                      return (u.displayName || '').toLowerCase().includes(q) || u.username.toLowerCase().includes(q);
-                    }).map((user) => {
-                      const isSelected = form.participants.includes(user.id);
-                      return (
-                        <button
-                          key={user.id}
-                          type="button"
-                          onClick={() => toggleParticipant(user.id)}
-                          className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition ${
-                            isSelected ? 'bg-brand-50 text-brand' : 'text-gray-700 hover:bg-gray-50'
-                          }`}
-                        >
-                          <span className={`flex h-4 w-4 items-center justify-center rounded border ${
-                            isSelected ? 'border-brand bg-brand' : 'border-gray-300'
-                          }`}>
-                            {isSelected && (
-                              <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                              </svg>
-                            )}
-                          </span>
-                          <span>{user.displayName || user.username}</span>
-                          {user.role && user.role !== 'admin' && (
-                            <span className="ml-auto text-xs text-gray-400">{user.role}</span>
-                          )}
-                        </button>
-                      );
-                    })
-                  )}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* 笔记底表上传 */}
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-900">笔记底表</label>
-            <p className="text-xs text-gray-500">
-              {project?.noteCount ? `当前已有 ${project.noteCount} 条笔记数据。重新上传将覆盖现有数据。` : '尚未上传笔记底表，上传后可用于复盘分析。'}
+          {(errors.category || errors.brand || errors.projectName) && (
+            <p className="text-xs text-rose-500">
+              {errors.category || errors.brand || errors.projectName}
             </p>
+          )}
+
+     
+          <div className="grid grid-cols-1 gap-4 
+            sm:grid-cols-2 
+            xl:grid-cols-[1fr_2fr_1fr]">
+            <FilterField label="创建者：">
+              <Input variant="filter" value={creatorName} readOnly disabled className="bg-gray-50" />
+            </FilterField>
+            <FilterField label="参与者：">
+              <ParticipantMultiSelect
+                users={allUsers}
+                value={form.participants}
+                onChange={(participants) =>
+                  setForm((prev) => (prev ? { ...prev, participants } : prev))
+                }
+              />
+            </FilterField>
+            <FilterField label="立项时间：">
+              <Input
+                variant="filter"
+                type="date"
+                value={form.startDate}
+                onChange={(e) =>
+                  setForm((prev) => (prev ? { ...prev, startDate: e.target.value } : prev))
+                }
+                placeholder="请输入"
+              />
+            </FilterField>
+          </div>
+
+          {/* 笔记底表 */}
+          <div className="space-y-1 border-t border-gray-100 pt-6">
+            <h3 className="text-lg font-medium text-gray-900">笔记底表</h3>
+            {project?.noteCount ? (
+              <p className="text-xs text-gray-500">
+                当前已有 {project.noteCount} 条笔记数据，重新上传将覆盖现有数据。
+              </p>
+            ) : null}
             <NoteBaseUploader
               projectId={projectId}
               onUploadSuccess={() => {
                 queryClient.invalidateQueries({ queryKey: ['project', projectId] });
                 queryClient.invalidateQueries({ queryKey: ['projects'] });
-                queryClient.invalidateQueries({ queryKey: ['project-note-base', projectId] });
+                queryClient.invalidateQueries({ queryKey: ['project-notes', projectId] });
               }}
               onUploadError={() => {}}
             />
-            {/* 笔记记录表格 */}
             <NoteBaseTable projectId={projectId} />
           </div>
 
-          {/* Submit */}
-          <div className="flex items-center justify-end gap-3 pt-4">
-            <button
-              type="button"
-              onClick={() => router.push('/')}
-              className="inline-flex h-10 items-center rounded-lg border border-gray-200 px-5 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
-            >
-              取消
-            </button>
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={updateProjectMutation.isPending}
-              className="inline-flex h-10 items-center gap-2 rounded-lg bg-brand px-6 text-sm font-medium text-white transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {updateProjectMutation.isPending && <Loader2 size={16} className="animate-spin" />}
-              保存修改
-            </button>
-          </div>
-
           {updateProjectMutation.isError && (
-            <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-600">
+            <div className={listErrorClass}>
               {(updateProjectMutation.error as Error).message || '更新项目失败'}
             </div>
           )}
+
+          <div className="flex justify-center items-center gap-3">
+            <Button
+              type="button"
+              variant="submit"
+              size="lg"
+              disabled={updateProjectMutation.isPending}
+              onClick={handleSubmit}
+              className="min-w-[150px]"
+            >
+              {updateProjectMutation.isPending && (
+                <Loader2 size={18} className="mr-2 animate-spin" />
+              )}
+              保存修改
+            </Button>
+            <Button variant="outline" className="text-gray-500" asChild>
+              <Link href="/">取消并返回列表</Link>
+            </Button>
+          </div>
         </div>
-      </div>
+
     </div>
   );
 }
