@@ -3,318 +3,217 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { CardFooter } from '@/components/ui/card';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-} from '@/components/ui/select';
-import {
-  listTableHeadClass,
-  listTableHeaderRowClass,
-  listTableRowClass,
-  listTableWrapperClass,
-} from '@/components/ui/data-list';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { cn } from '@/lib/utils';
+import { DISPLAY_ONLY_COLUMN_MAP } from '@/lib/note-base-parser';
 
-interface NoteRecord {
+interface NoteBaseRecord {
   id: string;
+  projectId: string;
   noteId: string;
   noteLink: string | null;
   kolNickName: string | null;
-  totalPlatformPrice: number;
-  components: Record<string, unknown> | null;
+  kolFanNum: number | null;
+  cooperationForm: string | null;
+  isRegistered: boolean;
+  contentDirection: string | null;
+  kolType: string | null;
+  spuName: string | null;
+  contentCost: number;
+  contentSettlement: number;
+  adSpend: number;
+  totalCost: number;
+  metrics: Record<string, number | string> | null;
+  createdAt: string;
 }
 
-interface NotesResponse {
-  notes: NoteRecord[];
-  total: number;
-  page: number;
-  pageSize: number;
-  updatedAt: string | null;
+interface NoteBaseResponse {
+  records: NoteBaseRecord[];
+  count: number;
 }
 
 export interface NoteBaseTableProps {
   projectId: string;
 }
 
-const selectTriggerClass =
-  'h-8 min-w-[88px] rounded border-gray-200 bg-white text-xs text-gray-700 focus-visible:ring-brand/25';
+/** Reverse map: field key → Chinese label */
+const METRICS_LABELS: Record<string, string> = Object.fromEntries(
+  Object.entries(DISPLAY_ONLY_COLUMN_MAP).map(([label, key]) => [key, label])
+);
 
+/** Get all unique metric keys from records */
+function getMetricKeys(records: NoteBaseRecord[]): string[] {
+  const keys = new Set<string>();
+  for (const r of records) {
+    if (r.metrics) {
+      for (const k of Object.keys(r.metrics)) {
+        keys.add(k);
+      }
+    }
+  }
+  return Array.from(keys);
+}
+
+function formatMetricValue(value: unknown): string {
+  if (value == null || value === '') return '-';
+  const num = Number(value);
+  if (isNaN(num)) return String(value);
+  if (num > 0 && num < 1) return (num * 100).toFixed(2) + '%';
+  if (Number.isInteger(num)) return num.toLocaleString();
+  return num.toLocaleString(undefined, { maximumFractionDigits: 2 });
+}
+
+/**
+ * NoteBaseTable - 笔记底表数据展示组件
+ *
+ * 查询 /api/projects/:id/note-base 端点，展示所有 note_base 字段 + metrics JSON 字段。
+ * 支持横向滚动，序号列固定在左侧。
+ */
 export function NoteBaseTable({ projectId }: NoteBaseTableProps) {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const [jumpPage, setJumpPage] = useState('');
 
-  const { data, isLoading, isError } = useQuery<NotesResponse>({
-    queryKey: ['project-notes', projectId, page, pageSize],
+  const { data, isLoading, isError } = useQuery<NoteBaseResponse>({
+    queryKey: ['project-note-base', projectId],
     queryFn: async () => {
-      const res = await fetch(
-        `/api/projects/${projectId}/notes?page=${page}&pageSize=${pageSize}`
-      );
-      if (!res.ok) throw new Error('获取笔记数据失败');
+      const res = await fetch(`/api/projects/${projectId}/note-base`);
+      if (!res.ok) throw new Error('获取笔记底表数据失败');
       return res.json();
     },
     enabled: !!projectId,
   });
 
-  const total = data?.total ?? 0;
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const notes = data?.notes ?? [];
-  const updatedAt = data?.updatedAt;
+  const allRecords = data?.records ?? [];
+  const total = data?.count ?? 0;
+  const totalPages = Math.ceil(total / pageSize);
+  const metricKeys = getMetricKeys(allRecords);
 
+  // Client-side pagination
+  const paginatedRecords = allRecords.slice(
+    (page - 1) * pageSize,
+    page * pageSize
+  );
+
+  // Don't render anything if no data
   if (!isLoading && total === 0) {
     return null;
   }
 
-  const handleExport = async () => {
-    try {
-      const res = await fetch(`/api/projects/${projectId}/notes?page=1&pageSize=10000`);
-      if (!res.ok) return;
-      const allData: NotesResponse = await res.json();
-
-      const headers = ['序号', '笔记链接', '笔记id', '博主名称', '内容方向', '总消耗'];
-      const rows = allData.notes.map((note, idx) => {
-        const contentDirection = note.components
-          ? String((note.components as Record<string, unknown>).contentDirection ?? '')
-          : '';
-        return [
-          idx + 1,
-          note.noteLink ?? '',
-          note.noteId,
-          note.kolNickName ?? '',
-          contentDirection,
-          Number(note.totalPlatformPrice).toFixed(2),
-        ];
-      });
-
-      const csvContent = [
-        headers.join(','),
-        ...rows.map((row) =>
-          row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')
-        ),
-      ].join('\n');
-
-      const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `笔记底表数据_${new Date().toISOString().slice(0, 10)}.csv`;
-      link.click();
-      URL.revokeObjectURL(url);
-    } catch {
-      // ignore
-    }
-  };
-
-  const formatDate = (dateStr: string | null) => {
-    if (!dateStr) return '';
-    const d = new Date(dateStr);
-    return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日 ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`;
-  };
-
-  const getContentDirection = (note: NoteRecord): string => {
-    if (note.components && typeof note.components === 'object') {
-      return String((note.components as Record<string, unknown>).contentDirection ?? '');
-    }
-    return '';
-  };
-
-  const truncateLink = (link: string | null, maxLen = 14): string => {
-    if (!link) return '';
-    if (link.length <= maxLen) return link;
-    return link.slice(0, maxLen) + '...';
-  };
-
-  const handleJump = () => {
-    const val = parseInt(jumpPage, 10);
-    if (val >= 1 && val <= totalPages) setPage(val);
-  };
-
   return (
-    <div className="space-y-3 pt-6">
-      <div className="flex items-center justify-between rounded-lg bg-[#F5F5F5] px-4 py-3 text-sm">
-
-          <span className="text-gray-500">
-            笔记数据共计{total}条
-            {updatedAt && `，数据更新时间${formatDate(updatedAt)}`}
-          </span>
-       
-        <Button variant="primary" size="sm" onClick={handleExport} className="shrink-0">
-          导出现有数据
-        </Button>
+    <div className="mt-4 space-y-3">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="text-sm text-gray-600">
+          <span className="font-medium">笔记底表</span>
+          <span className="ml-4 text-gray-500">共计 {total} 条记录</span>
+        </div>
       </div>
 
-      <div className={listTableWrapperClass}>
-        <Table className="text-sm">
-          <TableHeader>
-            <TableRow className={listTableHeaderRowClass}>
-              <TableHead className={cn(listTableHeadClass, 'w-16')}>序号</TableHead>
-              <TableHead className={listTableHeadClass}>笔记链接</TableHead>
-              <TableHead className={listTableHeadClass}>笔记id</TableHead>
-              <TableHead className={listTableHeadClass}>博主名称</TableHead>
-              <TableHead className={listTableHeadClass}>内容方向</TableHead>
-              <TableHead className={cn(listTableHeadClass, 'text-right')}>总消耗</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
+      {/* Table with horizontal scroll */}
+      <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
+        <table className="w-full text-sm border-collapse">
+          <thead>
+            <tr className="border-b bg-gray-50">
+              <th className="sticky left-0 z-10 bg-gray-50 whitespace-nowrap px-3 py-2.5 text-center text-xs font-medium text-gray-600 border-r border-gray-200 min-w-[36px]">#</th>
+              <th className="whitespace-nowrap px-3 py-2.5 text-left text-xs font-medium text-gray-600">博主昵称</th>
+              <th className="whitespace-nowrap px-3 py-2.5 text-left text-xs font-medium text-gray-600">笔记ID</th>
+              <th className="whitespace-nowrap px-3 py-2.5 text-left text-xs font-medium text-gray-600">是否报备</th>
+              <th className="whitespace-nowrap px-3 py-2.5 text-left text-xs font-medium text-gray-600">合作形式</th>
+              <th className="whitespace-nowrap px-3 py-2.5 text-left text-xs font-medium text-gray-600">内容方向</th>
+              <th className="whitespace-nowrap px-3 py-2.5 text-right text-xs font-medium text-gray-600">达人金额</th>
+              <th className="whitespace-nowrap px-3 py-2.5 text-right text-xs font-medium text-gray-600">投流金额</th>
+              <th className="whitespace-nowrap px-3 py-2.5 text-right text-xs font-medium text-gray-600">总消耗</th>
+              {/* Dynamic metric columns from metrics JSON */}
+              {metricKeys.map((key) => (
+                <th key={key} className="whitespace-nowrap px-3 py-2.5 text-right text-xs font-medium text-gray-600">
+                  {METRICS_LABELS[key] || key}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
             {isLoading ? (
-              <TableRow>
-                <TableCell colSpan={6} className="py-12 text-center text-gray-400">
-                  加载中...
-                </TableCell>
-              </TableRow>
+              <tr>
+                <td colSpan={9 + metricKeys.length} className="px-4 py-8 text-center text-gray-400">加载中...</td>
+              </tr>
             ) : isError ? (
-              <TableRow>
-                <TableCell colSpan={6} className="py-12 text-center text-red-500">
-                  加载失败，请刷新重试
-                </TableCell>
-              </TableRow>
+              <tr>
+                <td colSpan={9 + metricKeys.length} className="px-4 py-8 text-center text-red-500">加载失败，请刷新重试</td>
+              </tr>
+            ) : paginatedRecords.length === 0 ? (
+              <tr>
+                <td colSpan={9 + metricKeys.length} className="px-4 py-8 text-center text-gray-400">暂无数据</td>
+              </tr>
             ) : (
-              notes.map((note, idx) => (
-                <TableRow key={note.id} className={listTableRowClass(idx)}>
-                  <TableCell className="py-3 text-gray-500">
+              paginatedRecords.map((record, idx) => (
+                <tr key={record.id} className="border-b last:border-b-0 hover:bg-gray-50">
+                  <td className="sticky left-0 z-10 bg-white whitespace-nowrap px-3 py-2 text-center text-xs text-gray-500 border-r border-gray-200">
                     {(page - 1) * pageSize + idx + 1}
-                  </TableCell>
-                  <TableCell className="py-3">
-                    {note.noteLink ? (
-                      <a
-                        href={note.noteLink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-brand hover:underline"
-                        title={note.noteLink}
-                      >
-                        {truncateLink(note.noteLink)}
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-2 text-xs text-gray-700">{record.kolNickName || '-'}</td>
+                  <td className="whitespace-nowrap px-3 py-2">
+                    {record.noteLink ? (
+                      <a href={record.noteLink} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-xs font-mono">
+                        {record.noteId}
                       </a>
                     ) : (
-                      <span className="text-gray-400">-</span>
+                      <span className="text-xs font-mono text-gray-600">{record.noteId}</span>
                     )}
-                  </TableCell>
-                  <TableCell className="py-3 font-mono text-xs text-gray-600">
-                    {note.noteId}
-                  </TableCell>
-                  <TableCell className="py-3">{note.kolNickName || '-'}</TableCell>
-                  <TableCell className="py-3">{getContentDirection(note) || '-'}</TableCell>
-                  <TableCell className="py-3 text-right tabular-nums">
-                    {Number(note.totalPlatformPrice).toLocaleString('zh-CN', {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
-                  </TableCell>
-                </TableRow>
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-2 text-xs text-gray-700">{record.isRegistered ? '是' : '否'}</td>
+                  <td className="whitespace-nowrap px-3 py-2 text-xs text-gray-700">{record.cooperationForm || '-'}</td>
+                  <td className="whitespace-nowrap px-3 py-2 text-xs text-gray-700">{record.contentDirection || '-'}</td>
+                  <td className="whitespace-nowrap px-3 py-2 text-right text-xs tabular-nums text-gray-700">{Number(record.contentCost).toLocaleString()}</td>
+                  <td className="whitespace-nowrap px-3 py-2 text-right text-xs tabular-nums text-gray-700">{Number(record.adSpend).toLocaleString()}</td>
+                  <td className="whitespace-nowrap px-3 py-2 text-right text-xs tabular-nums text-gray-700">{Number(record.totalCost).toLocaleString()}</td>
+                  {/* Dynamic metric values */}
+                  {metricKeys.map((key) => (
+                    <td key={key} className="whitespace-nowrap px-3 py-2 text-right text-xs tabular-nums text-gray-700">
+                      {formatMetricValue(record.metrics?.[key])}
+                    </td>
+                  ))}
+                </tr>
               ))
             )}
-          </TableBody>
-        </Table>
+          </tbody>
+        </table>
       </div>
 
+      {/* Pagination */}
       {total > 0 && (
-     
-        <CardFooter className="flex flex-wrap items-center justify-center gap-3">
-          <Button
-            type="button"
-            variant="outline"
-            size="icon-sm"
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={page <= 1}
-          >
-            <ChevronLeft size={16} />
-          </Button>
-          {generatePageNumbers(page, totalPages).map((p, i) =>
-            p === '...' ? (
-              <span key={`ellipsis-${i}`} className="px-1 text-gray-400">
-                ...
-              </span>
-            ) : (
-              <Button
-                key={p}
-                type="button"
-                variant={page === p ? 'primary' : 'outline'}
-                size="icon-sm"
-                onClick={() => setPage(p as number)}
-                className={cn('text-sm', page === p && 'pointer-events-none')}
-              >
-                {p}
-              </Button>
-            )
-          )}
-          <Button
-            type="button"
-            variant="outline"
-            size="icon-sm"
-            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            disabled={page >= totalPages}
-          >
-            <ChevronRight size={16} />
-          </Button>
-
-          <Select
-            value={String(pageSize)}
-            className="flex-0"
-            onValueChange={(v) => {
-              setPageSize(Number(v));
-              setPage(1);
-            }}
-          >
-            <SelectTrigger className={selectTriggerClass} />
-            <SelectContent>
-              <SelectItem value="10">10条/页</SelectItem>
-              <SelectItem value="20">20条/页</SelectItem>
-              <SelectItem value="50">50条/页</SelectItem>
-              <SelectItem value="100">100条/页</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <span className="text-xs text-gray-500">跳至</span>
-          <Input
-            variant="filter"
-            type="number"
-            min={1}
-            max={totalPages}
-            value={jumpPage}
-            onChange={(e) => setJumpPage(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') handleJump();
-            }}
-            className="h-8 w-12 px-1 text-center text-xs"
-          />
-          <span className="text-xs text-gray-500">页</span>
-          </CardFooter>
+        <div className="flex items-center justify-between text-sm">
+          <p className="text-sm text-gray-500">共 {total} 条，第 {page}/{totalPages} 页</p>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-sm bg-white border border-gray-300 text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+              aria-label="上一页"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <span className="text-xs text-gray-600">{page} / {totalPages}</span>
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page >= totalPages}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-sm bg-white border border-gray-300 text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+              aria-label="下一页"
+            >
+              <ChevronRight size={16} />
+            </button>
+            <select
+              value={pageSize}
+              onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }}
+              className="ml-2 h-8 rounded-sm border border-gray-300 px-2 text-xs text-gray-600 outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+            >
+              <option value={10}>10条/页</option>
+              <option value={20}>20条/页</option>
+              <option value={50}>50条/页</option>
+              <option value={100}>100条/页</option>
+            </select>
+          </div>
+        </div>
       )}
     </div>
   );
-}
-
-function generatePageNumbers(current: number, total: number): (number | '...')[] {
-  if (total <= 9) {
-    return Array.from({ length: total }, (_, i) => i + 1);
-  }
-
-  const pages: (number | '...')[] = [];
-  const showPages = new Set<number>();
-  showPages.add(1);
-  showPages.add(total);
-  for (let i = Math.max(1, current - 2); i <= Math.min(total, current + 2); i++) {
-    showPages.add(i);
-  }
-
-  const sorted = Array.from(showPages).sort((a, b) => a - b);
-  for (let i = 0; i < sorted.length; i++) {
-    if (i > 0 && sorted[i] - sorted[i - 1] > 1) pages.push('...');
-    pages.push(sorted[i]);
-  }
-
-  return pages;
 }

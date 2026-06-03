@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { ChevronRight, KeyRound, LogOut, User } from 'lucide-react';
-import { ChangePasswordModal } from '@/components/auth/change-password-modal';
 import { cn } from '@/lib/utils';
 
 interface SidebarUserMenuProps {
@@ -12,7 +12,6 @@ interface SidebarUserMenuProps {
 
 export function SidebarUserMenu({ userName, collapsed }: SidebarUserMenuProps) {
   const [open, setOpen] = useState(false);
-  const [showChangePassword, setShowChangePassword] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -43,11 +42,6 @@ export function SidebarUserMenu({ userName, collapsed }: SidebarUserMenuProps) {
 
   return (
     <div ref={rootRef} className={cn('relative', collapsed ? 'px-2' : 'px-3')}>
-      <ChangePasswordModal
-        open={showChangePassword}
-        onClose={() => setShowChangePassword(false)}
-      />
-
       {open && (
         <div
           className={cn(
@@ -58,18 +52,15 @@ export function SidebarUserMenu({ userName, collapsed }: SidebarUserMenuProps) {
           )}
           role="menu"
         >
-          <button
-            type="button"
+          <Link
+            href="/change-password"
             role="menuitem"
-            onClick={() => {
-              setOpen(false);
-              setShowChangePassword(true);
-            }}
-            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-xs text-gray-500 transition-colors hover:bg-gray-50"
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-xs text-gray-500 transition-colors hover:bg-gray-50"
           >
             <KeyRound size={16} className="shrink-0 text-gray-400" />
             修改密码
-          </button>
+          </Link>
           <button
             type="button"
             role="menuitem"

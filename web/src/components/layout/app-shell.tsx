@@ -109,7 +109,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
 
         <main className="min-w-0 flex-1 overflow-y-auto bg-[#F3F4F6] p-6">
-          <div className="rounded-xl border border-gray-100 bg-white text-card-foreground shadow-sm py-6 px-8">
+          <div className="rounded-xl border border-gray-100 bg-white text-card-foreground shadow-sm p-6">
           {children}
           </div>
         </main>

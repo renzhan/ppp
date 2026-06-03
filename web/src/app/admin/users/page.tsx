@@ -10,8 +10,6 @@ import {
   UserX,
   UserCheck,
   X,
-  UserRound,
-  Lock,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -326,25 +324,18 @@ export default function AdminUsersPage() {
 
 function ModalWrapper({
   title,
-  icon,
   onClose,
   children,
-  className,
 }: {
   title: string;
-  icon?: React.ReactNode;
   onClose: () => void;
   children: React.ReactNode;
-  className?: string;
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <Card className={cn('w-full max-w-md shadow-2xl', className)}>
+      <Card className="w-full max-w-md shadow-2xl">
         <CardHeader className="flex-row items-center justify-between space-y-0 pb-4">
-          <div className="flex items-center gap-2">
-            {icon}
-            <CardTitle className="text-lg">{title}</CardTitle>
-          </div>
+          <CardTitle className="text-lg">{title}</CardTitle>
           <Button variant="ghost" size="icon-sm" onClick={onClose} aria-label="关闭">
             <X size={20} />
           </Button>
@@ -446,12 +437,7 @@ function AddUserModal({
   };
 
   return (
-    <ModalWrapper
-      title="添加用户"
-      icon={<UserRound size={20} className="text-brand" />}
-      onClose={onClose}
-      className="max-w-lg"
-    >
+    <ModalWrapper title="添加用户" onClose={onClose}>
       <ModalError error={error} />
       <form onSubmit={handleSubmit} className="space-y-4">
         <FormField label="用户名 *" htmlFor="add-username">
@@ -539,22 +525,9 @@ function EditUserModal({
   };
 
   return (
-    <ModalWrapper title="编辑用户" 
-    icon={<UserRound size={20} className="text-brand" />}
-    onClose={onClose}
-    className="max-w-lg"
-    >
+    <ModalWrapper title={`编辑用户 - ${user.username}`} onClose={onClose}>
       <ModalError error={error} />
       <form onSubmit={handleSubmit} className="space-y-4">
-        <FormField label="用户名" htmlFor="username">
-          <Input
-            id="username"
-            type="text"
-            value={user.username}
-                disabled
-    className="w-full bg-gray-100 cursor-not-allowed pointer-events-none"
-          />
-        </FormField>
         <FormField label="显示名称" htmlFor="edit-displayName">
           <Input
             id="edit-displayName"
@@ -616,23 +589,10 @@ function ResetPasswordModal({
   };
 
   return (
-    <ModalWrapper title="重置密码" 
-      icon={<Lock size={20} className="text-brand" />}
-      onClose={onClose}
-      className="max-w-lg"
-      >
+    <ModalWrapper title={`重置密码 - ${user.username}`} onClose={onClose}>
       <ModalError error={error} />
       <form onSubmit={handleSubmit} className="space-y-4">
         <p className="text-sm text-gray-500">重置后用户下次登录需要重新设置密码。</p>
-        <FormField label="用户名" htmlFor="username">
-          <Input
-            id="username"
-            type="text"
-            value={user.username}
-                disabled
-    className="w-full bg-gray-100 cursor-not-allowed pointer-events-none"
-          />
-        </FormField>
         <FormField label="新密码 *" htmlFor="reset-password">
           <Input
             id="reset-password"
@@ -712,11 +672,7 @@ function ImportModal({
   };
 
   return (
-    <ModalWrapper
-      title="批量导入用户"
-      icon={<Upload size={20} className="text-brand" />}
-      onClose={onClose}
-    >
+    <ModalWrapper title="批量导入用户" onClose={onClose}>
       <ModalError error={error} />
       {importErrors.length > 0 && (
         <div className="mb-3 max-h-40 overflow-y-auto rounded-lg bg-orange-50 px-3 py-2 text-xs text-orange-700">
@@ -749,7 +705,7 @@ function ImportModal({
               setError('');
               setImportErrors([]);
             }}
-            className="cursor-pointer p-0 file:mr-4 file:rounded-lg file:border-0 file:bg-brand-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-brand-700 hover:file:bg-brand-100"
+            className="cursor-pointer file:mr-4 file:rounded-lg file:border-0 file:bg-brand-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-brand-700 hover:file:bg-brand-100"
           />
         </FormField>
         <ModalActions

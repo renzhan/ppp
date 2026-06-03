@@ -17,40 +17,9 @@ import {
   CartesianGrid,
 } from 'recharts';
 import { Search, Download, FileText, MessageCircle, ChevronLeft, ChevronRight } from 'lucide-react';
-import { PageHeader } from '@/components/layout/page-header';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  listEmptyClass,
-  listErrorClass,
-  listTableHeadClass,
-  listTableHeaderRowClass,
-  listTableRowClass,
-  listTableWrapperClass,
-} from '@/components/ui/data-list';
-import { FilterField } from '@/components/ui/filter-field';
 import { Loading } from '@/components/ui/loading';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-} from '@/components/ui/select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { WordCloud } from '@/components/ui/word-cloud';
 import { formatDate } from '@/lib/project-meta';
-import { cn } from '@/lib/utils';
-
-const selectTriggerClass =
-  'h-9 rounded border-gray-200 bg-white text-gray-900 focus-visible:ring-brand/25 disabled:bg-gray-50 disabled:text-gray-400';
 
 interface TreeNode {
   id: string;
@@ -193,7 +162,22 @@ function SentimentPageContent() {
     queryFn: async () => {
       const response = await fetch(`/api/sentiment/${activeProjectId}`);
       if (!response.ok) throw new Error('获取舆情数据失败');
-      return response.json();
+      const data = await response.json();
+      console.log('[SentimentPage] API 返回数据:', {
+        keys: Object.keys(data),
+        trend: data.trend?.length ?? 'undefined',
+        keywords: data.keywords?.length ?? 'undefined',
+        comments: data.comments?.length ?? 'undefined',
+        negativeComments: data.negativeComments?.length ?? 'undefined',
+        sentimentDistribution: data.sentimentDistribution?.length ?? 'undefined',
+      });
+      if (data.trend?.length > 0) {
+        console.log('[SentimentPage] trend[0]:', data.trend[0]);
+      }
+      if (data.keywords?.length > 0) {
+        console.log('[SentimentPage] keywords[0].dataContent:', data.keywords[0].dataContent);
+      }
+      return data;
     },
     enabled: !!activeProjectId,
   });
@@ -267,8 +251,12 @@ function SentimentPageContent() {
 
   // Parse trend data for bar chart
   const trendChartData = useMemo(() => {
-    if (!sentimentData?.trend?.length) return [];
-    return sentimentData.trend
+    if (!sentimentData?.trend?.length) {
+      console.log('[SentimentPage] trend 数据为空, sentimentData.trend =', sentimentData?.trend);
+      return [];
+    }
+    console.log('[SentimentPage] trend 原始数据条数:', sentimentData.trend.length, '前3条:', sentimentData.trend.slice(0, 3));
+    const result = sentimentData.trend
       .filter((item) => item.periodStart)
       .sort((a, b) => (a.periodStart! > b.periodStart! ? 1 : -1))
       .map((item) => {
@@ -281,6 +269,8 @@ function SentimentPageContent() {
           negative: Number(content.negative ?? 0),
         };
       });
+    console.log('[SentimentPage] trend 处理后:', result.length, '条, 前3条:', result.slice(0, 3));
+    return result;
   }, [sentimentData]);
 
   // Parse keywords data
@@ -330,191 +320,166 @@ function SentimentPageContent() {
     return filteredComments.slice(start, start + PAGE_SIZE);
   }, [filteredComments, commentPage]);
 
-  const headerActions = activeProjectId ? (
-    <div className="flex items-center gap-2">
-      <Button
-        type="button"
-        variant="primary"
-        size="sm"
-        className="gap-1.5"
-        onClick={() => exportMutation.mutate()}
-        disabled={exportMutation.isPending}
-      >
-        <Download size={16} />
-        {exportMutation.isPending ? '导出中...' : '导出'}
-      </Button>
-      <Button
-        type="button"
-        variant="secondary"
-        size="sm"
-        className="gap-1.5"
-        onClick={() => setShowExportRecords(!showExportRecords)}
-      >
-        <FileText size={16} />
-        查看导出记录
-      </Button>
-    </div>
-  ) : undefined;
-
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="舆情系统"
-        description="查看项目评论分析、情感分布和关键词统计。"
-        actions={headerActions}
-      />
-
-
-
-          <div className="flex  justify-between">
-            <div className='flex flex-wrap items-end gap-4'>
-            <FilterField label="品类：" className="min-w-[140px] flex-1 sm:max-w-[200px]">
-              <Select value={filters.category} onValueChange={handleCategoryChange}>
-                <SelectTrigger className={selectTriggerClass} />
-                <SelectContent>
-                  <SelectItem value="">请选择</SelectItem>
-                  {(treeData ?? []).map((node) => (
-                    <SelectItem key={node.id} value={node.id}>
-                      {node.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </FilterField>
-            <FilterField label="品牌：" className="min-w-[180px] flex-1 sm:max-w-[200px]">
-              <Select
-                value={filters.brand}
-                onValueChange={handleBrandChange}
-                disabled={!filters.category}
-              >
-                <SelectTrigger className={selectTriggerClass} />
-                <SelectContent>
-                  <SelectItem value="">请选择</SelectItem>
-                  {brandOptions.map((node) => (
-                    <SelectItem key={node.id} value={node.id}>
-                      {node.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </FilterField>
-            <FilterField label="品牌业务线：" className="min-w-[220px] flex-1 sm:max-w-[200px]">
-              <Select
-                value={filters.businessLine}
-                onValueChange={handleBusinessLineChange}
-                disabled={!filters.brand}
-              >
-                <SelectTrigger className={selectTriggerClass} />
-                <SelectContent>
-                  <SelectItem value="">请选择</SelectItem>
-                  {businessLineOptions.map((node) => (
-                    <SelectItem key={node.id} value={node.id}>
-                      {node.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </FilterField>
-            <FilterField label="项目名称：" className="min-w-[180px] flex-[2] sm:max-w-[280px]">
-              <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
-                <SelectTrigger className={selectTriggerClass} />
-                <SelectContent>
-                  <SelectItem value="">请选择</SelectItem>
-                  {(projectsData?.items ?? []).map((project) => (
-                    <SelectItem key={project.id} value={project.id}>
-                      {project.projectName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </FilterField>
-            </div>
-            <Button
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-gray-900">舆情系统</h1>
+          <p className="mt-1 text-sm text-gray-500">查看项目评论分析、情感分布和关键词统计。</p>
+        </div>
+        {activeProjectId && (
+          <div className="flex items-center gap-2">
+            <button
               type="button"
-              variant="primary"
-              size="sm"
-              className="mb-0.5 shrink-0 gap-1.5"
-              onClick={handleViewSentiment}
-              disabled={!selectedProjectId}
+              onClick={() => exportMutation.mutate()}
+              disabled={exportMutation.isPending}
+              className="inline-flex h-10 items-center gap-2 rounded-lg bg-brand px-5 text-sm font-medium text-white transition hover:bg-brand-600 disabled:opacity-50"
             >
-              <Search size={14} />
-              查看舆情
-            </Button>
+              <Download size={16} />
+              {exportMutation.isPending ? '导出中...' : '导出'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowExportRecords(!showExportRecords)}
+              className="inline-flex h-10 items-center gap-2 rounded-lg border border-gray-200 px-5 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+            >
+              <FileText size={16} />
+              查看导出记录
+            </button>
           </div>
+        )}
+      </div>
 
-   
+      {/* Filter Bar */}
+      <div className="rounded-lg border bg-white p-4">
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="min-w-[140px]">
+            <label className="mb-1 block text-xs font-medium text-gray-600">品类</label>
+            <select
+              value={filters.category}
+              onChange={(e) => handleCategoryChange(e.target.value)}
+              className="h-9 w-full rounded-md border border-gray-200 px-3 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
+            >
+              <option value="">全部品类</option>
+              {(treeData ?? []).map((node) => (
+                <option key={node.id} value={node.id}>{node.label}</option>
+              ))}
+            </select>
+          </div>
+          <div className="min-w-[140px]">
+            <label className="mb-1 block text-xs font-medium text-gray-600">品牌</label>
+            <select
+              value={filters.brand}
+              onChange={(e) => handleBrandChange(e.target.value)}
+              disabled={!filters.category}
+              className="h-9 w-full rounded-md border border-gray-200 px-3 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20 disabled:cursor-not-allowed disabled:bg-gray-50"
+            >
+              <option value="">全部品牌</option>
+              {brandOptions.map((node) => (
+                <option key={node.id} value={node.id}>{node.label}</option>
+              ))}
+            </select>
+          </div>
+          <div className="min-w-[140px]">
+            <label className="mb-1 block text-xs font-medium text-gray-600">业务线</label>
+            <select
+              value={filters.businessLine}
+              onChange={(e) => handleBusinessLineChange(e.target.value)}
+              disabled={!filters.brand}
+              className="h-9 w-full rounded-md border border-gray-200 px-3 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20 disabled:cursor-not-allowed disabled:bg-gray-50"
+            >
+              <option value="">全部业务线</option>
+              {businessLineOptions.map((node) => (
+                <option key={node.id} value={node.id}>{node.label}</option>
+              ))}
+            </select>
+          </div>
+          <div className="min-w-[180px]">
+            <label className="mb-1 block text-xs font-medium text-gray-600">项目名称</label>
+            <select
+              value={selectedProjectId}
+              onChange={(e) => setSelectedProjectId(e.target.value)}
+              className="h-9 w-full rounded-md border border-gray-200 px-3 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
+            >
+              <option value="">选择项目</option>
+              {(projectsData?.items ?? []).map((project) => (
+                <option key={project.id} value={project.id}>{project.projectName}</option>
+              ))}
+            </select>
+          </div>
+          <button
+            type="button"
+            onClick={handleViewSentiment}
+            disabled={!selectedProjectId}
+            className="inline-flex h-9 items-center gap-1.5 rounded-md bg-brand px-4 text-sm font-medium text-white transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Search size={14} />
+            查看舆情
+          </button>
+        </div>
+      </div>
 
+      {/* Export Records Panel */}
       {showExportRecords && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">导出记录</CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            {exportRecordsData?.records?.length ? (
-              <div className={listTableWrapperClass}>
-                <Table className="text-sm">
-                  <TableHeader>
-                    <TableRow className={listTableHeaderRowClass}>
-                      <TableHead className={listTableHeadClass}>文件名</TableHead>
-                      <TableHead className={listTableHeadClass}>导出时间</TableHead>
-                      <TableHead className={listTableHeadClass}>操作</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {exportRecordsData.records.map((record, index) => (
-                      <TableRow key={record.id} className={listTableRowClass(index)}>
-                        <TableCell className="py-2.5">{record.fileName}</TableCell>
-                        <TableCell className="whitespace-nowrap py-2.5">
-                          {formatDate(record.createdAt)}
-                        </TableCell>
-                        <TableCell className="py-2.5">
-                          {record.fileUrl && (
-                            <Button variant="text-link" size="sm" className="h-auto p-0 text-xs" asChild>
-                              <a href={record.fileUrl} target="_blank" rel="noopener noreferrer">
-                                下载
-                              </a>
-                            </Button>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            ) : (
-              <p className="text-sm text-gray-500">暂无导出记录</p>
-            )}
-          </CardContent>
-        </Card>
+        <div className="rounded-lg border bg-white p-4">
+          <h3 className="mb-3 text-sm font-medium text-gray-900">导出记录</h3>
+          {exportRecordsData?.records?.length ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-gray-50 text-left">
+                    <th className="whitespace-nowrap px-3 py-2 font-medium text-gray-600">文件名</th>
+                    <th className="whitespace-nowrap px-3 py-2 font-medium text-gray-600">导出时间</th>
+                    <th className="whitespace-nowrap px-3 py-2 font-medium text-gray-600">操作</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {exportRecordsData.records.map((record) => (
+                    <tr key={record.id} className="hover:bg-gray-50">
+                      <td className="px-3 py-2 text-gray-700">{record.fileName}</td>
+                      <td className="whitespace-nowrap px-3 py-2 text-gray-700">{formatDate(record.createdAt)}</td>
+                      <td className="px-3 py-2">
+                        {record.fileUrl && (
+                          <a href={record.fileUrl} target="_blank" rel="noopener noreferrer" className="text-xs font-medium text-brand hover:underline">下载</a>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="text-sm text-gray-500">暂无导出记录</p>
+          )}
+        </div>
       )}
 
       {exportMutation.isError && (
-        <div className={listErrorClass}>
+        <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-600">
           {(exportMutation.error as Error).message || '导出失败'}
         </div>
       )}
 
+      {/* Sentiment Data Display */}
       {!activeProjectId ? (
-        <Card>
-          <CardContent className={cn(listEmptyClass, 'border-0 shadow-none')}>
-            <MessageCircle size={48} className="mx-auto mb-4 text-gray-300" />
-            请选择项目并点击「查看舆情」按钮查看舆情数据
-          </CardContent>
-        </Card>
+        <div className="rounded-lg border bg-white px-6 py-16 text-center">
+          <MessageCircle size={48} className="mx-auto mb-4 text-gray-300" />
+          <p className="text-sm text-gray-500">请选择项目并点击"查看舆情"按钮查看舆情数据</p>
+        </div>
       ) : isSentimentLoading ? (
         <Loading size="lg" text="正在加载舆情数据..." className="py-20" />
       ) : isSentimentError ? (
-        <div className={listErrorClass}>
+        <div className="rounded-lg border border-rose-200 bg-rose-50 p-6 text-sm text-rose-600">
           {(sentimentError as Error).message || '获取舆情数据失败'}
         </div>
       ) : (
         <div className="space-y-6">
+          {/* Row 1: Pie Chart + Bar Chart */}
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">情感倾向分布</CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0">
+            {/* Sentiment Distribution - Donut Chart */}
+            <div className="rounded-lg border bg-white p-4">
+              <h3 className="mb-3 text-sm font-medium text-gray-900">情感倾向分布</h3>
               {pieChartData.length > 0 ? (
                 <ResponsiveContainer width="100%" height={280}>
                   <PieChart>
@@ -543,14 +508,11 @@ function SentimentPageContent() {
               ) : (
                 <div className="flex h-[280px] items-center justify-center text-sm text-gray-400">暂无情感分布数据</div>
               )}
-              </CardContent>
-            </Card>
+            </div>
 
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">评论数变化趋势</CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0">
+            {/* Comment Trend - Bar Chart */}
+            <div className="rounded-lg border bg-white p-4">
+              <h3 className="mb-3 text-sm font-medium text-gray-900">评论数变化趋势</h3>
               {trendChartData.length > 0 ? (
                 <ResponsiveContainer width="100%" height={280}>
                   <BarChart data={trendChartData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
@@ -564,15 +526,12 @@ function SentimentPageContent() {
               ) : (
                 <div className="flex h-[280px] items-center justify-center text-sm text-gray-400">暂无趋势数据</div>
               )}
-              </CardContent>
-            </Card>
+            </div>
           </div>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">关键词高频分布统计</CardTitle>
-            </CardHeader>
-            <CardContent className="pt-0">
+          {/* Row 2: Keywords */}
+          <div className="rounded-lg border bg-white p-4">
+            <h3 className="mb-3 text-sm font-medium text-gray-900">关键词高频分布统计</h3>
             {keywordsData.length > 0 ? (
               <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
                 {/* Word Cloud */}
@@ -586,172 +545,154 @@ function SentimentPageContent() {
                 {/* Keyword Frequency Table with frequency rate */}
                 <div>
                   <h4 className="mb-2 text-xs font-medium text-gray-600">高频词指数</h4>
-                  <div className={cn(listTableWrapperClass, 'max-h-[320px] overflow-y-auto')}>
-                    <Table className="text-sm">
-                      <TableHeader className="sticky top-0 z-10">
-                        <TableRow className={listTableHeaderRowClass}>
-                          <TableHead className={listTableHeadClass}>关键词</TableHead>
-                          <TableHead className={listTableHeadClass}>数量</TableHead>
-                          <TableHead className={listTableHeadClass}>频率</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
+                  <div className="max-h-[320px] overflow-y-auto">
+                    <table className="w-full text-sm">
+                      <thead className="sticky top-0">
+                        <tr className="border-b bg-gray-50 text-left">
+                          <th className="px-3 py-2 font-medium text-gray-600">关键词</th>
+                          <th className="px-3 py-2 font-medium text-gray-600">数量</th>
+                          <th className="px-3 py-2 font-medium text-gray-600">频率</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
                         {keywordsData.map((kw, idx) => (
-                          <TableRow key={idx} className={listTableRowClass(idx)}>
-                            <TableCell className="py-2">{kw.word}</TableCell>
-                            <TableCell className="py-2">{kw.count}</TableCell>
-                            <TableCell className="py-2 text-gray-500">
-                              {totalKeywordCount > 0
-                                ? `${((kw.count / totalKeywordCount) * 100).toFixed(2)}%`
-                                : '-'}
-                            </TableCell>
-                          </TableRow>
+                          <tr key={idx} className="hover:bg-gray-50">
+                            <td className="px-3 py-2 text-gray-900">{kw.word}</td>
+                            <td className="px-3 py-2 text-gray-700">{kw.count}</td>
+                            <td className="px-3 py-2 text-gray-500">
+                              {totalKeywordCount > 0 ? ((kw.count / totalKeywordCount) * 100).toFixed(2) + '%' : '-'}
+                            </td>
+                          </tr>
                         ))}
-                      </TableBody>
-                    </Table>
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               </div>
             ) : (
               <p className="py-8 text-center text-sm text-gray-400">暂无关键词数据</p>
             )}
-            </CardContent>
-          </Card>
+          </div>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">评论文本</CardTitle>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <div className="mb-4 flex gap-1 border-b border-gray-200">
-                {(['all', 'positive', 'negative', 'neutral'] as const).map((tab) => {
-                  const label = tab === 'all' ? '全部' : SENTIMENT_LABELS[tab];
-                  const count =
-                    tab === 'all'
-                      ? allComments.length
-                      : allComments.filter((c) => c.sentiment === tab).length;
-                  const isActive = commentFilter === tab;
-                  return (
-                    <button
-                      key={tab}
-                      type="button"
-                      onClick={() => {
-                        setCommentFilter(tab);
-                        setCommentPage(1);
-                      }}
-                      className={cn(
-                        '-mb-px border-b-2 px-4 py-2 text-sm font-medium transition',
-                        isActive
-                          ? tab === 'all'
-                            ? 'border-brand text-brand'
-                            : SENTIMENT_TAB_COLORS[tab]
-                          : 'border-transparent text-gray-500 hover:text-gray-700'
-                      )}
-                    >
-                      {label} ({count})
-                    </button>
-                  );
-                })}
-              </div>
+          {/* Row 3: Comments List with tabs and pagination */}
+          <div className="rounded-lg border bg-white p-4">
+            <h3 className="mb-3 text-sm font-medium text-gray-900">评论文本</h3>
 
-              {paginatedComments.length > 0 ? (
-                <>
-                  <div className={listTableWrapperClass}>
-                    <Table className="min-w-[640px] text-sm">
-                      <TableHeader>
-                        <TableRow className={listTableHeaderRowClass}>
-                          <TableHead className={listTableHeadClass}>时间</TableHead>
-                          <TableHead className={listTableHeadClass}>描述</TableHead>
-                          <TableHead className={listTableHeadClass}>情感倾向</TableHead>
-                          <TableHead className={cn(listTableHeadClass, 'text-right')}>
-                            评论点赞数量
-                          </TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {paginatedComments.map((comment, index) => (
-                          <TableRow key={comment.id} className={listTableRowClass(index)}>
-                            <TableCell className="whitespace-nowrap py-3 text-brand">
-                              {comment.date || '-'}
-                            </TableCell>
-                            <TableCell className="max-w-[400px] py-3">{comment.content}</TableCell>
-                            <TableCell className="whitespace-nowrap py-3">
-                              <Badge
-                                variant="outline"
-                                className="border-transparent bg-transparent font-normal"
-                                style={{ color: SENTIMENT_COLORS[comment.sentiment] }}
-                              >
-                                {SENTIMENT_LABELS[comment.sentiment]}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="whitespace-nowrap py-3 text-right">
-                              {comment.likes}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
+            {/* Tabs */}
+            <div className="mb-4 flex gap-1 border-b border-gray-200">
+              {(['all', 'positive', 'negative', 'neutral'] as const).map((tab) => {
+                const label = tab === 'all' ? '全部' : SENTIMENT_LABELS[tab];
+                const count = tab === 'all'
+                  ? allComments.length
+                  : allComments.filter((c) => c.sentiment === tab).length;
+                const isActive = commentFilter === tab;
+                return (
+                  <button
+                    key={tab}
+                    type="button"
+                    onClick={() => { setCommentFilter(tab); setCommentPage(1); }}
+                    className={`px-4 py-2 text-sm font-medium transition border-b-2 -mb-px ${
+                      isActive
+                        ? (tab === 'all' ? 'text-brand border-blue-600' : SENTIMENT_TAB_COLORS[tab])
+                        : 'text-gray-500 border-transparent hover:text-gray-700'
+                    }`}
+                  >
+                    {label} ({count})
+                  </button>
+                );
+              })}
+            </div>
 
-                  {totalPages > 1 && (
-                    <div className="mt-4 flex items-center justify-between border-t border-gray-100 pt-3">
-                      <span className="text-xs text-gray-500">
-                        共 {filteredComments.length} 条，每页 {PAGE_SIZE} 条
-                      </span>
-                      <div className="flex items-center gap-1">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="icon-sm"
-                          onClick={() => setCommentPage((p) => Math.max(1, p - 1))}
-                          disabled={commentPage <= 1}
-                          aria-label="上一页"
-                        >
-                          <ChevronLeft size={14} />
-                        </Button>
-                        {Array.from({ length: Math.min(7, totalPages) }, (_, i) => {
-                          let page: number;
-                          if (totalPages <= 7) {
-                            page = i + 1;
-                          } else if (commentPage <= 4) {
-                            page = i + 1;
-                          } else if (commentPage >= totalPages - 3) {
-                            page = totalPages - 6 + i;
-                          } else {
-                            page = commentPage - 3 + i;
-                          }
-                          return (
-                            <Button
-                              key={page}
-                              type="button"
-                              variant={page === commentPage ? 'primary' : 'outline'}
-                              size="icon-sm"
-                              onClick={() => setCommentPage(page)}
+            {/* Comments Table */}
+            {paginatedComments.length > 0 ? (
+              <>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b bg-gray-50 text-left">
+                        <th className="whitespace-nowrap px-3 py-2 font-medium text-gray-600">时间</th>
+                        <th className="px-3 py-2 font-medium text-gray-600">描述</th>
+                        <th className="whitespace-nowrap px-3 py-2 font-medium text-gray-600">情感倾向</th>
+                        <th className="whitespace-nowrap px-3 py-2 text-right font-medium text-gray-600">评论点赞数量</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {paginatedComments.map((comment) => (
+                        <tr key={comment.id} className="hover:bg-gray-50">
+                          <td className="whitespace-nowrap px-3 py-3 text-sm text-brand">{comment.date || '-'}</td>
+                          <td className="max-w-[400px] px-3 py-3 text-sm text-gray-800">{comment.content}</td>
+                          <td className="whitespace-nowrap px-3 py-3">
+                            <span
                               className="text-sm"
+                              style={{ color: SENTIMENT_COLORS[comment.sentiment] }}
                             >
-                              {page}
-                            </Button>
-                          );
-                        })}
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="icon-sm"
-                          onClick={() => setCommentPage((p) => Math.min(totalPages, p + 1))}
-                          disabled={commentPage >= totalPages}
-                          aria-label="下一页"
-                        >
-                          <ChevronRight size={14} />
-                        </Button>
-                      </div>
+                              {SENTIMENT_LABELS[comment.sentiment]}
+                            </span>
+                          </td>
+                          <td className="whitespace-nowrap px-3 py-3 text-right text-sm text-gray-700">{comment.likes}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div className="mt-4 flex items-center justify-between border-t pt-3">
+                    <span className="text-xs text-gray-500">
+                      共 {filteredComments.length} 条，每页 {PAGE_SIZE} 条
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setCommentPage((p) => Math.max(1, p - 1))}
+                        disabled={commentPage <= 1}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded border text-gray-600 transition hover:bg-gray-50 disabled:opacity-30"
+                      >
+                        <ChevronLeft size={14} />
+                      </button>
+                      {Array.from({ length: Math.min(7, totalPages) }, (_, i) => {
+                        let page: number;
+                        if (totalPages <= 7) {
+                          page = i + 1;
+                        } else if (commentPage <= 4) {
+                          page = i + 1;
+                        } else if (commentPage >= totalPages - 3) {
+                          page = totalPages - 6 + i;
+                        } else {
+                          page = commentPage - 3 + i;
+                        }
+                        return (
+                          <button
+                            key={page}
+                            type="button"
+                            onClick={() => setCommentPage(page)}
+                            className={`inline-flex h-8 w-8 items-center justify-center rounded text-sm transition ${
+                              page === commentPage
+                                ? 'bg-brand text-white'
+                                : 'border text-gray-600 hover:bg-gray-50'
+                            }`}
+                          >
+                            {page}
+                          </button>
+                        );
+                      })}
+                      <button
+                        type="button"
+                        onClick={() => setCommentPage((p) => Math.min(totalPages, p + 1))}
+                        disabled={commentPage >= totalPages}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded border text-gray-600 transition hover:bg-gray-50 disabled:opacity-30"
+                      >
+                        <ChevronRight size={14} />
+                      </button>
                     </div>
-                  )}
-                </>
-              ) : (
-                <p className="py-8 text-center text-sm text-gray-400">暂无评论数据</p>
-              )}
-            </CardContent>
-          </Card>
+                  </div>
+                )}
+              </>
+            ) : (
+              <p className="py-8 text-center text-sm text-gray-400">暂无评论数据</p>
+            )}
+          </div>
         </div>
       )}
     </div>

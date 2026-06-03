@@ -300,7 +300,7 @@ export default function ProjectListPage() {
                   <TableHead className={listTableHeadClass}>笔记数量</TableHead>
                   <TableHead className={listTableHeadClass}>项目结束日期</TableHead>
                   <TableHead className={listTableHeadClass}>参与者</TableHead>
-                  <TableHead className={`${listTableHeadClass} text-center`}>操作</TableHead>
+                  <TableHead className={listTableHeadClass}>操作</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -311,7 +311,7 @@ export default function ProjectListPage() {
                     <TableCell className="whitespace-nowrap py-3">
                       {project.businessLine || '-'}
                     </TableCell>
-                    <TableCell title={project.projectName} className="max-w-[280px] truncate py-3">
+                    <TableCell className="max-w-[280px] truncate py-3">
                       {project.projectName}
                     </TableCell>
                     <TableCell className="whitespace-nowrap py-3">
@@ -339,7 +339,7 @@ export default function ProjectListPage() {
                           <Link href="/planning">策划</Link>
                         </Button>
                         <Button variant="text-link" size="sm" className="h-auto px-0 text-xs" asChild>
-                          <Link href={`/sentiment?projectId=${project.id}`}>舆情</Link>
+                          <Link href={`/sentiment?projectId=${project.id}`}>舆情监控</Link>
                         </Button>
                       </div>
                     </TableCell>
