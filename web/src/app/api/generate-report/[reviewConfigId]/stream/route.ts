@@ -14,22 +14,20 @@ const MAX_CONCURRENT_CHAPTERS = parseInt(process.env.REPORT_MAX_CONCURRENCY || '
 
 /**
  * 章节定义 - id 用于前端去重/追加
+ * 注意：封面(1)、人群资产(8)、尾页(10) 已移除，不再生成
  */
 const CHAPTER_DEFS: Array<{ id: string; number: number }> = [
-  { id: 'cover', number: 1 },
   { id: 'projectReview', number: 2 },
   { id: 'dataOverview', number: 3 },
   { id: 'highlights', number: 4 },
   { id: 'quadrantAnalysis', number: 5 },
   { id: 'contentAnalysis', number: 6 },
   { id: 'trafficAnalysis', number: 7 },
-  { id: 'audienceAssets', number: 8 },
   { id: 'optimization', number: 9 },
-  { id: 'endPage', number: 10 },
 ];
 
-/** 静态章节（封面、尾页）不调用 LLM */
-const STATIC_CHAPTERS = new Set([1, 10]);
+/** 静态章节不调用 LLM（当前已移除封面和尾页，保留备用） */
+const STATIC_CHAPTERS = new Set<number>([]);
 
 /**
  * 全局 HTML 输出格式规范 - 追加到每个章节的 system prompt 后面
@@ -89,25 +87,21 @@ async function runBackgroundGeneration(reviewConfigId: string, projectId: string
     const templateLoader = new PromptTemplateLoader(templatesDir);
     const llmClient = createLLMClientFromEnv();
 
-    const completedChapters: Array<{ id: string; title: string; number: number; content: string; traceIds?: { traceId: string; label: string }[] }> = [];
     const allTraceItems: Array<{ traceId: string; chapterNumber: number; label: string; sourceTable: string; sourceQuery: string; totalRows: number; columns: unknown; dataRows: unknown; calculations?: unknown }> = [];
 
     const chapterResults = new Array<{ id: string; title: string; number: number; content: string; traceIds?: { traceId: string; label: string }[] } | null>(CHAPTER_DEFS.length).fill(null);
-    let nextToSave = 0;
 
-    // Save completed chapters to DB incrementally
+    // Save all completed chapters to DB immediately (out-of-order OK)
     const flushToDb = async () => {
-      while (nextToSave < chapterResults.length && chapterResults[nextToSave] !== null) {
-        completedChapters.push(chapterResults[nextToSave]!);
-        nextToSave++;
+      const currentCompleted = chapterResults.filter((r): r is NonNullable<typeof r> => r !== null);
+      if (currentCompleted.length > 0) {
+        await prisma.reviewConfig.update({
+          where: { id: reviewConfigId },
+          data: {
+            reportContent: { type: 'chapters', chapters: currentCompleted, generatedAt: new Date().toISOString() },
+          },
+        });
       }
-      // Persist current progress
-      await prisma.reviewConfig.update({
-        where: { id: reviewConfigId },
-        data: {
-          reportContent: { type: 'chapters', chapters: completedChapters, generatedAt: new Date().toISOString() },
-        },
-      });
     };
 
     // Process a single chapter
@@ -188,10 +182,11 @@ async function runBackgroundGeneration(reviewConfigId: string, projectId: string
     await Promise.all(executing);
 
     // Final save with completed status
+    const finalChapters = chapterResults.filter((r): r is NonNullable<typeof r> => r !== null);
     await prisma.reviewConfig.update({
       where: { id: reviewConfigId },
       data: {
-        reportContent: { type: 'chapters', chapters: completedChapters, generatedAt: new Date().toISOString() },
+        reportContent: { type: 'chapters', chapters: finalChapters, generatedAt: new Date().toISOString() },
         status: 'completed',
       },
     });
@@ -215,7 +210,7 @@ async function runBackgroundGeneration(reviewConfigId: string, projectId: string
       });
     }
 
-    console.log(`[ReportGen] Completed: ${reviewConfigId}, ${completedChapters.length} chapters`);
+    console.log(`[ReportGen] Completed: ${reviewConfigId}, ${finalChapters.length} chapters`);
   } catch (err) {
     console.error(`[ReportGen] Failed: ${reviewConfigId}`, err);
     await prisma.reviewConfig.update({

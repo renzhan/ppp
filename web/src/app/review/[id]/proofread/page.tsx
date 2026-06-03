@@ -38,16 +38,13 @@ interface ChapterStatus {
 // ─── Chapter Definitions ─────────────────────────────────────────────────────
 
 const CHAPTER_DEFS: Array<{ id: string; title: string; number: number }> = [
-  { id: 'cover', title: '封面', number: 1 },
   { id: 'projectReview', title: '项目回顾', number: 2 },
   { id: 'dataOverview', title: '数据总览', number: 3 },
   { id: 'highlights', title: '项目亮点', number: 4 },
   { id: 'quadrantAnalysis', title: '综合分析', number: 5 },
   { id: 'contentAnalysis', title: '内容分析', number: 6 },
   { id: 'trafficAnalysis', title: '投流分析', number: 7 },
-  { id: 'audienceAssets', title: '人群资产', number: 8 },
   { id: 'optimization', title: '优化建议', number: 9 },
-  { id: 'endPage', title: '尾页', number: 10 },
 ];
 
 interface ReviewDetail {
