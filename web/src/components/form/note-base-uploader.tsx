@@ -1,163 +1,150 @@
 'use client';
 
 import { useState, useRef, useCallback } from 'react';
-import { CheckCircle2, XCircle } from 'lucide-react';
+import { FolderPlus, FileSpreadsheet, X } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 export interface NoteBaseUploaderProps {
   projectId?: string;
   onUploadSuccess: (count: number) => void;
   onUploadError: (error: string) => void;
+  /** 无 projectId 时仅选择文件（如新建项目页） */
+  onFileSelect?: (file: File) => void;
+  onFileClear?: () => void;
 }
 
-/**
- * NoteBaseUploader - 笔记底表上传组件
- *
- * Behavior:
- * 1. Only accepts .xlsx files
- * 2. When a file is selected, validates extension client-side
- * 3. If projectId is provided, uploads to /api/upload/note-base/[projectId]
- * 4. Shows loading state during upload
- * 5. On success: displays "上传成功，共 N 条笔记" and calls onUploadSuccess(count)
- * 6. On error: displays error message and calls onUploadError(error)
- */
-export function NoteBaseUploader({ projectId, onUploadSuccess, onUploadError }: NoteBaseUploaderProps) {
+export function NoteBaseUploader({
+  projectId,
+  onUploadSuccess,
+  onUploadError,
+  onFileSelect,
+  onFileClear,
+}: NoteBaseUploaderProps) {
   const [uploading, setUploading] = useState(false);
-  const [result, setResult] = useState<{ type: 'success'; count: number } | { type: 'error'; message: string } | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [fileName, setFileName] = useState<string | null>(null);
+  const [result, setResult] = useState<
+    { type: 'success'; count: number } | { type: 'error'; message: string } | null
+  >(null);
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFile = useCallback(async (file: File) => {
-    // Client-side validation: only .xlsx
-    if (!file.name.toLowerCase().endsWith('.xlsx')) {
-      const errorMsg = '仅支持.xlsx格式文件';
-      setResult({ type: 'error', message: errorMsg });
-      onUploadError(errorMsg);
-      return;
-    }
-
-    if (!projectId) {
-      const errorMsg = '请先保存项目后再上传笔记底表';
-      setResult({ type: 'error', message: errorMsg });
-      onUploadError(errorMsg);
-      return;
-    }
-
-    setUploading(true);
-    setResult(null);
-
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-
-      const response = await fetch(`/api/upload/note-base/${projectId}`, {
-        method: 'POST',
-        body: formData,
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        const errorMsg = data.error || '上传失败，请稍后重试';
+  const handleFile = useCallback(
+    async (file: File) => {
+      if (!file.name.toLowerCase().endsWith('.xlsx')) {
+        const errorMsg = '仅支持.xlsx格式文件';
         setResult({ type: 'error', message: errorMsg });
         onUploadError(errorMsg);
-      } else {
-        const count = data.noteCount ?? 0;
-        setResult({ type: 'success', count });
-        onUploadSuccess(count);
+        return;
       }
-    } catch {
-      const errorMsg = '网络错误，请检查网络连接后重试';
-      setResult({ type: 'error', message: errorMsg });
-      onUploadError(errorMsg);
-    } finally {
-      setUploading(false);
-    }
-  }, [projectId, onUploadSuccess, onUploadError]);
+
+      if (!projectId) {
+        if (onFileSelect) {
+          onFileSelect(file);
+          setFileName(file.name);
+          setResult(null);
+          return;
+        }
+        const errorMsg = '请先保存项目后再上传笔记底表';
+        setResult({ type: 'error', message: errorMsg });
+        onUploadError(errorMsg);
+        return;
+      }
+
+      setFileName(file.name);
+      setUploading(true);
+      setUploadProgress(30);
+      setResult(null);
+
+      const progressTimer = setInterval(() => {
+        setUploadProgress((p) => Math.min(p + 12, 90));
+      }, 200);
+
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const response = await fetch(`/api/upload/note-base/${projectId}`, {
+          method: 'POST',
+          body: formData,
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          const errorMsg = data.error || '上传失败，请稍后重试';
+          setResult({ type: 'error', message: errorMsg });
+          onUploadError(errorMsg);
+        } else {
+          const count = data.noteCount ?? 0;
+          setUploadProgress(100);
+          setResult({ type: 'success', count });
+          onUploadSuccess(count);
+        }
+      } catch {
+        const errorMsg = '网络错误，请检查网络连接后重试';
+        setResult({ type: 'error', message: errorMsg });
+        onUploadError(errorMsg);
+      } finally {
+        clearInterval(progressTimer);
+        setUploading(false);
+      }
+    },
+    [projectId, onUploadSuccess, onUploadError]
+  );
+
+  const clearFile = () => {
+    setFileName(null);
+    setUploadProgress(0);
+    setResult(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      handleFile(file);
-    }
-    // Reset input so the same file can be re-selected
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
+    if (file) void handleFile(file);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setDragOver(false);
     const file = e.dataTransfer.files?.[0];
-    if (file) {
-      handleFile(file);
-    }
+    if (file) void handleFile(file);
   };
 
-  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    setDragOver(true);
-  };
-
-  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    setDragOver(false);
-  };
-
-  const handleClick = () => {
-    fileInputRef.current?.click();
-  };
+  const showFileRow = fileName && (uploading || result || (!projectId && onFileSelect));
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       <div
         role="button"
         tabIndex={0}
-        onClick={handleClick}
-        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleClick(); }}
+        onClick={() => !uploading && fileInputRef.current?.click()}
+        onKeyDown={(e) => {
+          if ((e.key === 'Enter' || e.key === ' ') && !uploading) fileInputRef.current?.click();
+        }}
         onDrop={handleDrop}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        className={`
-          flex flex-col items-center justify-center rounded-lg border-2 border-dashed px-4 py-6
-          transition-colors cursor-pointer
-          ${dragOver
-            ? 'border-brand bg-[#FFF8E1]'
-            : 'border-gray-300 bg-white hover:border-gray-400 hover:bg-gray-50'
-          }
-          ${uploading ? 'pointer-events-none opacity-60' : ''}
-        `}
-      >
-        {uploading ? (
-          <div className="flex w-full flex-col items-center gap-2 px-4">
-            <div className="h-6 w-6 animate-spin rounded-full border-2 border-gray-300 border-t-brand" />
-            <span className="text-sm text-gray-500">正在上传并解析...</span>
-            <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-gray-200">
-              <div className="h-full animate-pulse rounded-full bg-brand" style={{ width: '60%' }} />
-            </div>
-          </div>
-        ) : (
-          <>
-            <svg
-              className="mb-2 h-8 w-8 text-gray-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1.5}
-                d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-              />
-            </svg>
-            <p className="text-sm text-gray-600">
-              拖拽文件到此处，或 <span className="font-medium text-brand">点击选择文件</span>
-            </p>
-            <p className="mt-1 text-xs text-gray-400">仅支持 .xlsx 格式</p>
-          </>
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragOver(true);
+        }}
+        onDragLeave={(e) => {
+          e.preventDefault();
+          setDragOver(false);
+        }}
+        className={cn(
+          'flex flex-col items-center justify-center rounded-lg border border-dashed px-6 py-10 transition-colors',
+          dragOver ? 'border-brand bg-brand-50' : 'border-gray-300 bg-[#FAFAFA] hover:border-gray-400',
+          uploading && 'pointer-events-none'
         )}
+      >
+        <FolderPlus size={40} className="mb-3 text-gray-400" strokeWidth={1.25} />
+        <p className="text-sm text-gray-600">
+          点击或将文件 <span className="font-medium text-brand">拖拽</span> 到这里上传
+        </p>
+        <p className="mt-1 text-xs text-gray-400">支持扩展名：.xlsx</p>
       </div>
 
       <input
@@ -169,27 +156,36 @@ export function NoteBaseUploader({ projectId, onUploadSuccess, onUploadError }: 
         aria-label="上传笔记底表"
       />
 
-      {result && (
-        <div
-          className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm ${
-            result.type === 'success'
-              ? 'bg-green-50 text-green-700'
-              : 'bg-red-50 text-red-700'
-          }`}
-          role="status"
-          aria-live="polite"
-        >
-          {result.type === 'success' ? (
-            <CheckCircle2 size={16} className="shrink-0 text-green-500" />
-          ) : (
-            <XCircle size={16} className="shrink-0 text-red-500" />
+      {showFileRow && (
+        <div className="flex items-center gap-3 rounded-lg border border-gray-100 bg-white px-4 py-3">
+          <FileSpreadsheet size={20} className="shrink-0 text-brand" />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm text-gray-800">{fileName}</p>
+            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-gray-100">
+              <div
+                className="h-full rounded-full bg-brand transition-all duration-300"
+                style={{ width: `${uploading ? uploadProgress : 100}%` }}
+              />
+            </div>
+            {result?.type === 'success' && (
+              <p className="mt-1 text-xs text-green-600">上传成功，共 {result.count} 条笔记</p>
+            )}
+            {result?.type === 'error' && (
+              <p className="mt-1 text-xs text-red-600">{result.message}</p>
+            )}
+          </div>
+          {!uploading && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              onClick={clearFile}
+              className="shrink-0 text-gray-400"
+              aria-label="移除文件"
+            >
+              <X size={16} />
+            </Button>
           )}
-          <span>
-            {result.type === 'success'
-              ? `上传成功，共 ${result.count} 条笔记`
-              : result.message
-            }
-          </span>
         </div>
       )}
     </div>

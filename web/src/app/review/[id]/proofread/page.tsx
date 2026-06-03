@@ -408,16 +408,16 @@ export default function ProofreadPage({ params }: { params: { id: string } }) {
   return (
     <div className="flex h-[calc(100vh-3rem)] flex-col">
       {/* Top bar */}
-      <header className="flex items-center justify-between border-b bg-white px-4 py-2">
-        <div className="flex items-center gap-3">
+      <header className="flex items-center justify-between border-b bg-white  py-2">
+        <div className="flex items-center gap-3 text-lg">
           <Link
             href="/review"
-            className="text-xs text-gray-500 hover:text-gray-700"
+            className=" text-gray-500 hover:text-gray-700"
           >
             复盘系统
           </Link>
-          <span className="text-xs text-gray-300">/</span>
-          <span className="text-xs text-gray-700">审校台</span>
+          <span className=" text-gray-300">/</span>
+          <span className="text-gray-700">审校台</span>
         </div>
 
         <div className="flex items-center gap-2">
@@ -465,7 +465,7 @@ export default function ProofreadPage({ params }: { params: { id: string } }) {
       </header>
 
       {/* Report title area */}
-      <div className="border-b bg-white px-8 py-4">
+      <div className="border-b bg-white px-0 py-4">
         <h1 className="text-xl font-bold text-gray-900">
           {review?.project.projectName || ''}-复盘
         </h1>

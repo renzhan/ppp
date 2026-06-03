@@ -2,32 +2,38 @@
 
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronLeft, ChevronRight, Download } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { CardFooter } from '@/components/ui/card';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+} from '@/components/ui/select';
+import {
+  listTableHeadClass,
+  listTableHeaderRowClass,
+  listTableRowClass,
+  listTableWrapperClass,
+} from '@/components/ui/data-list';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { cn } from '@/lib/utils';
 
 interface NoteRecord {
   id: string;
   noteId: string;
   noteLink: string | null;
   kolNickName: string | null;
-  kolFanNum: number;
-  noteType: string | null;
-  spuName: string | null;
-  impNum: number;
-  readNum: number;
-  engageNum: number;
-  likeNum: number;
-  favNum: number;
-  cmtNum: number;
-  shareNum: number;
-  followNum: number;
-  kolPrice: number;
-  serviceFee: number;
   totalPlatformPrice: number;
-  isUnderwater: boolean;
-  underwaterPrice: number;
-  heatImpNum: number;
-  heatReadNum: number;
-  createdAt: string;
   components: Record<string, unknown> | null;
 }
 
@@ -43,15 +49,13 @@ export interface NoteBaseTableProps {
   projectId: string;
 }
 
-/**
- * NoteBaseTable - 笔记底表数据展示组件
- *
- * 在笔记底表上传区域下方展示已导入的笔记记录，支持分页。
- * 显示字段：序号、笔记链接、笔记id、博主名称、内容方向、总消耗
- */
+const selectTriggerClass =
+  'h-8 min-w-[88px] rounded border-gray-200 bg-white text-xs text-gray-700 focus-visible:ring-brand/25';
+
 export function NoteBaseTable({ projectId }: NoteBaseTableProps) {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [jumpPage, setJumpPage] = useState('');
 
   const { data, isLoading, isError } = useQuery<NotesResponse>({
     queryKey: ['project-notes', projectId, page, pageSize],
@@ -66,28 +70,24 @@ export function NoteBaseTable({ projectId }: NoteBaseTableProps) {
   });
 
   const total = data?.total ?? 0;
-  const totalPages = Math.ceil(total / pageSize);
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const notes = data?.notes ?? [];
   const updatedAt = data?.updatedAt;
 
-  // Don't render anything if no data
   if (!isLoading && total === 0) {
     return null;
   }
 
   const handleExport = async () => {
-    // Trigger a download of all notes as CSV
     try {
-      const res = await fetch(
-        `/api/projects/${projectId}/notes?page=1&pageSize=10000`
-      );
+      const res = await fetch(`/api/projects/${projectId}/notes?page=1&pageSize=10000`);
       if (!res.ok) return;
       const allData: NotesResponse = await res.json();
 
       const headers = ['序号', '笔记链接', '笔记id', '博主名称', '内容方向', '总消耗'];
       const rows = allData.notes.map((note, idx) => {
         const contentDirection = note.components
-          ? (note.components as Record<string, unknown>).contentDirection ?? ''
+          ? String((note.components as Record<string, unknown>).contentDirection ?? '')
           : '';
         return [
           idx + 1,
@@ -101,7 +101,9 @@ export function NoteBaseTable({ projectId }: NoteBaseTableProps) {
 
       const csvContent = [
         headers.join(','),
-        ...rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')),
+        ...rows.map((row) =>
+          row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')
+        ),
       ].join('\n');
 
       const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -112,7 +114,7 @@ export function NoteBaseTable({ projectId }: NoteBaseTableProps) {
       link.click();
       URL.revokeObjectURL(url);
     } catch {
-      // Silently fail
+      // ignore
     }
   };
 
@@ -129,75 +131,63 @@ export function NoteBaseTable({ projectId }: NoteBaseTableProps) {
     return '';
   };
 
-  const truncateLink = (link: string | null, maxLen = 20): string => {
+  const truncateLink = (link: string | null, maxLen = 14): string => {
     if (!link) return '';
     if (link.length <= maxLen) return link;
     return link.slice(0, maxLen) + '...';
   };
 
+  const handleJump = () => {
+    const val = parseInt(jumpPage, 10);
+    if (val >= 1 && val <= totalPages) setPage(val);
+  };
+
   return (
-    <div className="mt-4 space-y-3">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="text-sm text-gray-600">
-          <span className="font-medium">总计</span>
-          <span className="ml-4 text-gray-500">
+    <div className="space-y-3 pt-6">
+      <div className="flex items-center justify-between rounded-lg bg-[#F5F5F5] px-4 py-3 text-sm">
+
+          <span className="text-gray-500">
             笔记数据共计{total}条
             {updatedAt && `，数据更新时间${formatDate(updatedAt)}`}
           </span>
-        </div>
-        <button
-          type="button"
-          onClick={handleExport}
-          className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600 transition hover:bg-gray-50"
-        >
-          <Download size={14} />
+       
+        <Button variant="primary" size="sm" onClick={handleExport} className="shrink-0">
           导出现有数据
-        </button>
+        </Button>
       </div>
 
-      {/* Table */}
-      <div className="overflow-x-auto bg-white rounded-lg border border-gray-200">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b bg-gray-50">
-              <th className="whitespace-nowrap px-4 py-3 text-left text-sm font-medium text-gray-600">序号</th>
-              <th className="whitespace-nowrap px-4 py-3 text-left text-sm font-medium text-gray-600">笔记链接</th>
-              <th className="whitespace-nowrap px-4 py-3 text-left text-sm font-medium text-gray-600">笔记id</th>
-              <th className="whitespace-nowrap px-4 py-3 text-left text-sm font-medium text-gray-600">博主名称</th>
-              <th className="whitespace-nowrap px-4 py-3 text-left text-sm font-medium text-gray-600">内容方向</th>
-              <th className="whitespace-nowrap px-4 py-3 text-right text-sm font-medium text-gray-600">总消耗</th>
-            </tr>
-          </thead>
-          <tbody>
+      <div className={listTableWrapperClass}>
+        <Table className="text-sm">
+          <TableHeader>
+            <TableRow className={listTableHeaderRowClass}>
+              <TableHead className={cn(listTableHeadClass, 'w-16')}>序号</TableHead>
+              <TableHead className={listTableHeadClass}>笔记链接</TableHead>
+              <TableHead className={listTableHeadClass}>笔记id</TableHead>
+              <TableHead className={listTableHeadClass}>博主名称</TableHead>
+              <TableHead className={listTableHeadClass}>内容方向</TableHead>
+              <TableHead className={cn(listTableHeadClass, 'text-right')}>总消耗</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {isLoading ? (
-              <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
+              <TableRow>
+                <TableCell colSpan={6} className="py-12 text-center text-gray-400">
                   加载中...
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ) : isError ? (
-              <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-red-500">
+              <TableRow>
+                <TableCell colSpan={6} className="py-12 text-center text-red-500">
                   加载失败，请刷新重试
-                </td>
-              </tr>
-            ) : notes.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
-                  暂无数据
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ) : (
               notes.map((note, idx) => (
-                <tr
-                  key={note.id}
-                  className="bg-white text-sm text-gray-900 border-b hover:bg-gray-50 last:border-b-0"
-                >
-                  <td className="px-4 py-3 text-gray-500">
+                <TableRow key={note.id} className={listTableRowClass(idx)}>
+                  <TableCell className="py-3 text-gray-500">
                     {(page - 1) * pageSize + idx + 1}
-                  </td>
-                  <td className="px-4 py-3">
+                  </TableCell>
+                  <TableCell className="py-3">
                     {note.noteLink ? (
                       <a
                         href={note.noteLink}
@@ -211,139 +201,118 @@ export function NoteBaseTable({ projectId }: NoteBaseTableProps) {
                     ) : (
                       <span className="text-gray-400">-</span>
                     )}
-                  </td>
-                  <td className="px-4 py-3 font-mono text-xs text-gray-600">
+                  </TableCell>
+                  <TableCell className="py-3 font-mono text-xs text-gray-600">
                     {note.noteId}
-                  </td>
-                  <td className="px-4 py-3 text-gray-700">
-                    {note.kolNickName || <span className="text-gray-400">-</span>}
-                  </td>
-                  <td className="px-4 py-3 text-gray-700">
-                    {getContentDirection(note) || <span className="text-gray-400">-</span>}
-                  </td>
-                  <td className="px-4 py-3 text-right tabular-nums text-gray-700">
+                  </TableCell>
+                  <TableCell className="py-3">{note.kolNickName || '-'}</TableCell>
+                  <TableCell className="py-3">{getContentDirection(note) || '-'}</TableCell>
+                  <TableCell className="py-3 text-right tabular-nums">
                     {Number(note.totalPlatformPrice).toLocaleString('zh-CN', {
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2,
                     })}
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))
             )}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </div>
 
-      {/* Pagination */}
       {total > 0 && (
-        <div className="flex items-center justify-between text-sm">
-          <p className="text-sm text-gray-500">
-            共 {total} 条记录，第 {page}/{totalPages} 页
-          </p>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page <= 1}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-sm bg-white border border-gray-300 text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
-              aria-label="上一页"
-            >
-              <ChevronLeft size={16} />
-            </button>
-            {generatePageNumbers(page, totalPages).map((p, i) =>
-              p === '...' ? (
-                <span key={`ellipsis-${i}`} className="px-1 text-gray-400">...</span>
-              ) : (
-                <button
-                  key={p}
-                  type="button"
-                  onClick={() => setPage(p as number)}
-                  className={`inline-flex h-8 w-8 items-center justify-center rounded-sm text-sm transition ${
-                    page === p
-                      ? 'bg-brand text-white'
-                      : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
-                  }`}
-                >
-                  {p}
-                </button>
-              )
-            )}
-            <button
-              type="button"
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={page >= totalPages}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-sm bg-white border border-gray-300 text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
-              aria-label="下一页"
-            >
-              <ChevronRight size={16} />
-            </button>
+     
+        <CardFooter className="flex flex-wrap items-center justify-center gap-3">
+          <Button
+            type="button"
+            variant="outline"
+            size="icon-sm"
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page <= 1}
+          >
+            <ChevronLeft size={16} />
+          </Button>
+          {generatePageNumbers(page, totalPages).map((p, i) =>
+            p === '...' ? (
+              <span key={`ellipsis-${i}`} className="px-1 text-gray-400">
+                ...
+              </span>
+            ) : (
+              <Button
+                key={p}
+                type="button"
+                variant={page === p ? 'primary' : 'outline'}
+                size="icon-sm"
+                onClick={() => setPage(p as number)}
+                className={cn('text-sm', page === p && 'pointer-events-none')}
+              >
+                {p}
+              </Button>
+            )
+          )}
+          <Button
+            type="button"
+            variant="outline"
+            size="icon-sm"
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={page >= totalPages}
+          >
+            <ChevronRight size={16} />
+          </Button>
 
-            {/* Page size selector */}
-            <select
-              value={pageSize}
-              onChange={(e) => {
-                setPageSize(Number(e.target.value));
-                setPage(1);
-              }}
-              className="ml-2 h-8 rounded-sm border border-gray-300 px-2 text-xs text-gray-600 outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
-            >
-              <option value={10}>10条/页</option>
-              <option value={20}>20条/页</option>
-              <option value={50}>50条/页</option>
-              <option value={100}>100条/页</option>
-            </select>
+          <Select
+            value={String(pageSize)}
+            className="flex-0"
+            onValueChange={(v) => {
+              setPageSize(Number(v));
+              setPage(1);
+            }}
+          >
+            <SelectTrigger className={selectTriggerClass} />
+            <SelectContent>
+              <SelectItem value="10">10条/页</SelectItem>
+              <SelectItem value="20">20条/页</SelectItem>
+              <SelectItem value="50">50条/页</SelectItem>
+              <SelectItem value="100">100条/页</SelectItem>
+            </SelectContent>
+          </Select>
 
-            {/* Jump to page */}
-            <span className="ml-2 text-xs text-gray-500">跳至</span>
-            <input
-              type="number"
-              min={1}
-              max={totalPages}
-              className="h-8 w-12 rounded-sm border border-gray-300 px-2 text-center text-xs outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  const val = parseInt((e.target as HTMLInputElement).value, 10);
-                  if (val >= 1 && val <= totalPages) {
-                    setPage(val);
-                  }
-                }
-              }}
-            />
-            <span className="text-xs text-gray-500">页</span>
-          </div>
-        </div>
+          <span className="text-xs text-gray-500">跳至</span>
+          <Input
+            variant="filter"
+            type="number"
+            min={1}
+            max={totalPages}
+            value={jumpPage}
+            onChange={(e) => setJumpPage(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleJump();
+            }}
+            className="h-8 w-12 px-1 text-center text-xs"
+          />
+          <span className="text-xs text-gray-500">页</span>
+          </CardFooter>
       )}
     </div>
   );
 }
 
-/**
- * Generate page number array with ellipsis for pagination display.
- * Shows: first, last, current, and 2 neighbors of current.
- */
 function generatePageNumbers(current: number, total: number): (number | '...')[] {
-  if (total <= 7) {
+  if (total <= 9) {
     return Array.from({ length: total }, (_, i) => i + 1);
   }
 
   const pages: (number | '...')[] = [];
   const showPages = new Set<number>();
-
-  // Always show first and last
   showPages.add(1);
   showPages.add(total);
-
-  // Show current and neighbors
   for (let i = Math.max(1, current - 2); i <= Math.min(total, current + 2); i++) {
     showPages.add(i);
   }
 
   const sorted = Array.from(showPages).sort((a, b) => a - b);
-
   for (let i = 0; i < sorted.length; i++) {
-    if (i > 0 && sorted[i] - sorted[i - 1] > 1) {
-      pages.push('...');
-    }
+    if (i > 0 && sorted[i] - sorted[i - 1] > 1) pages.push('...');
     pages.push(sorted[i]);
   }
 

@@ -1,4 +1,4 @@
-import { ArrowLeft } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 
 interface BreadcrumbItem {
@@ -41,14 +41,7 @@ export function PageHeader({ title, description, actions, backHref, breadcrumbs 
       {/* Title row with actions */}
       <div className="flex items-start justify-between">
         <div className="flex items-start gap-3">
-          {backHref && (
-            <Link
-              href={backHref}
-              className="mt-1 flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
-            >
-              <ArrowLeft size={18} />
-            </Link>
-          )}
+
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-gray-900">
               {title}
@@ -59,6 +52,15 @@ export function PageHeader({ title, description, actions, backHref, breadcrumbs 
           </div>
         </div>
         {actions && <div className="ml-auto flex items-center gap-2">{actions}</div>}
+        {backHref && (
+            <Link
+              href={backHref}
+              className="mt-1 flex h-8 text-sm items-center justify-center rounded-lg text-gray-400 transition gap-1 hover:text-gray-600"
+            >
+              返回项目列表
+              <ArrowRight size={14} /> 
+            </Link>
+          )}
       </div>
     </div>
   );
