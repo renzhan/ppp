@@ -2,231 +2,174 @@
 
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronLeft, ChevronRight, Download } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { DISPLAY_ONLY_COLUMN_MAP } from '@/lib/note-base-parser';
 
-interface NoteRecord {
+interface NoteBaseRecord {
   id: string;
+  projectId: string;
   noteId: string;
   noteLink: string | null;
   kolNickName: string | null;
-  kolFanNum: number;
-  noteType: string | null;
+  kolFanNum: number | null;
+  cooperationForm: string | null;
+  isRegistered: boolean;
+  contentDirection: string | null;
+  kolType: string | null;
   spuName: string | null;
-  impNum: number;
-  readNum: number;
-  engageNum: number;
-  likeNum: number;
-  favNum: number;
-  cmtNum: number;
-  shareNum: number;
-  followNum: number;
-  kolPrice: number;
-  serviceFee: number;
-  totalPlatformPrice: number;
-  isUnderwater: boolean;
-  underwaterPrice: number;
-  heatImpNum: number;
-  heatReadNum: number;
+  contentCost: number;
+  contentSettlement: number;
+  adSpend: number;
+  totalCost: number;
+  metrics: Record<string, number | string> | null;
   createdAt: string;
-  components: Record<string, unknown> | null;
 }
 
-interface NotesResponse {
-  notes: NoteRecord[];
-  total: number;
-  page: number;
-  pageSize: number;
-  updatedAt: string | null;
+interface NoteBaseResponse {
+  records: NoteBaseRecord[];
+  count: number;
 }
 
 export interface NoteBaseTableProps {
   projectId: string;
 }
 
+/** Reverse map: field key → Chinese label */
+const METRICS_LABELS: Record<string, string> = Object.fromEntries(
+  Object.entries(DISPLAY_ONLY_COLUMN_MAP).map(([label, key]) => [key, label])
+);
+
+/** Get all unique metric keys from records */
+function getMetricKeys(records: NoteBaseRecord[]): string[] {
+  const keys = new Set<string>();
+  for (const r of records) {
+    if (r.metrics) {
+      for (const k of Object.keys(r.metrics)) {
+        keys.add(k);
+      }
+    }
+  }
+  return Array.from(keys);
+}
+
+function formatMetricValue(value: unknown): string {
+  if (value == null || value === '') return '-';
+  const num = Number(value);
+  if (isNaN(num)) return String(value);
+  if (num > 0 && num < 1) return (num * 100).toFixed(2) + '%';
+  if (Number.isInteger(num)) return num.toLocaleString();
+  return num.toLocaleString(undefined, { maximumFractionDigits: 2 });
+}
+
 /**
  * NoteBaseTable - 笔记底表数据展示组件
  *
- * 在笔记底表上传区域下方展示已导入的笔记记录，支持分页。
- * 显示字段：序号、笔记链接、笔记id、博主名称、内容方向、总消耗
+ * 查询 /api/projects/:id/note-base 端点，展示所有 note_base 字段 + metrics JSON 字段。
+ * 支持横向滚动，序号列固定在左侧。
  */
 export function NoteBaseTable({ projectId }: NoteBaseTableProps) {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
-  const { data, isLoading, isError } = useQuery<NotesResponse>({
-    queryKey: ['project-notes', projectId, page, pageSize],
+  const { data, isLoading, isError } = useQuery<NoteBaseResponse>({
+    queryKey: ['project-note-base', projectId],
     queryFn: async () => {
-      const res = await fetch(
-        `/api/projects/${projectId}/notes?page=${page}&pageSize=${pageSize}`
-      );
-      if (!res.ok) throw new Error('获取笔记数据失败');
+      const res = await fetch(`/api/projects/${projectId}/note-base`);
+      if (!res.ok) throw new Error('获取笔记底表数据失败');
       return res.json();
     },
     enabled: !!projectId,
   });
 
-  const total = data?.total ?? 0;
+  const allRecords = data?.records ?? [];
+  const total = data?.count ?? 0;
   const totalPages = Math.ceil(total / pageSize);
-  const notes = data?.notes ?? [];
-  const updatedAt = data?.updatedAt;
+  const metricKeys = getMetricKeys(allRecords);
+
+  // Client-side pagination
+  const paginatedRecords = allRecords.slice(
+    (page - 1) * pageSize,
+    page * pageSize
+  );
 
   // Don't render anything if no data
   if (!isLoading && total === 0) {
     return null;
   }
 
-  const handleExport = async () => {
-    // Trigger a download of all notes as CSV
-    try {
-      const res = await fetch(
-        `/api/projects/${projectId}/notes?page=1&pageSize=10000`
-      );
-      if (!res.ok) return;
-      const allData: NotesResponse = await res.json();
-
-      const headers = ['序号', '笔记链接', '笔记id', '博主名称', '内容方向', '总消耗'];
-      const rows = allData.notes.map((note, idx) => {
-        const contentDirection = note.components
-          ? (note.components as Record<string, unknown>).contentDirection ?? ''
-          : '';
-        return [
-          idx + 1,
-          note.noteLink ?? '',
-          note.noteId,
-          note.kolNickName ?? '',
-          contentDirection,
-          Number(note.totalPlatformPrice).toFixed(2),
-        ];
-      });
-
-      const csvContent = [
-        headers.join(','),
-        ...rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')),
-      ].join('\n');
-
-      const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `笔记底表数据_${new Date().toISOString().slice(0, 10)}.csv`;
-      link.click();
-      URL.revokeObjectURL(url);
-    } catch {
-      // Silently fail
-    }
-  };
-
-  const formatDate = (dateStr: string | null) => {
-    if (!dateStr) return '';
-    const d = new Date(dateStr);
-    return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日 ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`;
-  };
-
-  const getContentDirection = (note: NoteRecord): string => {
-    if (note.components && typeof note.components === 'object') {
-      return String((note.components as Record<string, unknown>).contentDirection ?? '');
-    }
-    return '';
-  };
-
-  const truncateLink = (link: string | null, maxLen = 20): string => {
-    if (!link) return '';
-    if (link.length <= maxLen) return link;
-    return link.slice(0, maxLen) + '...';
-  };
-
   return (
     <div className="mt-4 space-y-3">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="text-sm text-gray-600">
-          <span className="font-medium">总计</span>
-          <span className="ml-4 text-gray-500">
-            笔记数据共计{total}条
-            {updatedAt && `，数据更新时间${formatDate(updatedAt)}`}
-          </span>
+          <span className="font-medium">笔记底表</span>
+          <span className="ml-4 text-gray-500">共计 {total} 条记录</span>
         </div>
-        <button
-          type="button"
-          onClick={handleExport}
-          className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600 transition hover:bg-gray-50"
-        >
-          <Download size={14} />
-          导出现有数据
-        </button>
       </div>
 
-      {/* Table */}
-      <div className="overflow-x-auto bg-white rounded-lg border border-gray-200">
-        <table className="w-full text-sm">
+      {/* Table with horizontal scroll */}
+      <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
+        <table className="w-full text-sm border-collapse">
           <thead>
             <tr className="border-b bg-gray-50">
-              <th className="whitespace-nowrap px-4 py-3 text-left text-sm font-medium text-gray-600">序号</th>
-              <th className="whitespace-nowrap px-4 py-3 text-left text-sm font-medium text-gray-600">笔记链接</th>
-              <th className="whitespace-nowrap px-4 py-3 text-left text-sm font-medium text-gray-600">笔记id</th>
-              <th className="whitespace-nowrap px-4 py-3 text-left text-sm font-medium text-gray-600">博主名称</th>
-              <th className="whitespace-nowrap px-4 py-3 text-left text-sm font-medium text-gray-600">内容方向</th>
-              <th className="whitespace-nowrap px-4 py-3 text-right text-sm font-medium text-gray-600">总消耗</th>
+              <th className="sticky left-0 z-10 bg-gray-50 whitespace-nowrap px-3 py-2.5 text-center text-xs font-medium text-gray-600 border-r border-gray-200 min-w-[36px]">#</th>
+              <th className="whitespace-nowrap px-3 py-2.5 text-left text-xs font-medium text-gray-600">博主昵称</th>
+              <th className="whitespace-nowrap px-3 py-2.5 text-left text-xs font-medium text-gray-600">笔记ID</th>
+              <th className="whitespace-nowrap px-3 py-2.5 text-left text-xs font-medium text-gray-600">是否报备</th>
+              <th className="whitespace-nowrap px-3 py-2.5 text-left text-xs font-medium text-gray-600">合作形式</th>
+              <th className="whitespace-nowrap px-3 py-2.5 text-left text-xs font-medium text-gray-600">内容方向</th>
+              <th className="whitespace-nowrap px-3 py-2.5 text-right text-xs font-medium text-gray-600">达人金额</th>
+              <th className="whitespace-nowrap px-3 py-2.5 text-right text-xs font-medium text-gray-600">投流金额</th>
+              <th className="whitespace-nowrap px-3 py-2.5 text-right text-xs font-medium text-gray-600">总消耗</th>
+              {/* Dynamic metric columns from metrics JSON */}
+              {metricKeys.map((key) => (
+                <th key={key} className="whitespace-nowrap px-3 py-2.5 text-right text-xs font-medium text-gray-600">
+                  {METRICS_LABELS[key] || key}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
             {isLoading ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
-                  加载中...
-                </td>
+                <td colSpan={9 + metricKeys.length} className="px-4 py-8 text-center text-gray-400">加载中...</td>
               </tr>
             ) : isError ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-red-500">
-                  加载失败，请刷新重试
-                </td>
+                <td colSpan={9 + metricKeys.length} className="px-4 py-8 text-center text-red-500">加载失败，请刷新重试</td>
               </tr>
-            ) : notes.length === 0 ? (
+            ) : paginatedRecords.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
-                  暂无数据
-                </td>
+                <td colSpan={9 + metricKeys.length} className="px-4 py-8 text-center text-gray-400">暂无数据</td>
               </tr>
             ) : (
-              notes.map((note, idx) => (
-                <tr
-                  key={note.id}
-                  className="bg-white text-sm text-gray-900 border-b hover:bg-gray-50 last:border-b-0"
-                >
-                  <td className="px-4 py-3 text-gray-500">
+              paginatedRecords.map((record, idx) => (
+                <tr key={record.id} className="border-b last:border-b-0 hover:bg-gray-50">
+                  <td className="sticky left-0 z-10 bg-white whitespace-nowrap px-3 py-2 text-center text-xs text-gray-500 border-r border-gray-200">
                     {(page - 1) * pageSize + idx + 1}
                   </td>
-                  <td className="px-4 py-3">
-                    {note.noteLink ? (
-                      <a
-                        href={note.noteLink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-brand hover:underline"
-                        title={note.noteLink}
-                      >
-                        {truncateLink(note.noteLink)}
+                  <td className="whitespace-nowrap px-3 py-2 text-xs text-gray-700">{record.kolNickName || '-'}</td>
+                  <td className="whitespace-nowrap px-3 py-2">
+                    {record.noteLink ? (
+                      <a href={record.noteLink} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-xs font-mono">
+                        {record.noteId}
                       </a>
                     ) : (
-                      <span className="text-gray-400">-</span>
+                      <span className="text-xs font-mono text-gray-600">{record.noteId}</span>
                     )}
                   </td>
-                  <td className="px-4 py-3 font-mono text-xs text-gray-600">
-                    {note.noteId}
-                  </td>
-                  <td className="px-4 py-3 text-gray-700">
-                    {note.kolNickName || <span className="text-gray-400">-</span>}
-                  </td>
-                  <td className="px-4 py-3 text-gray-700">
-                    {getContentDirection(note) || <span className="text-gray-400">-</span>}
-                  </td>
-                  <td className="px-4 py-3 text-right tabular-nums text-gray-700">
-                    {Number(note.totalPlatformPrice).toLocaleString('zh-CN', {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
-                  </td>
+                  <td className="whitespace-nowrap px-3 py-2 text-xs text-gray-700">{record.isRegistered ? '是' : '否'}</td>
+                  <td className="whitespace-nowrap px-3 py-2 text-xs text-gray-700">{record.cooperationForm || '-'}</td>
+                  <td className="whitespace-nowrap px-3 py-2 text-xs text-gray-700">{record.contentDirection || '-'}</td>
+                  <td className="whitespace-nowrap px-3 py-2 text-right text-xs tabular-nums text-gray-700">{Number(record.contentCost).toLocaleString()}</td>
+                  <td className="whitespace-nowrap px-3 py-2 text-right text-xs tabular-nums text-gray-700">{Number(record.adSpend).toLocaleString()}</td>
+                  <td className="whitespace-nowrap px-3 py-2 text-right text-xs tabular-nums text-gray-700">{Number(record.totalCost).toLocaleString()}</td>
+                  {/* Dynamic metric values */}
+                  {metricKeys.map((key) => (
+                    <td key={key} className="whitespace-nowrap px-3 py-2 text-right text-xs tabular-nums text-gray-700">
+                      {formatMetricValue(record.metrics?.[key])}
+                    </td>
+                  ))}
                 </tr>
               ))
             )}
@@ -237,9 +180,7 @@ export function NoteBaseTable({ projectId }: NoteBaseTableProps) {
       {/* Pagination */}
       {total > 0 && (
         <div className="flex items-center justify-between text-sm">
-          <p className="text-sm text-gray-500">
-            共 {total} 条记录，第 {page}/{totalPages} 页
-          </p>
+          <p className="text-sm text-gray-500">共 {total} 条，第 {page}/{totalPages} 页</p>
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -250,24 +191,7 @@ export function NoteBaseTable({ projectId }: NoteBaseTableProps) {
             >
               <ChevronLeft size={16} />
             </button>
-            {generatePageNumbers(page, totalPages).map((p, i) =>
-              p === '...' ? (
-                <span key={`ellipsis-${i}`} className="px-1 text-gray-400">...</span>
-              ) : (
-                <button
-                  key={p}
-                  type="button"
-                  onClick={() => setPage(p as number)}
-                  className={`inline-flex h-8 w-8 items-center justify-center rounded-sm text-sm transition ${
-                    page === p
-                      ? 'bg-brand text-white'
-                      : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
-                  }`}
-                >
-                  {p}
-                </button>
-              )
-            )}
+            <span className="text-xs text-gray-600">{page} / {totalPages}</span>
             <button
               type="button"
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
@@ -277,14 +201,9 @@ export function NoteBaseTable({ projectId }: NoteBaseTableProps) {
             >
               <ChevronRight size={16} />
             </button>
-
-            {/* Page size selector */}
             <select
               value={pageSize}
-              onChange={(e) => {
-                setPageSize(Number(e.target.value));
-                setPage(1);
-              }}
+              onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }}
               className="ml-2 h-8 rounded-sm border border-gray-300 px-2 text-xs text-gray-600 outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
             >
               <option value={10}>10条/页</option>
@@ -292,60 +211,9 @@ export function NoteBaseTable({ projectId }: NoteBaseTableProps) {
               <option value={50}>50条/页</option>
               <option value={100}>100条/页</option>
             </select>
-
-            {/* Jump to page */}
-            <span className="ml-2 text-xs text-gray-500">跳至</span>
-            <input
-              type="number"
-              min={1}
-              max={totalPages}
-              className="h-8 w-12 rounded-sm border border-gray-300 px-2 text-center text-xs outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  const val = parseInt((e.target as HTMLInputElement).value, 10);
-                  if (val >= 1 && val <= totalPages) {
-                    setPage(val);
-                  }
-                }
-              }}
-            />
-            <span className="text-xs text-gray-500">页</span>
           </div>
         </div>
       )}
     </div>
   );
-}
-
-/**
- * Generate page number array with ellipsis for pagination display.
- * Shows: first, last, current, and 2 neighbors of current.
- */
-function generatePageNumbers(current: number, total: number): (number | '...')[] {
-  if (total <= 7) {
-    return Array.from({ length: total }, (_, i) => i + 1);
-  }
-
-  const pages: (number | '...')[] = [];
-  const showPages = new Set<number>();
-
-  // Always show first and last
-  showPages.add(1);
-  showPages.add(total);
-
-  // Show current and neighbors
-  for (let i = Math.max(1, current - 2); i <= Math.min(total, current + 2); i++) {
-    showPages.add(i);
-  }
-
-  const sorted = Array.from(showPages).sort((a, b) => a - b);
-
-  for (let i = 0; i < sorted.length; i++) {
-    if (i > 0 && sorted[i] - sorted[i - 1] > 1) {
-      pages.push('...');
-    }
-    pages.push(sorted[i]);
-  }
-
-  return pages;
 }

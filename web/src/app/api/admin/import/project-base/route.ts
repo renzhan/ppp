@@ -14,13 +14,16 @@ const COLUMN_MAP: Record<string, string> = {
   '品类': 'category',
   // 品牌 (brand)
   '品牌简称': 'brand',
+  '品牌简称（必填）': 'brand',
   '品牌': 'brand',
   // 业务线 (businessLine)
   '品牌业务线': 'businessLine',
-  // 项目名称 (projectName) - 优先用元派实际立项名称，其次飞书项目名称
+  '品牌业务线（必填）': 'businessLine',
+  // 项目名称 (projectName) - 优先用元派实际立项名称，其次飞书项目名称，最后客户名称
   '元派实际立项名称': 'projectName',
   '飞书项目名称': 'projectName',
   '项目名称': 'projectName',
+  '客户名称': 'projectName',
   // 立项时间 (startDate)
   '立项时间': 'startDate',
   // 创建者 (createdBy)

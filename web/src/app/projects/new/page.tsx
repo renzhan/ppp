@@ -6,7 +6,8 @@ import { useRouter } from 'next/navigation';
 import { Loader2, X, ChevronDown } from 'lucide-react';
 import { PageHeader } from '@/components/layout/page-header';
 import { CascadeSelector, CascadeSelectorValue } from '@/components/form/cascade-selector';
-import { NoteBaseUploader } from '@/components/form/note-base-uploader';
+import { NoteBasePreview } from '@/components/form/note-base-preview';
+import { ParsedNoteBaseRow } from '@/lib/note-base-parser';
 
 interface User {
   id: string;
@@ -46,10 +47,10 @@ export default function NewProjectPage() {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [showParticipantDropdown, setShowParticipantDropdown] = useState(false);
   const [participantSearch, setParticipantSearch] = useState('');
-  const [createdProjectId, setCreatedProjectId] = useState<string | null>(null);
   const [pendingNoteFile, setPendingNoteFile] = useState<File | null>(null);
-  const [noteUploadStatus, setNoteUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
-  const [noteUploadMessage, setNoteUploadMessage] = useState<string>('');
+  const [parsedPreviewRecords, setParsedPreviewRecords] = useState<ParsedNoteBaseRow[]>([]);
+  const [parseWarnings, setParseWarnings] = useState<string[]>([]);
+  const [isParsing, setIsParsing] = useState(false);
   const suggestionsRef = useRef<HTMLDivElement>(null);
   const participantRef = useRef<HTMLDivElement>(null);
 
@@ -162,32 +163,21 @@ export default function NewProjectPage() {
       return data;
     },
     onSuccess: async (project) => {
-      setCreatedProjectId(project.id);
       // Auto-upload pending note file if selected
       if (pendingNoteFile) {
-        setNoteUploadStatus('uploading');
         try {
           const formData = new FormData();
           formData.append('file', pendingNoteFile);
-          const res = await fetch(`/api/upload/note-base/${project.id}`, {
+          await fetch(`/api/upload/note-base/${project.id}`, {
             method: 'POST',
             body: formData,
           });
-          if (res.ok) {
-            const result = await res.json();
-            const count = result.count ?? result.imported ?? 0;
-            setNoteUploadStatus('success');
-            setNoteUploadMessage(`笔记底表解析成功，共导入 ${count} 条记录`);
-          } else {
-            const err = await res.json().catch(() => ({ error: '解析失败' }));
-            setNoteUploadStatus('error');
-            setNoteUploadMessage(err.error || '笔记底表解析失败');
-          }
-        } catch (err) {
-          setNoteUploadStatus('error');
-          setNoteUploadMessage('笔记底表上传失败，请稍后在项目编辑页重新上传');
+        } catch {
+          // Silently fail — user can re-upload in edit page
         }
       }
+      // Always redirect to project list
+      router.push('/');
     },
   });
 
@@ -426,108 +416,109 @@ export default function NewProjectPage() {
           <div className="space-y-2">
             <label className="block text-sm font-medium text-gray-900">笔记底表（可选）</label>
             <p className="text-xs text-gray-500">
-              可选上传，创建项目后将自动解析。也可后续通过编辑项目上传。
+              可选上传，创建项目时将自动保存到数据库。也可后续通过编辑项目上传。
             </p>
-            {createdProjectId && pendingNoteFile ? (
-              // 已创建项目且有待上传文件 - 显示解析状态
-              <div className="rounded-md border border-gray-200 bg-gray-50 px-4 py-3">
-                <p className="text-sm text-gray-700 font-medium">{pendingNoteFile.name}</p>
-                {noteUploadStatus === 'uploading' && (
-                  <p className="mt-1 flex items-center gap-2 text-xs text-brand">
-                    <Loader2 size={12} className="animate-spin" />
-                    正在解析笔记底表...
-                  </p>
+            <div>
+              <label className="flex cursor-pointer flex-col items-center justify-center rounded-md border-2 border-dashed border-gray-300 bg-white px-4 py-6 transition-colors hover:border-gray-400 hover:bg-gray-50">
+                <svg className="mb-2 h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+                {pendingNoteFile ? (
+                  <p className="text-sm text-emerald-600 font-medium">已选择: {pendingNoteFile.name}</p>
+                ) : (
+                  <>
+                    <p className="text-sm text-gray-600">
+                      点击选择 <span className="font-medium text-brand">.xlsx</span> 笔记底表文件
+                    </p>
+                    <p className="mt-1 text-xs text-gray-400">创建项目时将自动保存</p>
+                  </>
                 )}
-                {noteUploadStatus === 'success' && (
-                  <p className="mt-1 text-xs text-emerald-600">✓ {noteUploadMessage}</p>
-                )}
-                {noteUploadStatus === 'error' && (
-                  <p className="mt-1 text-xs text-amber-600">⚠ {noteUploadMessage}</p>
-                )}
-              </div>
-            ) : createdProjectId && !pendingNoteFile ? (
-              // 已创建项目但没有待上传文件 - 显示上传组件
-              <NoteBaseUploader
-                projectId={createdProjectId}
-                onUploadSuccess={() => {}}
-                onUploadError={() => {}}
-              />
-            ) : (
-              <div>
-                <label className="flex cursor-pointer flex-col items-center justify-center rounded-md border-2 border-dashed border-gray-300 bg-white px-4 py-6 transition-colors hover:border-gray-400 hover:bg-gray-50">
-                  <svg className="mb-2 h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                  </svg>
-                  {pendingNoteFile ? (
-                    <p className="text-sm text-emerald-600 font-medium">已选择: {pendingNoteFile.name}</p>
-                  ) : (
-                    <>
-                      <p className="text-sm text-gray-600">
-                        点击选择 <span className="font-medium text-brand">.xlsx</span> 笔记底表文件
-                      </p>
-                      <p className="mt-1 text-xs text-gray-400">创建项目后将自动上传</p>
-                    </>
-                  )}
-                  <input
-                    type="file"
-                    accept=".xlsx"
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        if (!file.name.toLowerCase().endsWith('.xlsx')) {
-                          alert('仅支持 .xlsx 格式文件');
-                          return;
-                        }
-                        setPendingNoteFile(file);
+                <input
+                  type="file"
+                  accept=".xlsx"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      if (!file.name.toLowerCase().endsWith('.xlsx')) {
+                        alert('仅支持 .xlsx 格式文件');
+                        return;
                       }
-                    }}
-                  />
-                </label>
-                {pendingNoteFile && (
-                  <button
-                    type="button"
-                    onClick={() => setPendingNoteFile(null)}
-                    className="mt-2 text-xs text-gray-500 hover:text-rose-500"
-                  >
-                    取消选择
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Submit / Success */}
-          {createdProjectId ? (
-            <div className="space-y-4 pt-4">
-              <div className="rounded-lg bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-700">
-                项目创建成功！
-              </div>
-              <div className="flex items-center justify-end gap-3">
+                      setPendingNoteFile(file);
+                      // 立即调用解析端点预览数据
+                      setIsParsing(true);
+                      setParsedPreviewRecords([]);
+                      setParseWarnings([]);
+                      try {
+                        const formData = new FormData();
+                        formData.append('file', file);
+                        const res = await fetch('/api/upload/note-base/parse', {
+                          method: 'POST',
+                          body: formData,
+                        });
+                        const data = await res.json();
+                        if (res.ok && data.success) {
+                          setParsedPreviewRecords(data.records);
+                          setParseWarnings(data.warnings || []);
+                        } else {
+                          setParseWarnings([data.error || '解析失败']);
+                        }
+                      } catch {
+                        setParseWarnings(['解析请求失败，请稍后重试']);
+                      } finally {
+                        setIsParsing(false);
+                      }
+                    }
+                  }}
+                />
+              </label>
+              {pendingNoteFile && (
                 <button
                   type="button"
-                  onClick={() => router.push('/')}
-                  className="inline-flex h-10 items-center gap-2 rounded-lg bg-brand px-5 text-sm font-medium text-white transition hover:bg-brand-600"
+                  onClick={() => {
+                    setPendingNoteFile(null);
+                    setParsedPreviewRecords([]);
+                    setParseWarnings([]);
+                  }}
+                  className="mt-2 text-xs text-gray-500 hover:text-rose-500"
                 >
-                  返回项目列表
+                  取消选择
                 </button>
-              </div>
+              )}
+              {/* 解析中提示 */}
+              {isParsing && (
+                <div className="mt-2 flex items-center gap-2 text-xs text-brand">
+                  <Loader2 size={12} className="animate-spin" />
+                  正在解析预览...
+                </div>
+              )}
+              {/* 解析预览 */}
+              {!isParsing && parsedPreviewRecords.length > 0 && (
+                <NoteBasePreview records={parsedPreviewRecords} warnings={parseWarnings} />
+              )}
+              {/* 解析失败提示（无记录时） */}
+              {!isParsing && parsedPreviewRecords.length === 0 && parseWarnings.length > 0 && (
+                <div className="mt-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                  {parseWarnings.map((w, i) => <p key={i}>{w}</p>)}
+                </div>
+              )}
             </div>
-          ) : (
-            <div className="flex items-center justify-end pt-4">
-              <button
-                type="button"
-                onClick={handleSubmit}
-                disabled={createProjectMutation.isPending}
-                className="inline-flex h-12 items-center gap-2 rounded-lg bg-brand px-6 text-sm font-medium text-white transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {createProjectMutation.isPending ? (
-                  <Loader2 size={16} className="animate-spin" />
-                ) : null}
-                <span>创建项目</span>
-              </button>
-            </div>
-          )}
+          </div>
+
+          {/* Submit */}
+          <div className="flex items-center justify-end pt-4">
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={createProjectMutation.isPending}
+              className="inline-flex h-12 items-center gap-2 rounded-lg bg-brand px-6 text-sm font-medium text-white transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {createProjectMutation.isPending ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : null}
+              <span>创建项目</span>
+            </button>
+          </div>
 
           {createProjectMutation.isError && (
             <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-600">

@@ -298,7 +298,7 @@ export default function ProjectListPage() {
                   <TableHead className={cn(listTableHeadClass, 'min-w-[220px]')}>项目名称</TableHead>
                   <TableHead className={listTableHeadClass}>创建者</TableHead>
                   <TableHead className={listTableHeadClass}>笔记数量</TableHead>
-                  <TableHead className={listTableHeadClass}>立项时间</TableHead>
+                  <TableHead className={listTableHeadClass}>项目结束日期</TableHead>
                   <TableHead className={listTableHeadClass}>参与者</TableHead>
                   <TableHead className={listTableHeadClass}>操作</TableHead>
                 </TableRow>
@@ -319,7 +319,7 @@ export default function ProjectListPage() {
                     </TableCell>
                     <TableCell className="whitespace-nowrap py-3">{project.noteCount ?? 0}</TableCell>
                     <TableCell className="whitespace-nowrap py-3">
-                      {formatDate(project.startDate)}
+                      {project.endDate ? formatDate(project.endDate) : '-'}
                     </TableCell>
                     <TableCell className="whitespace-nowrap py-3">
                       {project.participants?.length > 0
@@ -330,6 +330,35 @@ export default function ProjectListPage() {
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                         <Button variant="text-link" size="sm" className="h-auto px-0 text-xs" asChild>
                           <Link href={`/projects/${project.id}/edit`}>编辑</Link>
+                        </Button>
+                        <Button
+                          variant="text-link"
+                          size="sm"
+                          className="h-auto px-0 text-xs"
+                          onClick={async () => {
+                            try {
+                              const res = await fetch(`/api/export/raw-notes/${project.id}`, { method: 'POST' });
+                              if (!res.ok) {
+                                const err = await res.json().catch(() => ({ error: '导出失败' }));
+                                alert(err.error || '导出失败');
+                                return;
+                              }
+                              const blob = await res.blob();
+                              const contentDisposition = res.headers.get('Content-Disposition') || '';
+                              const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
+                              const filename = filenameMatch ? decodeURIComponent(filenameMatch[1]) : `${project.projectName}_导出.xlsx`;
+                              const url = URL.createObjectURL(blob);
+                              const a = document.createElement('a');
+                              a.href = url;
+                              a.download = filename;
+                              a.click();
+                              URL.revokeObjectURL(url);
+                            } catch {
+                              alert('导出失败，请稍后重试');
+                            }
+                          }}
+                        >
+                          导出
                         </Button>
                         <Button variant="text-link" size="sm" className="h-auto px-0 text-xs" asChild>
                           <Link href={`/review/new?projectId=${project.id}`}>复盘</Link>

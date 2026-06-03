@@ -100,7 +100,7 @@ export async function GET(request: NextRequest) {
         where,
         skip: (page - 1) * pageSize,
         take: pageSize,
-        orderBy: { startDate: 'desc' },
+        orderBy: { endDate: 'desc' },
         include: {
           reportVersions: {
             orderBy: [{ versionNumber: 'desc' }],
@@ -337,6 +337,17 @@ export async function POST(request: Request) {
 
     return NextResponse.json(project, { status: 201 });
   } catch (error) {
+    // Handle unique constraint violation (P2002)
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === 'P2002'
+    ) {
+      return NextResponse.json(
+        { error: '该品类+品牌+业务线+项目名称组合已存在' },
+        { status: 409 }
+      );
+    }
+
     if (error instanceof Error) {
       if (error.message.endsWith('.startDate') || error.message.endsWith('.endDate')) {
         return NextResponse.json(

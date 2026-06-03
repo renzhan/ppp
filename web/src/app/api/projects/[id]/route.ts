@@ -156,6 +156,17 @@ export async function PUT(
 
     return NextResponse.json(updated);
   } catch (error) {
+    // Handle unique constraint violation (P2002)
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === 'P2002'
+    ) {
+      return NextResponse.json(
+        { error: '该品类+品牌+业务线+项目名称组合已存在' },
+        { status: 409 }
+      );
+    }
+
     if (error instanceof Error && error.message.startsWith('invalid_launch_phase:')) {
       const phase = error.message.split(':')[1];
       return NextResponse.json(

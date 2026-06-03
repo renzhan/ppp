@@ -338,7 +338,7 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
               onUploadSuccess={() => {
                 queryClient.invalidateQueries({ queryKey: ['project', projectId] });
                 queryClient.invalidateQueries({ queryKey: ['projects'] });
-                queryClient.invalidateQueries({ queryKey: ['project-notes', projectId] });
+                queryClient.invalidateQueries({ queryKey: ['project-note-base', projectId] });
               }}
               onUploadError={() => {}}
             />
