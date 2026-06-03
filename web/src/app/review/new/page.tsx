@@ -780,9 +780,9 @@ function NewReviewPageContent() {
         </FormSection>
       )}
 
-      {/* Section: 广告主ID */}
+      {/* Section: 投放ID */}
       {modules.launchAnalysis && (
-        <FormSection title="广告主ID">
+        <FormSection title="投放ID">
           <div className="space-y-3">
             <div className="flex flex-wrap gap-2">
               {advertiserIds.map((id, index) => (
@@ -807,7 +807,7 @@ function NewReviewPageContent() {
             <div className="flex items-center gap-2">
               <input
                 type="text"
-                placeholder="输入广告主ID（纯数字）"
+                placeholder="输入投放ID（纯数字）"
                 value={advertiserIdInput}
                 onChange={(e) => {
                   setAdvertiserIdInput(e.target.value);
@@ -819,15 +819,15 @@ function NewReviewPageContent() {
                     const value = advertiserIdInput.trim();
                     if (!value) return;
                     if (!/^\d+$/.test(value)) {
-                      setAdvertiserIdError('广告主ID必须为纯数字');
+                      setAdvertiserIdError('投放ID必须为纯数字');
                       return;
                     }
                     if (advertiserIds.includes(value)) {
-                      setAdvertiserIdError('广告主ID不能重复');
+                      setAdvertiserIdError('投放ID不能重复');
                       return;
                     }
                     if (advertiserIds.length >= 5) {
-                      setAdvertiserIdError('最多添加5个广告主ID');
+                      setAdvertiserIdError('最多添加5个投放ID');
                       return;
                     }
                     setAdvertiserIds([...advertiserIds, value]);
@@ -843,15 +843,15 @@ function NewReviewPageContent() {
                   const value = advertiserIdInput.trim();
                   if (!value) return;
                   if (!/^\d+$/.test(value)) {
-                    setAdvertiserIdError('广告主ID必须为纯数字');
+                    setAdvertiserIdError('投放ID必须为纯数字');
                     return;
                   }
                   if (advertiserIds.includes(value)) {
-                    setAdvertiserIdError('广告主ID不能重复');
+                    setAdvertiserIdError('投放ID不能重复');
                     return;
                   }
                   if (advertiserIds.length >= 5) {
-                    setAdvertiserIdError('最多添加5个广告主ID');
+                    setAdvertiserIdError('最多添加5个投放ID');
                     return;
                   }
                   setAdvertiserIds([...advertiserIds, value]);
@@ -867,7 +867,7 @@ function NewReviewPageContent() {
             {advertiserIdError && (
               <p className="text-xs text-rose-500">{advertiserIdError}</p>
             )}
-            <p className="text-xs text-gray-400">最多 5 个广告主ID，用于拉取聚光投流数据</p>
+            <p className="text-xs text-gray-400">最多 5 个投放ID，用于拉取聚光投流数据</p>
           </div>
         </FormSection>
       )}
