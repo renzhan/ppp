@@ -11,9 +11,10 @@ export {
 } from './metrics';
 export type { JuguangAggregated } from './metrics';
 export { calculateEngagement } from './engagement';
-export { isViralNote, calculateViralRate } from './viral';
+export { isViralNote, calculateViralRate, DEFAULT_VIRAL_THRESHOLD } from './viral';
 export { calculateKPICompletion } from './kpi';
-export { classifyKOLTier, aggregateByKOLTier } from './kol-tier';
+export { classifyKOLTier, classifyKOLByExposureRate, aggregateByKOLTier } from './kol-tier';
+export type { ExposureRateTierConfig } from './kol-tier';
 export { calculateNaturalExposure } from './traffic';
 export { aggregateByDimension } from './content';
 export { calculateBenchmarkComparison } from './benchmark';

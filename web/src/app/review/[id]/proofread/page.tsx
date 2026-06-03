@@ -27,6 +27,29 @@ interface ChapterData {
   traceIds?: Array<{ traceId: string; label: string }>;
 }
 
+interface ChapterStatus {
+  id: string;
+  title: string;
+  number: number;
+  status: 'pending' | 'generating' | 'completed' | 'error';
+  tokensUsed?: number;
+}
+
+// ─── Chapter Definitions ─────────────────────────────────────────────────────
+
+const CHAPTER_DEFS: Array<{ id: string; title: string; number: number }> = [
+  { id: 'cover', title: '封面', number: 1 },
+  { id: 'projectReview', title: '项目回顾', number: 2 },
+  { id: 'dataOverview', title: '数据总览', number: 3 },
+  { id: 'highlights', title: '项目亮点', number: 4 },
+  { id: 'quadrantAnalysis', title: '综合分析', number: 5 },
+  { id: 'contentAnalysis', title: '内容分析', number: 6 },
+  { id: 'trafficAnalysis', title: '投流分析', number: 7 },
+  { id: 'audienceAssets', title: '人群资产', number: 8 },
+  { id: 'optimization', title: '优化建议', number: 9 },
+  { id: 'endPage', title: '尾页', number: 10 },
+];
+
 interface ReviewDetail {
   id: string;
   projectId: string;
@@ -61,6 +84,7 @@ export default function ProofreadPage({ params }: { params: { id: string } }) {
   const [exportOpen, setExportOpen] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
   const [activeTraceId, setActiveTraceId] = useState<string | null>(null);
+  const [chapterStatuses, setChapterStatuses] = useState<ChapterStatus[]>([]);
 
   const eventSourceRef = useRef<EventSource | null>(null);
   const exportRef = useRef<HTMLDivElement>(null);
@@ -135,6 +159,14 @@ export default function ProofreadPage({ params }: { params: { id: string } }) {
   const startGeneration = useCallback(() => {
     setPageStatus('generating');
     setChapters([]);
+    setChapterStatuses(
+      CHAPTER_DEFS.map((def) => ({
+        id: def.id,
+        title: def.title,
+        number: def.number,
+        status: 'pending' as const,
+      }))
+    );
     connectToStream();
   }, []);
 
@@ -153,8 +185,23 @@ export default function ProofreadPage({ params }: { params: { id: string } }) {
         const data = JSON.parse(event.data);
 
         if (data.type === 'start') {
-          // Generation started
+          // Generation started - initialize all chapter statuses to pending
           setPageStatus('generating');
+          setChapterStatuses(
+            CHAPTER_DEFS.map((def) => ({
+              id: def.id,
+              title: def.title,
+              number: def.number,
+              status: 'pending' as const,
+            }))
+          );
+        } else if (data.type === 'progress') {
+          // Chapter generation progress update
+          setChapterStatuses(prev => prev.map(cs =>
+            cs.id === data.chapterId
+              ? { ...cs, status: 'generating', tokensUsed: data.tokensUsed }
+              : cs
+          ));
         } else if (data.type === 'chapter') {
           // New chapter received
           const chapter = data.chapter as ChapterData;
@@ -165,6 +212,12 @@ export default function ProofreadPage({ params }: { params: { id: string } }) {
             }
             return [...prev, chapter];
           });
+          // Mark chapter status as completed
+          setChapterStatuses(prev => prev.map(cs =>
+            cs.id === chapter.id
+              ? { ...cs, status: 'completed' }
+              : cs
+          ));
           // Auto-select first chapter
           setActiveChapterId((prev) => prev ?? chapter.id);
         } else if (data.type === 'done') {
@@ -488,10 +541,10 @@ export default function ProofreadPage({ params }: { params: { id: string } }) {
         {/* Left: Chapter navigation (resizable) */}
         <div className="flex-shrink-0 overflow-y-auto" style={{ width: leftPanel.width }}>
           <ReportChapterNav
+            chapterStatuses={chapterStatuses}
             chapters={chapters}
             activeChapterId={activeChapterId}
             onSelectChapter={setActiveChapterId}
-            isGenerating={pageStatus === 'generating'}
           />
         </div>
         {/* Left resize handle */}
@@ -507,6 +560,14 @@ export default function ProofreadPage({ params }: { params: { id: string } }) {
               <Loader2 size={32} className="animate-spin text-brand" />
               <p className="text-sm text-gray-600">正在生成复盘报告...</p>
               <p className="text-xs text-gray-400">按章节逐步生成，请稍候</p>
+            </div>
+          ) : activeChapterId && chapterStatuses.find(cs => cs.id === activeChapterId)?.status === 'generating' && !chapters.find(c => c.id === activeChapterId) ? (
+            <div className="flex h-full flex-col items-center justify-center gap-4">
+              <Loader2 size={32} className="animate-spin text-brand" />
+              <p className="text-sm text-gray-600">正在生成中...</p>
+              <p className="text-xs text-gray-400">
+                {chapterStatuses.find(cs => cs.id === activeChapterId)?.title || '章节'}正在生成，请稍候
+              </p>
             </div>
           ) : activeChapter ? (
             <div className="mx-auto max-w-3xl">

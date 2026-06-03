@@ -234,6 +234,13 @@ async function runBackgroundGeneration(reviewConfigId: string, projectId: string
  * 1. Kicks off background generation if not already running
  * 2. Polls DB for progress and streams completed chapters to the client
  * 3. Client can disconnect and reconnect without affecting generation
+ *
+ * Event types:
+ * - { type: 'start', totalChapters: number }
+ * - { type: 'progress', chapterId: string, tokensUsed: number }
+ * - { type: 'chapter', chapter: { id, title, number, content } }
+ * - { type: 'done', chapters: [...] }
+ * - { type: 'error', message: string }
  */
 export async function GET(
   request: NextRequest,
@@ -316,12 +323,23 @@ export async function GET(
         const content = current.reportContent as { type?: string; chapters?: Array<{ id: string; title: string; number: number; content: string; traceIds?: unknown }> } | null;
         const chapters = content?.chapters || [];
 
-        // Send any new chapters since last poll
+        // Emit progress events for chapters being generated
+        // Any chapter beyond lastSentCount but not yet sent is "generating"
         if (chapters.length > lastSentCount) {
           for (let i = lastSentCount; i < chapters.length; i++) {
-            send({ type: 'chapter', chapter: chapters[i] });
+            const ch = chapters[i];
+            // Emit progress (approximate token usage from content length)
+            const tokensUsed = Math.ceil((ch.content?.length || 0) / 2);
+            send({ type: 'progress', chapterId: ch.id, tokensUsed });
+            send({ type: 'chapter', chapter: ch });
           }
           lastSentCount = chapters.length;
+        } else if (current.status === 'generating' && chapters.length < CHAPTER_DEFS.length) {
+          // Emit progress event for the next chapter being generated (tokensUsed: 0)
+          const nextChapterId = CHAPTER_DEFS[chapters.length]?.id;
+          if (nextChapterId) {
+            send({ type: 'progress', chapterId: nextChapterId, tokensUsed: 0 });
+          }
         }
 
         // Check if generation is complete
