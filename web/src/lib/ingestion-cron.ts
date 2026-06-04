@@ -8,8 +8,8 @@
 import { prisma } from './prisma';
 import { DataIngestionService } from '@/ingestion/index';
 
-const CRON_HOUR = 16;
-const CRON_MINUTE = 0;
+const CRON_HOUR = parseInt(process.env.INGESTION_CRON_HOUR || '16', 10);
+const CRON_MINUTE = parseInt(process.env.INGESTION_CRON_MINUTE || '0', 10);
 
 let cronTimer: ReturnType<typeof setTimeout> | null = null;
 
