@@ -9,7 +9,6 @@ const NO_SHELL_PATHS = ['/login', '/change-password'];
 
 const BP_XL = 1280;
 const BP_MD = 768;
-const HEADER_HEIGHT = 'h-[66px]';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -50,67 +49,64 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const showHamburger = sidebarMode === 'hidden';
   const sidebarCollapsed = sidebarMode === 'collapsed';
 
+  const toggleSidebar = () => {
+    if (sidebarMode === 'expanded') {
+      setSidebarMode('collapsed');
+    } else if (sidebarMode === 'collapsed') {
+      setSidebarMode('expanded');
+    }
+  };
+
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-[#f1f1f1]">
-      {/* 顶部通栏：100% 页面宽度 */}
-      <header
-        className={`relative z-30 flex ${HEADER_HEIGHT} w-full shrink-0 items-center gap-4 border-b border-gray-200/80 shadow-sm bg-white`}
-      >
-        {showHamburger && (
-          <button
-            type="button"
-            onClick={() => setMobileOpen(!mobileOpen)}
-            className="rounded-md p-1.5 text-gray-600 transition-colors hover:bg-gray-100"
-            aria-label="打开导航菜单"
-          >
-            <Menu size={22} />
-          </button>
-        )}
-        <img src="/images/logo.jpg" alt="元派盘盘" className="h-[66px] object-contain" />
-        {!showHamburger && (
-          <button
-            type="button"
-            onClick={() => {
-              if (sidebarMode === 'expanded') {
-                setSidebarMode('collapsed');
-              } else if (sidebarMode === 'collapsed') {
-                setSidebarMode('expanded');
-              }
-            }}
-            className="rounded-md p-1.5 text-[#999999] transition-colors hover:bg-gray-100 hover:text-gray-600"
-            aria-label={sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'}
-          >
-            {sidebarCollapsed ? (
-              <PanelLeft size={18} strokeWidth={1.75} />
-            ) : (
-              <PanelLeftClose size={18} strokeWidth={1.75} />
-            )}
-          </button>
-        )}
-      </header>
-
-      <div className="relative flex min-h-0 flex-1 overflow-hidden">
-        {showHamburger && mobileOpen && (
-          <div
-            className="fixed inset-0 top-14 z-40 bg-black/30 transition-opacity duration-200"
-            onClick={() => setMobileOpen(false)}
-            aria-hidden="true"
-          />
-        )}
-
+    <div className="flex h-screen overflow-hidden bg-[#f1f1f1]">
+      {showHamburger && mobileOpen && (
         <div
-          className={
-            showHamburger
-              ? `fixed bottom-0 left-0 top-14 z-50 transition-transform duration-200 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`
-              : 'relative h-full shrink-0'
-          }
-        >
-          <Sidebar collapsed={sidebarCollapsed} />
-        </div>
+          className="fixed inset-0 z-40 bg-black/30 transition-opacity duration-200"
+          onClick={() => setMobileOpen(false)}
+          aria-hidden="true"
+        />
+      )}
 
-        <main className="min-w-0 flex-1 overflow-y-auto bg-[#F3F4F6] p-6">
-          <div className="rounded-xl border border-gray-100 bg-white text-card-foreground shadow-sm py-6 px-8">
-          {children}
+      <div
+        className={
+          showHamburger
+            ? `fixed bottom-0 left-0 top-0 z-50 transition-transform duration-200 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`
+            : 'relative h-full shrink-0'
+        }
+      >
+        <Sidebar collapsed={sidebarCollapsed} />
+      </div>
+
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <header className="relative z-30 flex shrink-0 items-center gap-3  bg-[#f5f5f5] py-2 px-6">
+          {showHamburger ? (
+            <button
+              type="button"
+              onClick={() => setMobileOpen(!mobileOpen)}
+              className="rounded-md p-1.5 text-gray-600 transition-colors hover:bg-white/60"
+              aria-label="打开导航菜单"
+            >
+              <Menu size={20} />
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={toggleSidebar}
+              className="rounded-md p-1.5 text-[#666666] transition-colors hover:bg-white/60 hover:text-gray-800"
+              aria-label={sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'}
+            >
+              {sidebarCollapsed ? (
+                <PanelLeft size={18} strokeWidth={1.75} />
+              ) : (
+                <PanelLeftClose size={18} strokeWidth={1.75} />
+              )}
+            </button>
+          )}
+        </header>
+
+        <main className="min-h-0 flex-1 overflow-y-auto bg-[#f5f5f5] p-6 pt-0">
+          <div className="rounded-xl border border-gray-100 bg-white py-6 px-8 text-card-foreground shadow-sm">
+            {children}
           </div>
         </main>
       </div>

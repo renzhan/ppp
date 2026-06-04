@@ -42,7 +42,7 @@ export function SidebarUserMenu({ userName, collapsed }: SidebarUserMenuProps) {
   };
 
   return (
-    <div ref={rootRef} className={cn('relative', collapsed ? 'px-2' : 'px-3')}>
+    <div ref={rootRef} className={cn('relative', collapsed ? 'px-2' : 'px-2')}>
       <ChangePasswordModal
         open={showChangePassword}
         onClose={() => setShowChangePassword(false)}
@@ -65,7 +65,7 @@ export function SidebarUserMenu({ userName, collapsed }: SidebarUserMenuProps) {
               setOpen(false);
               setShowChangePassword(true);
             }}
-            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-xs text-gray-500 transition-colors hover:bg-gray-50"
+            className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-xs text-gray-500 transition-colors hover:bg-gray-50"
           >
             <KeyRound size={16} className="shrink-0 text-gray-400" />
             修改密码
@@ -89,14 +89,14 @@ export function SidebarUserMenu({ userName, collapsed }: SidebarUserMenuProps) {
         type="button"
         onClick={() => setOpen((value) => !value)}
         className={cn(
-          'flex w-full items-center rounded-lg transition-colors hover:bg-white',
-          collapsed ? 'justify-center p-2' : 'gap-2.5 px-3 py-2'
+          'flex w-full items-center rounded-lg transition-colors hover:bg-gray-100',
+          collapsed ? 'justify-center p-2' : 'gap-2 px-2 py-1'
         )}
         aria-expanded={open}
         aria-haspopup="menu"
       >
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sky-100">
-          <User size={18} className="text-sky-700/70" />
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100">
+          <User size={18} className="text-gray-500" />
         </div>
         {!collapsed && (
           <>
