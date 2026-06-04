@@ -608,6 +608,57 @@ export default function ProofreadPage({ params }: { params: { id: string } }) {
                 }}
                 dangerouslySetInnerHTML={{ __html: activeChapter.content }}
               />
+              {/* 章节生成失败时显示重新生成按钮 */}
+              {(activeChapter.content.includes('生成失败') || activeChapter.content.includes('AI生成失败')) && chapterStatuses.find(cs => cs.id === activeChapterId)?.status !== 'generating' && (
+                <div className="mt-4 flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!review) return;
+                      const chapterId = activeChapter.id;
+                      // Mark as generating and clear content so UI shows loading state
+                      setChapterStatuses(prev => prev.map(cs =>
+                        cs.id === chapterId ? { ...cs, status: 'generating' } : cs
+                      ));
+                      setChapters(prev => prev.filter(ch => ch.id !== chapterId));
+                      try {
+                        const res = await fetch(`/api/generate-report/${review.id}/regenerate-chapter`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ chapterId }),
+                        });
+                        if (res.ok) {
+                          const data = await res.json();
+                          // Re-add chapter with new content
+                          setChapters(prev => {
+                            const existing = prev.find(ch => ch.id === chapterId);
+                            if (existing) {
+                              return prev.map(ch => ch.id === chapterId ? { ...ch, content: data.content } : ch);
+                            }
+                            // Add back (was removed)
+                            const chapterDef = chapterStatuses.find(cs => cs.id === chapterId);
+                            return [...prev, { id: chapterId, title: chapterDef?.title || '', number: chapterDef?.number || 0, content: data.content }];
+                          });
+                          setChapterStatuses(prev => prev.map(cs =>
+                            cs.id === chapterId ? { ...cs, status: 'completed' } : cs
+                          ));
+                        } else {
+                          setChapterStatuses(prev => prev.map(cs =>
+                            cs.id === chapterId ? { ...cs, status: 'error' } : cs
+                          ));
+                        }
+                      } catch {
+                        setChapterStatuses(prev => prev.map(cs =>
+                          cs.id === chapterId ? { ...cs, status: 'error' } : cs
+                        ));
+                      }
+                    }}
+                    className="inline-flex items-center gap-2 rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition hover:bg-brand-600"
+                  >
+                    重新生成此章节
+                  </button>
+                </div>
+              )}
               {pageStatus === 'generating' && (
                 <div className="mt-4 flex items-center gap-2 text-xs text-brand">
                   <Loader2 size={12} className="animate-spin" />

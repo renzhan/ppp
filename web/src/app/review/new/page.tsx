@@ -185,6 +185,9 @@ function NewReviewPageContent() {
     viralMetric: string;
     modules: Record<string, unknown>;
     launchPhases: LaunchPhase[];
+    advertiserIds: string[];
+    planFileName: string | null;
+    planFileUrl: string | null;
   }>({
     queryKey: ['review-for-edit', editFromId],
     queryFn: async () => {
@@ -273,6 +276,16 @@ function NewReviewPageContent() {
     if (editReview.launchPhases?.length) {
       setLaunchPhases(editReview.launchPhases);
     }
+
+    // Pre-fill advertiser IDs
+    if (editReview.advertiserIds?.length) {
+      setAdvertiserIds(editReview.advertiserIds);
+    }
+
+    // Pre-fill plan file name (display only, can't restore the actual file)
+    if (editReview.planFileName) {
+      setPlanFileName(editReview.planFileName);
+    }
   }, [editReview]);
 
   // ─── Mutations ───────────────────────────────────────────────────────────
@@ -300,7 +313,22 @@ function NewReviewPageContent() {
         });
       }
 
-      // Redirect directly to proofread page - report generation starts via SSE stream there
+      // If advertiserIds were provided, wait for ingestion to complete before redirecting
+      // The POST /api/reviews already triggered ingestion server-side,
+      // but we also trigger pugongying base data fetch here and wait
+      if (advertiserIds.length > 0 || selectedProjectId) {
+        setSubmitError(null);
+        try {
+          // Trigger base data ingestion (pugongying notes) and wait
+          await fetch(`/api/upload/api-fetch?projectId=${selectedProjectId}`, {
+            method: 'POST',
+          });
+        } catch {
+          // Don't block on failure — data may still come from cron
+        }
+      }
+
+      // Redirect to proofread page
       router.push(`/review/${review.id}/proofread`);
     },
     onError: (err: Error) => {

@@ -119,6 +119,23 @@ export async function POST(
       return count;
     }, { timeout: 30000 });
 
+    // 异步触发蒲公英数据爬取（不阻塞响应）
+    try {
+      const { DataIngestionService } = await import('@/ingestion/index');
+      const ingestionService = new DataIngestionService();
+      ingestionService.ingestBaseData(projectId).then((result) => {
+        if (result.errors.length > 0) {
+          console.warn(`[NoteBaseUpload] 蒲公英爬取部分失败 (project: ${projectId}):`, result.errors);
+        } else {
+          console.log(`[NoteBaseUpload] 蒲公英爬取完成 (project: ${projectId}): ${result.pugongyingNotes.length} 篇笔记`);
+        }
+      }).catch((err) => {
+        console.error(`[NoteBaseUpload] 蒲公英爬取异常 (project: ${projectId}):`, err);
+      });
+    } catch (importErr) {
+      console.error('[NoteBaseUpload] 无法加载 DataIngestionService:', importErr);
+    }
+
     return NextResponse.json({
       success: true,
       noteCount,
