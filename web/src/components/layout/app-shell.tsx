@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { usePathname } from 'next/navigation';
-import { Menu, PanelLeft, PanelLeftClose } from 'lucide-react';
+import { Menu } from 'lucide-react';
 import { Sidebar } from './sidebar';
-
+import { cn } from '@/lib/utils';
 const NO_SHELL_PATHS = ['/login', '/change-password'];
 
 const BP_XL = 1280;
@@ -74,12 +74,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             : 'relative h-full shrink-0'
         }
       >
-        <Sidebar collapsed={sidebarCollapsed} />
+        <Sidebar
+          collapsed={sidebarCollapsed}
+          showToggle={!showHamburger}
+          onToggle={toggleSidebar}
+        />
       </div>
 
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="relative z-30 flex shrink-0 items-center gap-3  bg-[#f5f5f5] py-2 px-6">
-          {showHamburger ? (
+        {showHamburger && (
+          <header className="relative z-30 flex shrink-0 items-center gap-3 bg-[#f5f5f5] px-6 py-2">
             <button
               type="button"
               onClick={() => setMobileOpen(!mobileOpen)}
@@ -88,23 +92,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             >
               <Menu size={20} />
             </button>
-          ) : (
-            <button
-              type="button"
-              onClick={toggleSidebar}
-              className="rounded-md p-1.5 text-[#666666] transition-colors hover:bg-white/60 hover:text-gray-800"
-              aria-label={sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'}
-            >
-              {sidebarCollapsed ? (
-                <PanelLeft size={18} strokeWidth={1.75} />
-              ) : (
-                <PanelLeftClose size={18} strokeWidth={1.75} />
-              )}
-            </button>
-          )}
-        </header>
+          </header>
+        )}
 
-        <main className="min-h-0 flex-1 overflow-y-auto bg-[#f5f5f5] p-6 pt-0">
+        <main className={cn(
+            'min-h-0 flex-1 overflow-y-auto bg-[#f5f5f5] p-6',
+            showHamburger ? 'pt-0' : ''
+          )}>
           <div className="rounded-xl border border-gray-100 bg-white py-6 px-8 text-card-foreground shadow-sm">
             {children}
           </div>
@@ -113,4 +107,3 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     </div>
   );
 }
-

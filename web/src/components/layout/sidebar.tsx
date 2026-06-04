@@ -10,6 +10,8 @@ import {
   MessageCircle,
   UserRound,
   Settings,
+  PanelLeft,
+  PanelLeftClose,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { SidebarUserMenu } from './sidebar-user-menu';
@@ -25,9 +27,11 @@ const navItems = [
 
 interface SidebarProps {
   collapsed?: boolean;
+  showToggle?: boolean;
+  onToggle?: () => void;
 }
 
-export function Sidebar({ collapsed = false }: SidebarProps) {
+export function Sidebar({ collapsed = false, showToggle = false, onToggle }: SidebarProps) {
   const [userRole, setUserRole] = useState<string | null>(null);
   const [userName, setUserName] = useState<string | null>(null);
   const pathname = usePathname();
@@ -54,7 +58,7 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
       <div
         className={cn(
           'flex h-[65px] shrink-0 items-center border-b border-gray-200/80 bg-white',
-          collapsed ? 'justify-center' : 'justify-center'
+          collapsed ? 'justify-right gap-0 px-1' : 'justify-between pl-4 pr-1'
         )}
       >
         <img
@@ -65,6 +69,20 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
             collapsed ? 'h-[24px] w-[24px]' : 'h-[24px] w-[109px]'
           )}
         />
+        {showToggle && onToggle && (
+          <button
+            type="button"
+            onClick={onToggle}
+            className="shrink-0 rounded-md p-1 text-[#666666] transition-colors hover:bg-gray-100 hover:text-gray-800"
+            aria-label={collapsed ? '展开侧边栏' : '收起侧边栏'}
+          >
+            {collapsed ? (
+              <PanelLeft size={14} strokeWidth={1.75} />
+            ) : (
+              <PanelLeftClose size={14} strokeWidth={1.75} />
+            )}
+          </button>
+        )}
       </div>
 
       <nav className="flex flex-1 flex-col gap-5 mt-6 overflow-y-auto px-2 py-4">
