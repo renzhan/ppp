@@ -47,11 +47,27 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
   return (
     <aside
       className={cn(
-        'flex h-full flex-col border-r border-gray-100 bg-[#f8f8f8] transition-all duration-200',
-        collapsed ? 'w-[72px]' : 'w-[220px]'
+        'flex h-full flex-col  bg-[#ebebeb] transition-all duration-200',
+        collapsed ? 'w-[52px]' : 'w-[155px]'
       )}
     >
-      <nav className="flex-1 overflow-y-auto py-6 gap-2 flex flex-col">
+      <div
+        className={cn(
+          'flex h-[65px] shrink-0 items-center border-b border-gray-200/80 bg-white',
+          collapsed ? 'justify-center' : 'justify-center'
+        )}
+      >
+        <img
+          src={collapsed ? '/images/logo-s.jpg' : '/images/logo.jpg'}
+          alt="派盘盘"
+          className={cn(
+            'shrink-0 object-contain',
+            collapsed ? 'h-[24px] w-[24px]' : 'h-[24px] w-[109px]'
+          )}
+        />
+      </div>
+
+      <nav className="flex flex-1 flex-col gap-5 mt-6 overflow-y-auto px-2 py-4">
         {navItems
           .filter((item) => !('adminOnly' in item) || userRole === 'admin')
           .map((item) => {
@@ -70,14 +86,13 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
                 href={item.href}
                 title={collapsed ? displayLabel : undefined}
                 className={cn(
-                  'relative flex items-center text-xs font-medium transition-colors group',
-                  collapsed ? 'mx-2 justify-center rounded-lg px-0 py-3' : 'gap-2 px-9 py-3.5',
+                  'group flex items-center text-sm font-bold transition-colors justify-center',
+                  collapsed
+                    ? 'justify-center rounded-lg p-2'
+                    : 'gap-1 rounded-lg px-2 py-2',
                   isActive
-                    ? 'bg-[#FFF9Eb] text-[#ff9100]'
-                    : 'text-[#999999] hover:bg-[#FFF9Eb]/50 hover:text-[#ff9100] bg-[#fcfcfc]',
-                  isActive &&
-                    !collapsed &&
-                    'before:absolute text-[#ffb600] before:left-0 before:top-1/2 before:h-[100%] before:w-[5px] before:-translate-y-1/2  before:bg-brand before:content-[""]'
+                    ? 'bg-[#FFF9EB] text-[#ff9100]'
+                    : 'text-[#666666] hover:bg-[#FFF9EB]/60 hover:text-[#ff9100]'
                 )}
               >
                 <Icon
@@ -85,18 +100,17 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
                   strokeWidth={isActive ? 2.25 : 1.75}
                   className={cn(
                     'shrink-0 transition-colors',
-                    isActive ? 'text-[#ff9100]' : 'text-[#999999]',
+                    isActive ? 'text-[#ff9100]' : 'text-[#666666]',
                     !isActive && 'group-hover:text-[#ff9100]'
                   )}
                 />
-
-                {!collapsed && <span className="leading-snug">{displayLabel}</span>}
+                {!collapsed && <span className="truncate leading-snug">{displayLabel}</span>}
               </Link>
             );
           })}
       </nav>
 
-      <div className="shrink-0 border-t border-gray-200/90 py-1">
+      <div className="shrink-0 border-t border-gray-400/20 py-2">
         <SidebarUserMenu userName={userName} collapsed={collapsed} />
       </div>
     </aside>
