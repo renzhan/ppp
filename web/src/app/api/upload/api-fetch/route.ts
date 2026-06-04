@@ -104,11 +104,10 @@ export async function POST(request: Request) {
       );
     }
 
-    const result = await ingestionService.ingestFromAPI(projectId, noteIds);
+    const result = await ingestionService.ingestBaseData(projectId);
 
     // Calculate success/failure counts
     const total = noteIds.length;
-    // Notes that were successfully fetched from pugongying
     const succeededNoteIds = new Set(result.pugongyingNotes.map((n) => n.noteId));
     const succeeded = succeededNoteIds.size;
     const failed = total - succeeded;

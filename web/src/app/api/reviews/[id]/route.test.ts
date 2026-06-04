@@ -19,6 +19,13 @@ vi.mock('@/lib/auth', () => ({
   getSession: vi.fn(),
 }));
 
+// Mock the ingestion service
+vi.mock('@/ingestion/index', () => ({
+  DataIngestionService: vi.fn().mockImplementation(() => ({
+    ingestJuguangData: vi.fn().mockResolvedValue(undefined),
+  })),
+}));
+
 import { GET, PUT } from './route';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';

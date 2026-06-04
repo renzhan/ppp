@@ -11,9 +11,7 @@ export const REPORT_MODULE_KEYS = [
   'highlights',
   'comprehensiveAnalysis',
   'contentAnalysis',
-  'audienceAnalysis',
   'launchAnalysis',
-  'competitorAnalysis',
   'optimization',
 ] as const;
 
@@ -42,4 +40,26 @@ export function toggleModule(state: ModuleState, moduleKey: string): ModuleState
     ...state,
     [moduleKey]: !state[moduleKey],
   };
+}
+
+/**
+ * 全选：将所有模块设置为选中状态。
+ */
+export function selectAllModules(state: ModuleState): ModuleState {
+  const newState: ModuleState = { ...state };
+  for (const key of REPORT_MODULE_KEYS) {
+    newState[key] = true;
+  }
+  return newState;
+}
+
+/**
+ * 取消全选：将所有模块设置为未选中状态。
+ */
+export function deselectAllModules(state: ModuleState): ModuleState {
+  const newState: ModuleState = { ...state };
+  for (const key of REPORT_MODULE_KEYS) {
+    newState[key] = false;
+  }
+  return newState;
 }

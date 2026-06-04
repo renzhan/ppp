@@ -7,7 +7,6 @@ import { HighlightsDataLoader } from './chapter-04-highlights';
 import { QuadrantAnalysisDataLoader } from './chapter-05-quadrant-analysis';
 import { ContentAnalysisDataLoader } from './chapter-06-content-analysis';
 import { TrafficAnalysisDataLoader } from './chapter-07-traffic-analysis';
-import { AudienceAssetsDataLoader } from './chapter-08-audience-assets';
 import { OptimizationDataLoader } from './chapter-09-optimization';
 import { EndPageDataLoader } from './chapter-10-end-page';
 
@@ -20,12 +19,12 @@ export { HighlightsDataLoader } from './chapter-04-highlights';
 export { QuadrantAnalysisDataLoader } from './chapter-05-quadrant-analysis';
 export { ContentAnalysisDataLoader } from './chapter-06-content-analysis';
 export { TrafficAnalysisDataLoader } from './chapter-07-traffic-analysis';
-export { AudienceAssetsDataLoader } from './chapter-08-audience-assets';
 export { OptimizationDataLoader } from './chapter-09-optimization';
 export { EndPageDataLoader } from './chapter-10-end-page';
 
 /**
- * Creates a fully configured ChapterDataLoaderRegistry with all 10 chapter loaders registered.
+ * Creates a fully configured ChapterDataLoaderRegistry with all 9 chapter loaders registered.
+ * Note: AudienceAssetsDataLoader (chapter 8) removed per requirement 7.1.
  */
 export function createChapterDataLoaderRegistry(prisma: InstanceType<typeof PrismaClient>): ChapterDataLoaderRegistry {
   const registry = new ChapterDataLoaderRegistry();
@@ -37,7 +36,6 @@ export function createChapterDataLoaderRegistry(prisma: InstanceType<typeof Pris
   registry.register(new QuadrantAnalysisDataLoader(prisma));
   registry.register(new ContentAnalysisDataLoader(prisma));
   registry.register(new TrafficAnalysisDataLoader(prisma));
-  registry.register(new AudienceAssetsDataLoader(prisma));
   registry.register(new OptimizationDataLoader(prisma));
   registry.register(new EndPageDataLoader(prisma));
 

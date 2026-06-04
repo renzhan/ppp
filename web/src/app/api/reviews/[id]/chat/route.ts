@@ -32,25 +32,36 @@ export async function POST(
   const chapterContent = context?.chapterContent || '';
 
   const systemPrompt = `你是一位资深的小红书营销复盘报告审校助手。
-用户正在编辑复盘报告的"${chapterTitle}"章节。
+用户正在查看复盘报告的"${chapterTitle}"章节。
 
 当前章节内容：
 ${chapterContent.slice(0, 3000)}
 
-请根据用户的指令，对当前章节内容进行优化、润色或重写。
+【意图判断】你需要判断用户消息的意图：
+1. **查询类**：用户在提问、查看数据、咨询建议（如"这个数据准确吗"、"CPM多少"、"有什么建议"）→ 直接回答问题，不修改内容
+2. **修改类**：用户明确要求修改、优化、重写、润色、调整内容（如"优化表达"、"把这段改成..."、"补充数据"、"删掉这一部分"）→ 修改内容并返回
 
-【重要】你必须严格按以下 JSON 格式输出，不要输出任何其他内容：
+【输出格式】根据意图选择对应格式：
+
+查询类 → 输出纯 JSON：
 {
-  "content": "优化后的完整HTML内容片段（替换整个章节）",
-  "summary": "一句话总结你做了什么修改（中文，20字以内）"
+  "intent": "query",
+  "reply": "你的回答内容（支持中文，详细回答用户问题）"
+}
+
+修改类 → 输出纯 JSON：
+{
+  "intent": "modify",
+  "content": "修改后的完整HTML内容片段（替换整个章节）",
+  "summary": "总结修改了什么，如：修改了3处表达，补充了CPM数据对比"
 }
 
 输出规则：
-- content 字段：输出优化后的完整 HTML 内容片段，用于直接替换当前章节
-- summary 字段：简短总结修改内容，如"优化了3处表达，补充了数据对比"
+- 仅输出 JSON，不要有任何前缀或后缀文字
+- 修改类：content 字段为优化后的完整 HTML，summary 简要说明修改内容
+- 查询类：reply 字段直接回答用户问题，专业简洁
 - 保持专业营销复盘语气
-- 数据引用必须准确
-- 仅输出 JSON，不要有任何前缀或后缀文字`;
+- 数据引用必须准确`;
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
@@ -66,8 +77,10 @@ ${chapterContent.slice(0, 3000)}
         );
 
         // Parse the JSON response from LLM
+        let intent = 'query';
         let content = '';
         let summary = '';
+        let reply = '';
 
         try {
           // Strip markdown code block wrappers if present
@@ -79,30 +92,36 @@ ${chapterContent.slice(0, 3000)}
           }
 
           const parsed = JSON.parse(cleaned);
+          intent = parsed.intent || 'query';
           content = parsed.content || '';
-          summary = parsed.summary || '已完成修改';
+          summary = parsed.summary || '';
+          reply = parsed.reply || '';
         } catch {
-          // If JSON parsing fails, treat entire response as content
-          content = response.trim();
-          if (content.startsWith('```html')) {
-            content = content.replace(/^```html\s*\n?/, '').replace(/\n?```\s*$/, '');
-          } else if (content.startsWith('```')) {
-            content = content.replace(/^```\s*\n?/, '').replace(/\n?```\s*$/, '');
+          // If JSON parsing fails, treat as plain text reply (don't modify content)
+          reply = response.trim();
+          if (reply.startsWith('```')) {
+            reply = reply.replace(/^```\w*\s*\n?/, '').replace(/\n?```\s*$/, '');
           }
-          summary = '已完成内容优化';
+          intent = 'query';
         }
 
-        // Send the updated content for the chapter
-        if (content) {
+        if (intent === 'modify' && content) {
+          // Only apply changes for modify intent
           controller.enqueue(
             encoder.encode(`data: ${JSON.stringify({ type: 'apply', content })}\n\n`)
           );
+          // Send the summary as chat message
+          const summaryText = `✅ ${summary || '已完成内容修改'}`;
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify({ type: 'text', content: summaryText })}\n\n`)
+          );
+        } else {
+          // Query intent — just reply, don't modify chapter
+          const replyText = reply || summary || '暂无回复';
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify({ type: 'text', content: replyText })}\n\n`)
+          );
         }
-
-        // Send the summary as chat message
-        const summaryText = `✅ ${summary}`;
-        const event = JSON.stringify({ type: 'text', content: summaryText });
-        controller.enqueue(encoder.encode(`data: ${event}\n\n`));
 
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'done' })}\n\n`));
       } catch (err) {

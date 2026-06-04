@@ -27,6 +27,26 @@ interface ChapterData {
   traceIds?: Array<{ traceId: string; label: string }>;
 }
 
+interface ChapterStatus {
+  id: string;
+  title: string;
+  number: number;
+  status: 'pending' | 'generating' | 'completed' | 'error';
+  tokensUsed?: number;
+}
+
+// ─── Chapter Definitions ─────────────────────────────────────────────────────
+
+const CHAPTER_DEFS: Array<{ id: string; title: string; number: number }> = [
+  { id: 'projectReview', title: '项目回顾', number: 2 },
+  { id: 'dataOverview', title: '数据总览', number: 3 },
+  { id: 'highlights', title: '项目亮点', number: 4 },
+  { id: 'quadrantAnalysis', title: '综合分析', number: 5 },
+  { id: 'contentAnalysis', title: '内容分析', number: 6 },
+  { id: 'trafficAnalysis', title: '投流分析', number: 7 },
+  { id: 'optimization', title: '优化建议', number: 9 },
+];
+
 interface ReviewDetail {
   id: string;
   projectId: string;
@@ -61,6 +81,7 @@ export default function ProofreadPage({ params }: { params: { id: string } }) {
   const [exportOpen, setExportOpen] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
   const [activeTraceId, setActiveTraceId] = useState<string | null>(null);
+  const [chapterStatuses, setChapterStatuses] = useState<ChapterStatus[]>([]);
 
   const eventSourceRef = useRef<EventSource | null>(null);
   const exportRef = useRef<HTMLDivElement>(null);
@@ -102,7 +123,22 @@ export default function ProofreadPage({ params }: { params: { id: string } }) {
         if (data.reportContent?.type === 'chapters' && data.reportContent.chapters?.length) {
           setChapters(data.reportContent.chapters);
           setActiveChapterId(data.reportContent.chapters[0].id);
-          setPageStatus('ready');
+          // Initialize chapterStatuses from loaded chapters (all completed)
+          setChapterStatuses(
+            data.reportContent.chapters.map((ch: ChapterData) => ({
+              id: ch.id,
+              title: ch.title,
+              number: ch.number,
+              status: 'completed' as const,
+            }))
+          );
+          if (data.status === 'completed') {
+            setPageStatus('ready');
+          } else {
+            // Still generating - show what we have and connect to stream for updates
+            setPageStatus('generating');
+            connectToStream();
+          }
         } else if (data.status === 'generating') {
           // Status is generating but no content yet - connect to stream
           setPageStatus('generating');
@@ -129,6 +165,14 @@ export default function ProofreadPage({ params }: { params: { id: string } }) {
   const startGeneration = useCallback(() => {
     setPageStatus('generating');
     setChapters([]);
+    setChapterStatuses(
+      CHAPTER_DEFS.map((def) => ({
+        id: def.id,
+        title: def.title,
+        number: def.number,
+        status: 'pending' as const,
+      }))
+    );
     connectToStream();
   }, []);
 
@@ -147,8 +191,23 @@ export default function ProofreadPage({ params }: { params: { id: string } }) {
         const data = JSON.parse(event.data);
 
         if (data.type === 'start') {
-          // Generation started
+          // Generation started - initialize all chapter statuses to pending
           setPageStatus('generating');
+          setChapterStatuses(
+            CHAPTER_DEFS.map((def) => ({
+              id: def.id,
+              title: def.title,
+              number: def.number,
+              status: 'pending' as const,
+            }))
+          );
+        } else if (data.type === 'progress') {
+          // Chapter generation progress update
+          setChapterStatuses(prev => prev.map(cs =>
+            cs.id === data.chapterId
+              ? { ...cs, status: 'generating', tokensUsed: data.tokensUsed }
+              : cs
+          ));
         } else if (data.type === 'chapter') {
           // New chapter received
           const chapter = data.chapter as ChapterData;
@@ -159,6 +218,12 @@ export default function ProofreadPage({ params }: { params: { id: string } }) {
             }
             return [...prev, chapter];
           });
+          // Mark chapter status as completed
+          setChapterStatuses(prev => prev.map(cs =>
+            cs.id === chapter.id
+              ? { ...cs, status: 'completed' }
+              : cs
+          ));
           // Auto-select first chapter
           setActiveChapterId((prev) => prev ?? chapter.id);
         } else if (data.type === 'done') {
@@ -408,16 +473,16 @@ export default function ProofreadPage({ params }: { params: { id: string } }) {
   return (
     <div className="flex h-[calc(100vh-3rem)] flex-col">
       {/* Top bar */}
-      <header className="flex items-center justify-between border-b bg-white  py-2">
-        <div className="flex items-center gap-3 text-lg">
+      <header className="flex items-center justify-between border-b bg-white px-4 py-2">
+        <div className="flex items-center gap-3">
           <Link
             href="/review"
-            className=" text-gray-500 hover:text-gray-700"
+            className="text-xs text-gray-500 hover:text-gray-700"
           >
             复盘系统
           </Link>
-          <span className=" text-gray-300">/</span>
-          <span className="text-gray-700">审校台</span>
+          <span className="text-xs text-gray-300">/</span>
+          <span className="text-xs text-gray-700">审校台</span>
         </div>
 
         <div className="flex items-center gap-2">
@@ -465,7 +530,7 @@ export default function ProofreadPage({ params }: { params: { id: string } }) {
       </header>
 
       {/* Report title area */}
-      <div className="border-b bg-white px-0 py-4">
+      <div className="border-b bg-white px-8 py-4">
         <h1 className="text-xl font-bold text-gray-900">
           {review?.project.projectName || ''}-复盘
         </h1>
@@ -482,10 +547,10 @@ export default function ProofreadPage({ params }: { params: { id: string } }) {
         {/* Left: Chapter navigation (resizable) */}
         <div className="flex-shrink-0 overflow-y-auto" style={{ width: leftPanel.width }}>
           <ReportChapterNav
+            chapterStatuses={chapterStatuses}
             chapters={chapters}
             activeChapterId={activeChapterId}
             onSelectChapter={setActiveChapterId}
-            isGenerating={pageStatus === 'generating'}
           />
         </div>
         {/* Left resize handle */}
@@ -501,6 +566,14 @@ export default function ProofreadPage({ params }: { params: { id: string } }) {
               <Loader2 size={32} className="animate-spin text-brand" />
               <p className="text-sm text-gray-600">正在生成复盘报告...</p>
               <p className="text-xs text-gray-400">按章节逐步生成，请稍候</p>
+            </div>
+          ) : activeChapterId && chapterStatuses.find(cs => cs.id === activeChapterId)?.status === 'generating' && !chapters.find(c => c.id === activeChapterId) ? (
+            <div className="flex h-full flex-col items-center justify-center gap-4">
+              <Loader2 size={32} className="animate-spin text-brand" />
+              <p className="text-sm text-gray-600">正在生成中...</p>
+              <p className="text-xs text-gray-400">
+                {chapterStatuses.find(cs => cs.id === activeChapterId)?.title || '章节'}正在生成，请稍候
+              </p>
             </div>
           ) : activeChapter ? (
             <div className="mx-auto max-w-3xl">

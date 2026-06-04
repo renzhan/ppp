@@ -1,6 +1,38 @@
 import type { KOLTier, NoteWithKOL, KOLTierAggregation } from '../shared/types';
 
 /**
+ * 曝光率层级配置
+ * lowerBound: 曝光率下限（含）
+ * upperBound: 曝光率上限（不含）
+ */
+export interface ExposureRateTierConfig {
+  name: string;
+  lowerBound: number; // inclusive
+  upperBound: number; // exclusive
+}
+
+/**
+ * 基于曝光率的达人层级分类
+ *
+ * 计算曝光率 = impressions / fanCount，匹配 tier 配置中 [lowerBound, upperBound) 的区间。
+ * 若 fanCount <= 0 或无匹配区间，返回 "未分类"。
+ */
+export function classifyKOLByExposureRate(
+  impressions: number,
+  fanCount: number,
+  tierConfig: ExposureRateTierConfig[]
+): string {
+  if (fanCount <= 0) return '未分类';
+  const exposureRate = impressions / fanCount;
+  for (const tier of tierConfig) {
+    if (exposureRate >= tier.lowerBound && exposureRate < tier.upperBound) {
+      return tier.name;
+    }
+  }
+  return '未分类';
+}
+
+/**
  * 达人层级分类（基于粉丝量）
  *
  * 分类规则：

@@ -187,7 +187,6 @@ export interface JuguangNote {
   acp: number;                    // 平均点击成本（元）— 推广消费/推广点击量
   cpm: number;                    // 平均千次展现费用（元）— 推广消费/推广展现量*1000
   cpi: number;                    // 平均互动成本（元）— 消费/互动量
-  targetDetail?: string | null;    // 精准定向
 }
 
 /**
@@ -392,7 +391,7 @@ export interface NaturalExposureResult {
 export interface BenchmarkResult {
   percentageDiff: number;
   isBetterThanBenchmark: boolean;
-  label: '优于大盘' | '劣于大盘';
+  label: '优于大盘' | '劣于大盘' | '持平大盘';
 }
 
 /**
@@ -570,27 +569,49 @@ export interface ManualInputData {
 
 /**
  * KPI目标集合
+ * 已移除字段: searchIndex, socSov, audienceSpuTotal, audienceSpuTi
  */
 export interface KPITargets {
   impression?: number;
   read?: number;
   engagement?: number;
-  viralCount?: number;
+  viralPosts1k?: number;          // 爆文数 (viral post count)
+  viralPosts10k?: number;         // 爆文率 (viral rate percentage)
   cpm?: number;
   cpc?: number;
   cpe?: number;
   ctr?: number;
+  audienceBrandTotal?: number;    // 人群资产-总-品牌
+  audienceBrandTi?: number;       // 人群资产-TI-品牌
 }
 
 /**
- * 大盘基准数据
+ * 大盘基准区间值
+ */
+export interface BenchmarkRange {
+  min: number;
+  max: number;
+}
+
+/**
+ * 大盘基准数据（支持区间格式和旧版单值格式）
  */
 export interface BenchmarkData {
-  cpm?: number;
-  cpc?: number;
-  cpe?: number;
-  ctr?: number;
-  viralRate?: number;
+  cpm?: number | BenchmarkRange;
+  cpc?: number | BenchmarkRange;
+  cpe?: number | BenchmarkRange;
+  ctr?: number | BenchmarkRange;
+  viralRate?: number | BenchmarkRange;
+  engagementRate?: number | BenchmarkRange;
+}
+
+/**
+ * 将单值或区间值统一转换为 BenchmarkRange 格式（向后兼容）
+ */
+export function normalizeBenchmarkValue(value: number | BenchmarkRange | undefined): BenchmarkRange | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value === 'number') return { min: value, max: value };
+  return value;
 }
 
 /**

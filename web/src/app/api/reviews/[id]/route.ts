@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
+import { DataIngestionService } from '@/ingestion/index';
 
 export async function GET(
   request: NextRequest,
@@ -83,10 +84,10 @@ export async function PUT(
 
     const { id } = await params;
 
-    // Check if review exists
+    // Check if review exists (include advertiserIds for change detection)
     const existing = await prisma.reviewConfig.findUnique({
       where: { id },
-      select: { id: true, projectId: true },
+      select: { id: true, projectId: true, advertiserIds: true },
     });
 
     if (!existing) {
@@ -125,6 +126,7 @@ export async function PUT(
       modules,
       launchPhases,
       presentationId,
+      advertiserIds,
     } = body;
 
     // Build update data with only provided fields
@@ -141,10 +143,36 @@ export async function PUT(
     if (launchPhases !== undefined) updateData.launchPhases = launchPhases;
     if (presentationId !== undefined) updateData.presentationId = presentationId;
 
+    // Sanitize advertiserIds if provided: filter to valid numeric strings, limit to 5
+    let sanitizedAdvertiserIds: string[] | undefined;
+    if (advertiserIds !== undefined) {
+      sanitizedAdvertiserIds = Array.isArray(advertiserIds)
+        ? advertiserIds.filter((aid: unknown) => typeof aid === 'string' && /^\d+$/.test(aid)).slice(0, 5)
+        : [];
+      updateData.advertiserIds = sanitizedAdvertiserIds;
+    }
+
     const updated = await prisma.reviewConfig.update({
       where: { id },
       data: updateData,
     });
+
+    // Compare old and new advertiserIds — trigger ingestion if changed
+    if (sanitizedAdvertiserIds !== undefined && sanitizedAdvertiserIds.length > 0) {
+      const oldAdvertiserIds = (existing.advertiserIds as string[] | null) ?? [];
+      const advertiserIdsChanged = JSON.stringify(oldAdvertiserIds) !== JSON.stringify(sanitizedAdvertiserIds);
+
+      if (advertiserIdsChanged) {
+        try {
+          const ingestionService = new DataIngestionService();
+          const numericAdvertiserIds = sanitizedAdvertiserIds.map((aid) => Number(aid));
+          await ingestionService.ingestJuguangData(existing.projectId, numericAdvertiserIds, updated.id);
+        } catch (ingestionError) {
+          // Do not block response on ingestion failure — log error and continue
+          console.error('PUT /api/reviews/[id] ingestion error (non-blocking):', ingestionError);
+        }
+      }
+    }
 
     return NextResponse.json(updated);
   } catch (error) {

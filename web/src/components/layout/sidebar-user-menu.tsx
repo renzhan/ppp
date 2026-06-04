@@ -42,7 +42,7 @@ export function SidebarUserMenu({ userName, collapsed }: SidebarUserMenuProps) {
   };
 
   return (
-    <div ref={rootRef} className={cn('relative', collapsed ? 'px-2' : 'px-2')}>
+    <div ref={rootRef} className={cn('relative', collapsed ? 'px-2' : 'px-3')}>
       <ChangePasswordModal
         open={showChangePassword}
         onClose={() => setShowChangePassword(false)}
@@ -65,7 +65,7 @@ export function SidebarUserMenu({ userName, collapsed }: SidebarUserMenuProps) {
               setOpen(false);
               setShowChangePassword(true);
             }}
-            className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-xs text-gray-500 transition-colors hover:bg-gray-50"
+            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-xs text-gray-500 transition-colors hover:bg-gray-50"
           >
             <KeyRound size={16} className="shrink-0 text-gray-400" />
             修改密码
@@ -113,3 +113,4 @@ export function SidebarUserMenu({ userName, collapsed }: SidebarUserMenuProps) {
     </div>
   );
 }
+

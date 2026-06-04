@@ -72,6 +72,7 @@ model Project {
   reviewEdits         ReviewEdit[]
   reviewConfigs      ReviewConfig[]
 
+  @@unique([category, brand, businessLine, projectName])
   @@map("projects")
 }
 
@@ -142,6 +143,8 @@ model NoteBase {
   projectId             String    @map("project_id") @db.Uuid
   noteId                String    @map("note_id") @db.VarChar(100)
   noteLink              String?   @map("note_link")                          // 笔记链接【长】
+  kolNickName           String?   @map("kol_nick_name") @db.VarChar(200)     // 博主昵称
+  kolFanNum             Int?      @map("kol_fan_num")                        // 博主粉丝量
   cooperationForm       String?   @map("cooperation_form") @db.VarChar(50)   // 合作形式
   isRegistered          Boolean   @default(false) @map("is_registered")      // 是否报备
   contentDirection      String?   @map("content_direction") @db.VarChar(100) // 内容方向
@@ -151,6 +154,7 @@ model NoteBase {
   contentSettlement     Decimal   @default(0) @map("content_settlement") @db.Decimal(12, 2)     // 内容实际结算金额
   adSpend               Decimal   @default(0) @map("ad_spend") @db.Decimal(12, 2)               // 投流实际消耗
   totalCost             Decimal   @default(0) @map("total_cost") @db.Decimal(12, 2)             // 总费用
+  metrics               Json?                                                                   // 所有数据指标（曝光量、CPM、投流等额外列，JSON存储）
   createdAt             DateTime? @default(now()) @map("created_at") @db.Timestamptz()
 
   // Relations
@@ -184,13 +188,15 @@ model JuguangData {
   acp                   Decimal  @default(0) @db.Decimal(12, 2)
   cpm                   Decimal  @default(0) @db.Decimal(12, 2)
   cpi                   Decimal  @default(0) @db.Decimal(12, 2)
-  targetDetail          String?  @map("target_detail") @db.VarChar(100)
+  reviewConfigId        String?  @map("review_config_id") @db.Uuid
   createdAt             DateTime? @default(now()) @map("created_at") @db.Timestamptz()
 
   // Relations
-  project Project @relation(fields: [projectId], references: [id])
+  project      Project        @relation(fields: [projectId], references: [id])
+  reviewConfig ReviewConfig?  @relation(fields: [reviewConfigId], references: [id])
 
   @@index([projectId])
+  @@index([reviewConfigId])
   @@map("juguang_data")
 }
 
@@ -626,12 +632,15 @@ model ReviewConfig {
   planFileName     String?  @map("plan_file_name") @db.VarChar(500)
   reportContent    Json?    @map("report_content")
   presentationId   String?  @map("presentation_id") @db.VarChar(100)
+  viralThreshold   Int?     @map("viral_threshold")
+  advertiserIds    Json     @default("[]") @map("advertiser_ids")
   createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt        DateTime @default(now()) @map("updated_at") @db.Timestamptz()
 
   // Relations
-  project    Project          @relation(fields: [projectId], references: [id])
-  traceItems ReportTraceItem[]
+  project     Project          @relation(fields: [projectId], references: [id])
+  traceItems  ReportTraceItem[]
+  juguangData JuguangData[]
 
   @@index([projectId])
   @@index([createdBy])

@@ -1,6 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   transpilePackages: ['../src/engines', '../src/shared', '../src/report', '../src/ingestion', '../src/export', '../src/validation', '../src/pipeline'],
+  logging: {
+    fetches: {
+      fullUrl: true,
+    },
+  },
   experimental: {
     serverComponentsExternalPackages: ['@napi-rs/canvas', '@napi-rs/canvas-win32-x64-msvc', 'pdfjs-dist', 'pdf-to-img', '@react-pdf/renderer', '@react-pdf/reconciler'],
     instrumentationHook: true,

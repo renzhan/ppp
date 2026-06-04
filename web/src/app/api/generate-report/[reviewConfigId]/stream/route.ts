@@ -14,22 +14,20 @@ const MAX_CONCURRENT_CHAPTERS = parseInt(process.env.REPORT_MAX_CONCURRENCY || '
 
 /**
  * 章节定义 - id 用于前端去重/追加
+ * 注意：封面(1)、人群资产(8)、尾页(10) 已移除，不再生成
  */
 const CHAPTER_DEFS: Array<{ id: string; number: number }> = [
-  { id: 'cover', number: 1 },
   { id: 'projectReview', number: 2 },
   { id: 'dataOverview', number: 3 },
   { id: 'highlights', number: 4 },
   { id: 'quadrantAnalysis', number: 5 },
   { id: 'contentAnalysis', number: 6 },
   { id: 'trafficAnalysis', number: 7 },
-  { id: 'audienceAssets', number: 8 },
   { id: 'optimization', number: 9 },
-  { id: 'endPage', number: 10 },
 ];
 
-/** 静态章节（封面、尾页）不调用 LLM */
-const STATIC_CHAPTERS = new Set([1, 10]);
+/** 静态章节不调用 LLM（当前已移除封面和尾页，保留备用） */
+const STATIC_CHAPTERS = new Set<number>([]);
 
 /**
  * 全局 HTML 输出格式规范 - 追加到每个章节的 system prompt 后面
@@ -54,14 +52,187 @@ const HTML_OUTPUT_INSTRUCTION = `
    data-trace-id 命名规则: ch{章节号}_{模块}_{类型}，如 ch3_kpi_table, ch7_by_placement
    纯文字分析段落（不直接引用具体数据数字）不需要添加此属性。`;
 
+// ─── In-memory tracking of active generation tasks ─────────────────────────
+// Key: reviewConfigId, Value: true if generation is running in this process
+const activeGenerations = new Map<string, boolean>();
+
+/**
+ * Background report generation - runs independently of SSE connection.
+ * Saves each chapter to DB incrementally so progress is persisted.
+ */
+async function runBackgroundGeneration(reviewConfigId: string, projectId: string) {
+  if (activeGenerations.get(reviewConfigId)) {
+    return; // Already running in this process
+  }
+  activeGenerations.set(reviewConfigId, true);
+
+  try {
+    const project = await prisma.project.findUnique({
+      where: { id: projectId },
+      select: { id: true, projectName: true },
+    });
+
+    if (!project) {
+      throw new Error('Project not found');
+    }
+
+    // Mark as generating
+    await prisma.reviewConfig.update({
+      where: { id: reviewConfigId },
+      data: { status: 'generating', reportContent: { type: 'chapters', chapters: [], generatedAt: new Date().toISOString() } },
+    });
+
+    const loaderRegistry = createChapterDataLoaderRegistry(prisma as any);
+    const templatesDir = path.resolve(process.cwd(), '..', 'src', 'prompts', 'chapters');
+    const templateLoader = new PromptTemplateLoader(templatesDir);
+    const llmClient = createLLMClientFromEnv();
+
+    const allTraceItems: Array<{ traceId: string; chapterNumber: number; label: string; sourceTable: string; sourceQuery: string; totalRows: number; columns: unknown; dataRows: unknown; calculations?: unknown }> = [];
+
+    const chapterResults = new Array<{ id: string; title: string; number: number; content: string; traceIds?: { traceId: string; label: string }[] } | null>(CHAPTER_DEFS.length).fill(null);
+
+    // Save all completed chapters to DB immediately (out-of-order OK)
+    const flushToDb = async () => {
+      const currentCompleted = chapterResults.filter((r): r is NonNullable<typeof r> => r !== null);
+      if (currentCompleted.length > 0) {
+        await prisma.reviewConfig.update({
+          where: { id: reviewConfigId },
+          data: {
+            reportContent: { type: 'chapters', chapters: currentCompleted, generatedAt: new Date().toISOString() },
+          },
+        });
+      }
+    };
+
+    // Process a single chapter
+    const processChapter = async (index: number) => {
+      const chapterDef = CHAPTER_DEFS[index];
+      try {
+        const template = templateLoader.loadTemplate(chapterDef.number);
+        const title = template.metadata.chapter_name;
+
+        const dataContext = await loaderRegistry.loadChapterData(chapterDef.number, project.id);
+
+        const userPrompt = templateLoader.substituteVariables(
+          template.userPromptTemplate,
+          dataContext.variables,
+        );
+
+        let content: string;
+
+        if (STATIC_CHAPTERS.has(chapterDef.number)) {
+          content = convertTemplateToHtml(userPrompt);
+        } else {
+          const systemPrompt = (template.systemPrompt || '') + HTML_OUTPUT_INSTRUCTION;
+          const messages: ChatMessage[] = [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt },
+          ];
+
+          const rawResponse = await llmClient.chat(messages, {
+            timeout: 60000,
+            temperature: 0.3,
+          });
+
+          if (!rawResponse || rawResponse.trim().length === 0) {
+            throw new Error('LLM returned empty response');
+          }
+
+          content = rawResponse.trim();
+          if (content.startsWith('```html')) {
+            content = content.replace(/^```html\s*\n?/, '').replace(/\n?```\s*$/, '');
+          } else if (content.startsWith('```')) {
+            content = content.replace(/^```\s*\n?/, '').replace(/\n?```\s*$/, '');
+          }
+        }
+
+        chapterResults[index] = {
+          id: chapterDef.id,
+          title,
+          number: chapterDef.number,
+          content,
+          traceIds: (dataContext.traceItems || []).map((t) => ({ traceId: t.traceId, label: t.label })),
+        };
+
+        if (dataContext.traceItems && dataContext.traceItems.length > 0) {
+          allTraceItems.push(...dataContext.traceItems);
+        }
+      } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : '生成失败';
+        const template = templateLoader.loadTemplate(chapterDef.number);
+        chapterResults[index] = {
+          id: chapterDef.id,
+          title: template.metadata.chapter_name,
+          number: chapterDef.number,
+          content: `<p class="text-gray-400">章节生成失败：${errorMsg}</p>`,
+        };
+      }
+      await flushToDb();
+    };
+
+    // Run chapters with sliding window concurrency
+    const executing = new Set<Promise<void>>();
+    for (let i = 0; i < CHAPTER_DEFS.length; i++) {
+      const p = processChapter(i).then(() => { executing.delete(p); });
+      executing.add(p);
+      if (executing.size >= MAX_CONCURRENT_CHAPTERS) {
+        await Promise.race(executing);
+      }
+    }
+    await Promise.all(executing);
+
+    // Final save with completed status
+    const finalChapters = chapterResults.filter((r): r is NonNullable<typeof r> => r !== null);
+    await prisma.reviewConfig.update({
+      where: { id: reviewConfigId },
+      data: {
+        reportContent: { type: 'chapters', chapters: finalChapters, generatedAt: new Date().toISOString() },
+        status: 'completed',
+      },
+    });
+
+    // Save trace items
+    if (allTraceItems.length > 0) {
+      await prisma.reportTraceItem.deleteMany({ where: { reviewConfigId } });
+      await prisma.reportTraceItem.createMany({
+        data: allTraceItems.map((item) => ({
+          reviewConfigId,
+          traceId: item.traceId,
+          chapterNumber: item.chapterNumber,
+          label: item.label,
+          sourceTable: item.sourceTable,
+          sourceQuery: item.sourceQuery,
+          totalRows: item.totalRows,
+          columns: item.columns as any,
+          dataRows: item.dataRows as any,
+          calculations: item.calculations as any ?? undefined,
+        })),
+      });
+    }
+
+    console.log(`[ReportGen] Completed: ${reviewConfigId}, ${finalChapters.length} chapters`);
+  } catch (err) {
+    console.error(`[ReportGen] Failed: ${reviewConfigId}`, err);
+    await prisma.reviewConfig.update({
+      where: { id: reviewConfigId },
+      data: { status: 'draft' },
+    }).catch(() => {});
+  } finally {
+    activeGenerations.delete(reviewConfigId);
+  }
+}
+
 /**
  * GET /api/generate-report/[reviewConfigId]/stream
  *
- * SSE 流式生成复盘报告，按章节逐步输出。
- * 每个章节独立加载数据（loaders）+ 填充提示词模板（prompts）+ 调用LLM生成HTML。
+ * SSE endpoint that:
+ * 1. Kicks off background generation if not already running
+ * 2. Polls DB for progress and streams completed chapters to the client
+ * 3. Client can disconnect and reconnect without affecting generation
  *
  * Event types:
  * - { type: 'start', totalChapters: number }
+ * - { type: 'progress', chapterId: string, tokensUsed: number }
  * - { type: 'chapter', chapter: { id, title, number, content } }
  * - { type: 'done', chapters: [...] }
  * - { type: 'error', message: string }
@@ -90,42 +261,6 @@ export async function GET(
     });
   }
 
-  // If report already exists (completed or partially generated), return existing content via SSE
-  // This prevents re-generation when user navigates away and comes back
-  const existingContent = reviewConfig.reportContent as { type?: string; chapters?: Array<{ id: string; title: string; number: number; content: string; traceIds?: unknown }> } | null;
-  if (existingContent?.type === 'chapters' && existingContent.chapters?.length) {
-    const encoder = new TextEncoder();
-    const stream = new ReadableStream({
-      start(controller) {
-        const send = (data: Record<string, unknown>) => {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
-        };
-        send({ type: 'start', totalChapters: existingContent.chapters!.length });
-        for (const chapter of existingContent.chapters!) {
-          send({ type: 'chapter', chapter });
-        }
-        send({ type: 'done', chapters: existingContent.chapters });
-        controller.close();
-      },
-    });
-
-    // Ensure status is completed
-    if (reviewConfig.status !== 'completed') {
-      await prisma.reviewConfig.update({
-        where: { id: reviewConfigId },
-        data: { status: 'completed' },
-      });
-    }
-
-    return new Response(stream, {
-      headers: {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        Connection: 'keep-alive',
-      },
-    });
-  }
-
   const project = await prisma.project.findUnique({
     where: { id: reviewConfig.projectId },
     select: { id: true, projectName: true },
@@ -138,175 +273,87 @@ export async function GET(
     });
   }
 
-  // Mark as generating
-  await prisma.reviewConfig.update({
-    where: { id: reviewConfigId },
-    data: { status: 'generating' },
-  });
+  // Start background generation if not already completed or running
+  const existingContent = reviewConfig.reportContent as { type?: string; chapters?: unknown[] } | null;
+  const isCompleted = reviewConfig.status === 'completed' && existingContent?.chapters?.length;
+  const isRunning = activeGenerations.get(reviewConfigId);
 
-  // Create SSE stream
+  if (!isCompleted && !isRunning) {
+    // Fire and forget - generation runs in background
+    runBackgroundGeneration(reviewConfigId, reviewConfig.projectId);
+  }
+
+  // SSE stream that polls DB for progress
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
       const send = (data: Record<string, unknown>) => {
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+        try {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+        } catch {
+          // Controller may be closed if client disconnected
+        }
       };
 
-      try {
-        // Initialize pipeline components
-        const loaderRegistry = createChapterDataLoaderRegistry(prisma as any);
-        const templatesDir = path.resolve(process.cwd(), '..', 'src', 'prompts', 'chapters');
-        const templateLoader = new PromptTemplateLoader(templatesDir);
-        const llmClient = createLLMClientFromEnv();
+      send({ type: 'start', totalChapters: CHAPTER_DEFS.length });
 
-        send({ type: 'start', totalChapters: CHAPTER_DEFS.length });
+      let lastSentCount = 0;
+      const POLL_INTERVAL = 1500; // 1.5s
+      const MAX_POLLS = 200; // 5 minutes max
 
-        const completedChapters: Array<{ id: string; title: string; number: number; content: string; traceIds?: { traceId: string; label: string }[] }> = [];
-        const allTraceItems: Array<{ traceId: string; chapterNumber: number; label: string; sourceTable: string; sourceQuery: string; totalRows: number; columns: unknown; dataRows: unknown; calculations?: unknown }> = [];
-
-        // Generate chapters in parallel with concurrency limit
-        // Results are sent in chapter order (flushReady sends as soon as consecutive chapters are ready)
-        const chapterResults = new Array<{ id: string; title: string; number: number; content: string; traceIds?: { traceId: string; label: string }[] } | null>(CHAPTER_DEFS.length).fill(null);
-        let nextToSend = 0;
-
-        const flushReady = () => {
-          while (nextToSend < chapterResults.length && chapterResults[nextToSend] !== null) {
-            const result = chapterResults[nextToSend]!;
-            completedChapters.push(result);
-            send({ type: 'chapter', chapter: result });
-            nextToSend++;
-          }
-        };
-
-        // Process a single chapter
-        const processChapter = async (index: number) => {
-          const chapterDef = CHAPTER_DEFS[index];
-          try {
-            // 1. Load template (prompt + metadata)
-            const template = templateLoader.loadTemplate(chapterDef.number);
-            const title = template.metadata.chapter_name;
-
-            // 2. Load chapter-specific data via loader
-            const dataContext = await loaderRegistry.loadChapterData(chapterDef.number, project.id);
-
-            // 3. Substitute variables into user prompt template
-            const userPrompt = templateLoader.substituteVariables(
-              template.userPromptTemplate,
-              dataContext.variables,
-            );
-
-            let content: string;
-
-            if (STATIC_CHAPTERS.has(chapterDef.number)) {
-              // Static chapters: convert template to simple HTML directly
-              content = convertTemplateToHtml(userPrompt);
-            } else {
-              // LLM chapters: build system prompt (chapter-specific + global HTML rules)
-              const systemPrompt = (template.systemPrompt || '') + HTML_OUTPUT_INSTRUCTION;
-
-              const messages: ChatMessage[] = [
-                { role: 'system', content: systemPrompt },
-                { role: 'user', content: userPrompt },
-              ];
-
-              const rawResponse = await llmClient.chat(messages, {
-                timeout: 60000,
-                temperature: 0.3,
-              });
-
-              if (!rawResponse || rawResponse.trim().length === 0) {
-                throw new Error('LLM returned empty response');
-              }
-
-              // Strip markdown code block wrappers if LLM added them
-              content = rawResponse.trim();
-              if (content.startsWith('```html')) {
-                content = content.replace(/^```html\s*\n?/, '').replace(/\n?```\s*$/, '');
-              } else if (content.startsWith('```')) {
-                content = content.replace(/^```\s*\n?/, '').replace(/\n?```\s*$/, '');
-              }
-            }
-
-            chapterResults[index] = {
-              id: chapterDef.id,
-              title,
-              number: chapterDef.number,
-              content,
-              traceIds: (dataContext.traceItems || []).map((t) => ({ traceId: t.traceId, label: t.label })),
-            };
-
-            // Collect trace items for this chapter
-            if (dataContext.traceItems && dataContext.traceItems.length > 0) {
-              allTraceItems.push(...dataContext.traceItems);
-            }
-          } catch (err) {
-            const errorMsg = err instanceof Error ? err.message : '生成失败';
-            const template = templateLoader.loadTemplate(chapterDef.number);
-            chapterResults[index] = {
-              id: chapterDef.id,
-              title: template.metadata.chapter_name,
-              number: chapterDef.number,
-              content: `<p class="text-gray-400">章节生成失败：${errorMsg}</p>`,
-            };
-          }
-          flushReady();
-        };
-
-        // Run chapters with sliding window concurrency (always keep MAX_CONCURRENT_CHAPTERS in flight)
-        const executing = new Set<Promise<void>>();
-        for (let i = 0; i < CHAPTER_DEFS.length; i++) {
-          const p = processChapter(i).then(() => { executing.delete(p); });
-          executing.add(p);
-          if (executing.size >= MAX_CONCURRENT_CHAPTERS) {
-            await Promise.race(executing);
-          }
+      for (let poll = 0; poll < MAX_POLLS; poll++) {
+        // Check if client disconnected
+        if (request.signal.aborted) {
+          break;
         }
-        await Promise.all(executing);
 
-        // Flush any remaining chapters
-        flushReady();
-
-        // Save to database
-        await prisma.reviewConfig.update({
+        // Read current progress from DB
+        const current = await prisma.reviewConfig.findUnique({
           where: { id: reviewConfigId },
-          data: {
-            reportContent: { type: 'chapters', chapters: completedChapters, generatedAt: new Date().toISOString() },
-            status: 'completed',
-          },
+          select: { status: true, reportContent: true },
         });
 
-        // Save trace items (delete old ones first, then bulk insert)
-        if (allTraceItems.length > 0) {
-          await prisma.reportTraceItem.deleteMany({ where: { reviewConfigId } });
-          await prisma.reportTraceItem.createMany({
-            data: allTraceItems.map((item) => ({
-              reviewConfigId,
-              traceId: item.traceId,
-              chapterNumber: item.chapterNumber,
-              label: item.label,
-              sourceTable: item.sourceTable,
-              sourceQuery: item.sourceQuery,
-              totalRows: item.totalRows,
-              columns: item.columns as any,
-              dataRows: item.dataRows as any,
-              calculations: item.calculations as any ?? undefined,
-            })),
-          });
+        if (!current) break;
+
+        const content = current.reportContent as { type?: string; chapters?: Array<{ id: string; title: string; number: number; content: string; traceIds?: unknown }> } | null;
+        const chapters = content?.chapters || [];
+
+        // Emit progress events for chapters being generated
+        // Any chapter beyond lastSentCount but not yet sent is "generating"
+        if (chapters.length > lastSentCount) {
+          for (let i = lastSentCount; i < chapters.length; i++) {
+            const ch = chapters[i];
+            // Emit progress (approximate token usage from content length)
+            const tokensUsed = Math.ceil((ch.content?.length || 0) / 2);
+            send({ type: 'progress', chapterId: ch.id, tokensUsed });
+            send({ type: 'chapter', chapter: ch });
+          }
+          lastSentCount = chapters.length;
+        } else if (current.status === 'generating' && chapters.length < CHAPTER_DEFS.length) {
+          // Emit progress event for the next chapter being generated (tokensUsed: 0)
+          const nextChapterId = CHAPTER_DEFS[chapters.length]?.id;
+          if (nextChapterId) {
+            send({ type: 'progress', chapterId: nextChapterId, tokensUsed: 0 });
+          }
         }
 
-        send({ type: 'done', chapters: completedChapters });
-      } catch (err) {
-        const errorMsg = err instanceof Error ? err.message : '报告生成失败';
-        send({ type: 'error', message: errorMsg });
+        // Check if generation is complete
+        if (current.status === 'completed') {
+          send({ type: 'done', chapters });
+          break;
+        }
 
-        // Reset status
-        await prisma.reviewConfig.update({
-          where: { id: reviewConfigId },
-          data: { status: 'draft' },
-        }).catch(() => {});
-      } finally {
-        controller.close();
+        // Check if generation failed (status reset to draft)
+        if (current.status === 'draft' && poll > 2) {
+          send({ type: 'error', message: '报告生成失败，请重试' });
+          break;
+        }
+
+        // Wait before next poll
+        await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL));
       }
+
+      controller.close();
     },
   });
 

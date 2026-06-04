@@ -29,7 +29,7 @@ function Select({ value, onValueChange, disabled, className, children }: SelectP
     (type as { displayName?: string } | undefined)?.displayName;
 
   React.Children.forEach(children, (child) => {
-    if (!React.isValidElement(child)) return;
+    if (!React.isValidElement<{ className?: string; children?: React.ReactNode }>(child)) return;
 
     if (getDisplayName(child.type) === 'SelectTrigger') {
       triggerClassName = child.props.className;
@@ -37,7 +37,7 @@ function Select({ value, onValueChange, disabled, className, children }: SelectP
 
     if (getDisplayName(child.type) === 'SelectContent') {
       React.Children.forEach(child.props.children, (item) => {
-        if (React.isValidElement(item) && getDisplayName(item.type) === 'SelectItem') {
+        if (React.isValidElement<{ value: string; children: React.ReactNode; disabled?: boolean }>(item) && getDisplayName(item.type) === 'SelectItem') {
           options.push({
             value: item.props.value,
             label: item.props.children,

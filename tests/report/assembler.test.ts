@@ -19,8 +19,8 @@ vi.mock('../../src/shared/db.js', () => ({
 
 describe('Report Assembler', () => {
   describe('REPORT_MODULE_ORDER', () => {
-    it('should contain exactly 12 modules', () => {
-      expect(REPORT_MODULE_ORDER).toHaveLength(12);
+    it('should contain exactly 10 modules', () => {
+      expect(REPORT_MODULE_ORDER).toHaveLength(10);
     });
 
     it('should have modules in the exact required order', () => {
@@ -31,10 +31,8 @@ describe('Report Assembler', () => {
         'highlights',
         'content_analysis',
         'brand_voice',
-        'audience_assets',
         'paid_traffic',
         'conversion_analysis',
-        'competitor_benchmark',
         'highlight_summary',
         'optimization_suggestions',
       ];
@@ -51,10 +49,8 @@ describe('Report Assembler', () => {
         highlights: '项目亮点',
         content_analysis: '内容分析',
         brand_voice: '品牌声量分析',
-        audience_assets: '人群资产分析',
         paid_traffic: '投流分析',
         conversion_analysis: '小程序/转化分析',
-        competitor_benchmark: '竞品/行业对标',
         highlight_summary: '亮点总结',
         optimization_suggestions: '优化建议',
       };
@@ -166,7 +162,7 @@ describe('Report Assembler', () => {
       const report = await assembleReport('test-project-id');
 
       // Verify module count
-      expect(report.modules).toHaveLength(12);
+      expect(report.modules).toHaveLength(10);
 
       // Verify exact module order
       const moduleIds = report.modules.map((m) => m.moduleId);
@@ -177,10 +173,8 @@ describe('Report Assembler', () => {
         'highlights',
         'content_analysis',
         'brand_voice',
-        'audience_assets',
         'paid_traffic',
         'conversion_analysis',
-        'competitor_benchmark',
         'highlight_summary',
         'optimization_suggestions',
       ]);
@@ -230,6 +224,107 @@ describe('Report Assembler', () => {
       // highlights should have placeholder
       const highlights = report.modules.find((m) => m.moduleId === 'highlights');
       expect(highlights?.data.highlights).toBe('数据待补充');
+    });
+
+    it('should assemble benchmark range data for data_overview module (new range format)', async () => {
+      const mockProject = {
+        id: 'test-project-id',
+        category: '美妆',
+        brand: '测试品牌',
+        spuName: null,
+        projectName: '测试项目',
+        startDate: new Date('2024-01-01'),
+        endDate: new Date('2024-03-31'),
+        engagementConfig: { includeShare: true, includeFollow: true },
+        cooperationPolicy: { defaultDiscount: 1, specialRules: [] },
+        notes: [],
+        juguangData: [],
+        lingxiData: [],
+        manualInputs: [
+          {
+            inputType: 'benchmark',
+            dataContent: {
+              ctr: { min: 10.59, max: 15.36 },
+              cpm: { min: 20, max: 35 },
+              cpc: { min: 0.5, max: 1.2 },
+              cpe: { min: 2.0, max: 5.5 },
+              engagementRate: { min: 3.0, max: 8.0 },
+            },
+          },
+        ],
+        kpiTargets: [],
+        calculatedMetrics: [],
+        aiGeneratedContent: [],
+        competitorData: [],
+      };
+
+      mockFindUniqueOrThrow.mockResolvedValue(mockProject);
+
+      const { assembleReport } = await import('../../src/report/assembler.js');
+      const report = await assembleReport('test-project-id');
+
+      const dataOverview = report.modules.find((m) => m.moduleId === 'data_overview');
+      expect(dataOverview?.data.benchmark_ctr_min).toBe(10.59);
+      expect(dataOverview?.data.benchmark_ctr_max).toBe(15.36);
+      expect(dataOverview?.data.benchmark_ctr_range).toBe('10.59%~15.36%');
+      expect(dataOverview?.data.benchmark_cpm_min).toBe(20);
+      expect(dataOverview?.data.benchmark_cpm_max).toBe(35);
+      expect(dataOverview?.data.benchmark_cpm_range).toBe('20~35');
+      expect(dataOverview?.data.benchmark_cpc_min).toBe(0.5);
+      expect(dataOverview?.data.benchmark_cpc_max).toBe(1.2);
+      expect(dataOverview?.data.benchmark_cpc_range).toBe('0.5~1.2');
+      expect(dataOverview?.data.benchmark_cpe_min).toBe(2.0);
+      expect(dataOverview?.data.benchmark_cpe_max).toBe(5.5);
+      expect(dataOverview?.data.benchmark_cpe_range).toBe('2~5.5');
+      expect(dataOverview?.data.benchmark_engagement_rate_min).toBe(3.0);
+      expect(dataOverview?.data.benchmark_engagement_rate_max).toBe(8.0);
+      expect(dataOverview?.data.benchmark_engagement_rate_range).toBe('3%~8%');
+    });
+
+    it('should handle old single-value benchmark format with backward compatibility', async () => {
+      const mockProject = {
+        id: 'test-project-id',
+        category: '美妆',
+        brand: '测试品牌',
+        spuName: null,
+        projectName: '测试项目',
+        startDate: new Date('2024-01-01'),
+        endDate: new Date('2024-03-31'),
+        engagementConfig: { includeShare: true, includeFollow: true },
+        cooperationPolicy: { defaultDiscount: 1, specialRules: [] },
+        notes: [],
+        juguangData: [],
+        lingxiData: [],
+        manualInputs: [
+          {
+            inputType: 'benchmark',
+            dataContent: {
+              ctr: 12.5,
+              cpm: 25,
+            },
+          },
+        ],
+        kpiTargets: [],
+        calculatedMetrics: [],
+        aiGeneratedContent: [],
+        competitorData: [],
+      };
+
+      mockFindUniqueOrThrow.mockResolvedValue(mockProject);
+
+      const { assembleReport } = await import('../../src/report/assembler.js');
+      const report = await assembleReport('test-project-id');
+
+      const dataOverview = report.modules.find((m) => m.moduleId === 'data_overview');
+      // Old single-value format should be normalized to min === max
+      expect(dataOverview?.data.benchmark_ctr_min).toBe(12.5);
+      expect(dataOverview?.data.benchmark_ctr_max).toBe(12.5);
+      // When min === max, display as single value with suffix
+      expect(dataOverview?.data.benchmark_ctr).toBe('12.5%');
+      expect(dataOverview?.data.benchmark_ctr_range).toBe('12.5%~12.5%');
+      expect(dataOverview?.data.benchmark_cpm_min).toBe(25);
+      expect(dataOverview?.data.benchmark_cpm_max).toBe(25);
+      expect(dataOverview?.data.benchmark_cpm).toBe('25');
     });
   });
 });
