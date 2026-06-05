@@ -7,7 +7,19 @@ export const listTableWrapperClass = 'rounded-lg border-gray-100';
 export const listTableHeaderRowClass = 'border-gray-100 bg-[#f8f8f8] hover:bg-[#f8f8f8]';
 
 /** 表头单元格 */
-export const listTableHeadClass = 'h-auto whitespace-nowrap py-3.5 text-gray-700';
+export const listTableHeadClass = 'h-auto whitespace-nowrap py-3.5 text-center text-gray-700';
+
+/** 操作列表头 */
+export const listTableActionHeadClass = cn(listTableHeadClass, 'text-center');
+
+/** 数据单元格 */
+export const listTableCellClass = 'py-3 text-center';
+
+/** 操作列单元格 */
+export const listTableActionCellClass = 'py-3 text-right';
+
+/** 筛选区与数据列表之间的间距 */
+export const listFilterToDataGapClass = 'mt-10';
 
 /** 数据行（斑马纹） */
 export function listTableRowClass(index: number) {
