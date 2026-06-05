@@ -71,6 +71,7 @@ p { margin: 8px 0; font-size: 14px; }
   border-collapse: collapse;
   margin: 16px 0;
   font-size: 13px;
+  page-break-inside: avoid;
 }
 .report-table th, .report-table td {
   border: 1px solid #e2e8f0;
@@ -94,7 +95,11 @@ li { margin: 4px 0; }
 @media print {
   body { background: #fff; padding: 0; }
   .report-container { box-shadow: none; padding: 20px; }
+  .chapter { page-break-before: always; page-break-inside: avoid; }
+  .chapter:first-child { page-break-before: avoid; }
+  .report-table { page-break-inside: avoid; }
   .chart-container { page-break-inside: avoid; }
+  h3 { page-break-after: avoid; }
 }
 </style>
 </head>

@@ -135,6 +135,9 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
     if (!form.cascade.category) nextErrors.category = '请选择品类';
     if (!form.cascade.brand) nextErrors.brand = '请选择品牌';
     if (!form.projectName.trim()) nextErrors.projectName = '请输入项目名称';
+    if (form.executionStartDate && form.endDate && form.endDate < form.executionStartDate) {
+      nextErrors.endDate = '项目结束日期不能早于开始执行日期';
+    }
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
   };
@@ -236,9 +239,13 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
             <input
               type="date"
               value={form.endDate}
-              onChange={(e) => setForm((prev) => prev ? { ...prev, endDate: e.target.value } : prev)}
+              onChange={(e) => {
+                setForm((prev) => prev ? { ...prev, endDate: e.target.value } : prev);
+                setErrors((prev) => { const n = { ...prev }; delete n.endDate; return n; });
+              }}
               className="h-11 w-full rounded-lg border border-gray-200 px-3 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
             />
+            {errors.endDate && <p className="text-xs text-rose-500">{errors.endDate}</p>}
           </div>
 
           {/* 参与者 */}

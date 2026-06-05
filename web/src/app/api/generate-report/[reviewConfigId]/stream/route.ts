@@ -6,6 +6,7 @@ import { createChapterDataLoaderRegistry } from '@/pipeline/loaders/index';
 import { PromptTemplateLoader } from '@/pipeline/template-loader';
 import type { ChatMessage } from '@/shared/types';
 import path from 'path';
+import fs from 'fs';
 
 export const maxDuration = 300; // 5 minutes
 
@@ -128,6 +129,20 @@ async function runBackgroundGeneration(reviewConfigId: string, projectId: string
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userPrompt },
           ];
+
+          // Log prompts to file for debugging
+          try {
+            const logDir = path.resolve(process.cwd(), '..', 'logs', 'prompts');
+            fs.mkdirSync(logDir, { recursive: true });
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            const logFile = path.join(logDir, `ch${chapterDef.number}_${chapterDef.id}_${timestamp}.txt`);
+            const logContent = `=== Chapter ${chapterDef.number}: ${chapterDef.id} ===\n` +
+              `=== Timestamp: ${new Date().toISOString()} ===\n` +
+              `=== ReviewConfig: ${reviewConfigId} ===\n\n` +
+              `--- SYSTEM PROMPT ---\n${systemPrompt}\n\n` +
+              `--- USER PROMPT ---\n${userPrompt}\n`;
+            fs.writeFileSync(logFile, logContent, 'utf-8');
+          } catch { /* ignore logging errors */ }
 
           const rawResponse = await llmClient.chat(messages, {
             timeout: 60000,

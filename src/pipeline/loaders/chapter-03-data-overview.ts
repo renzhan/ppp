@@ -109,12 +109,13 @@ export class DataOverviewDataLoader extends BaseChapterDataLoader {
     try {
       const project = await this.prisma.project.findUnique({
         where: { id: projectId },
-        select: { projectName: true, brand: true, startDate: true, endDate: true },
+        select: { projectName: true, brand: true, startDate: true, endDate: true, executionStartDate: true },
       });
       if (project) {
         if (project.projectName) variables['project_name'] = project.projectName;
         if (project.brand) variables['brand'] = project.brand;
-        if (project.startDate) variables['start_date'] = project.startDate.toISOString().split('T')[0];
+        if (project.executionStartDate) variables['start_date'] = project.executionStartDate.toISOString().split('T')[0];
+        else if (project.startDate) variables['start_date'] = project.startDate.toISOString().split('T')[0];
         if (project.endDate) variables['end_date'] = project.endDate.toISOString().split('T')[0];
       }
     } catch (error) {

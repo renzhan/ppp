@@ -145,6 +145,9 @@ export async function PUT(
     if (body.businessLine !== undefined) {
       updateData.businessLine = body.businessLine || null;
     }
+    if (body.executionStartDate !== undefined) {
+      updateData.executionStartDate = body.executionStartDate ? new Date(body.executionStartDate) : null;
+    }
     if (body.participants !== undefined) {
       updateData.participants = Array.isArray(body.participants) ? body.participants : [];
     }

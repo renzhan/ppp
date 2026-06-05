@@ -121,10 +121,13 @@ export function useChartRenderer(containerRef: React.RefObject<HTMLElement | nul
 
   // Re-render charts when content changes
   useEffect(() => {
-    // Small delay to ensure DOM is updated after dangerouslySetInnerHTML
-    const timer = setTimeout(renderCharts, 100);
+    // Delay to ensure DOM is fully updated after dangerouslySetInnerHTML
+    const timer = setTimeout(renderCharts, 300);
+    // Also try a second render in case the first was too early
+    const timer2 = setTimeout(renderCharts, 800);
     return () => {
       clearTimeout(timer);
+      clearTimeout(timer2);
       chartsRef.current.forEach((chart) => chart.dispose());
       chartsRef.current = [];
     };

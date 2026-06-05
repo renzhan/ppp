@@ -23,6 +23,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    image: ppp-app:${IMAGE_TAG:-latest}
     ports:
       - "3000:3000"
     env_file:
@@ -30,7 +31,9 @@ services:
     environment:
       - NODE_ENV=production
       - NEXT_TELEMETRY_DISABLED=1
+      - TZ=Asia/Shanghai
       - DATABASE_URL=postgresql://postgres:abc.123.ABC@db:5432/ppp?connection_limit=10
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-ppp-agent-mgmt-encryption-key-2024-change-in-production}
       - LLM_BASE_URL=${LLM_BASE_URL:-}
       - LLM_API_KEY=${LLM_API_KEY:-}
       - LLM_MODEL=${LLM_MODEL:-gpt-5.1}

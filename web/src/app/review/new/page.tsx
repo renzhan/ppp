@@ -152,6 +152,9 @@ function NewReviewPageContent() {
   const [advertiserIds, setAdvertiserIds] = useState<string[]>([]);
   const [advertiserIdInput, setAdvertiserIdInput] = useState('');
   const [advertiserIdError, setAdvertiserIdError] = useState<string | null>(null);
+  const [benchmarkErrors, setBenchmarkErrors] = useState<Record<string, string | null>>({});
+  const [tierError, setTierError] = useState<string | null>(null);
+  const [phaseError, setPhaseError] = useState<string | null>(null);
 
   // ─── Data Fetching ───────────────────────────────────────────────────────
   // Fetch project info by projectId (from URL param or edit mode)
@@ -392,6 +395,76 @@ function NewReviewPageContent() {
     setSubmitError(null);
   };
 
+  // ─── Validation Helpers ─────────────────────────────────────────────────
+  const validateBenchmarks = (): boolean => {
+    const errors: Record<string, string | null> = {};
+    let valid = true;
+    Object.entries(benchmark).forEach(([key, { min, max }]) => {
+      const minVal = min.trim() ? parseFloat(min) : null;
+      const maxVal = max.trim() ? parseFloat(max) : null;
+      if (minVal !== null && minVal < 0) {
+        errors[key] = '最小值不能为负数';
+        valid = false;
+      } else if (maxVal !== null && maxVal < 0) {
+        errors[key] = '最大值不能为负数';
+        valid = false;
+      } else if (minVal !== null && maxVal !== null && minVal > maxVal) {
+        errors[key] = '最小值不能大于最大值';
+        valid = false;
+      } else {
+        errors[key] = null;
+      }
+    });
+    setBenchmarkErrors(errors);
+    return valid;
+  };
+
+  const validateInfluencerTiers = (): boolean => {
+    if (influencerTiers.length <= 1) {
+      setTierError(null);
+      return true;
+    }
+    // Sort tiers by fanRangeMin descending (头部 first, larger fans)
+    const sorted = [...influencerTiers].sort((a, b) => b.fanRangeMin - a.fanRangeMin);
+    for (let i = 0; i < sorted.length - 1; i++) {
+      const currentLower = sorted[i].fanRangeMin;
+      const nextUpper = sorted[i + 1].fanRangeMax;
+      // The current tier's lower bound should equal the next tier's upper bound + 1 (continuous ranges)
+      if (nextUpper + 1 !== currentLower) {
+        setTierError(`层级"${sorted[i].name || `第${i + 1}层`}"下限(${currentLower})与"${sorted[i + 1].name || `第${i + 2}层`}"上限(${nextUpper})不连续，相邻层级应头尾相接`);
+        return false;
+      }
+    }
+    setTierError(null);
+    return true;
+  };
+
+  const validateLaunchPhases = (): boolean => {
+    // Only validate phases that have dates filled
+    const filledPhases = launchPhases.filter((p) => p.startDate && p.endDate);
+    if (filledPhases.length <= 1) {
+      setPhaseError(null);
+      return true;
+    }
+    // Check each phase's own start <= end
+    for (const phase of filledPhases) {
+      if (phase.startDate > phase.endDate) {
+        setPhaseError(`阶段"${phase.name || '未命名'}"的开始日期晚于结束日期`);
+        return false;
+      }
+    }
+    // Sort by startDate for chronological check
+    const sorted = [...filledPhases].sort((a, b) => a.startDate.localeCompare(b.startDate));
+    for (let i = 0; i < sorted.length - 1; i++) {
+      if (sorted[i].endDate > sorted[i + 1].startDate) {
+        setPhaseError(`阶段"${sorted[i].name || `第${i + 1}阶段`}"与"${sorted[i + 1].name || `第${i + 2}阶段`}"时间存在重叠`);
+        return false;
+      }
+    }
+    setPhaseError(null);
+    return true;
+  };
+
   const handleSubmit = () => {
     setSubmitError(null);
 
@@ -403,6 +476,15 @@ function NewReviewPageContent() {
     // Check note count
     if (projectInfo && projectInfo.noteCount === 0) {
       setSubmitError('请先为该项目上传笔记底表，再开始复盘');
+      return;
+    }
+
+    // Validate benchmarks
+    const benchmarkValid = validateBenchmarks();
+    const tiersValid = validateInfluencerTiers();
+    const phasesValid = validateLaunchPhases();
+    if (!benchmarkValid || !tiersValid || !phasesValid) {
+      setSubmitError('请修正表单中的错误后再提交');
       return;
     }
 
@@ -500,6 +582,7 @@ function NewReviewPageContent() {
             maxValue={benchmark.ctr.max}
             onMinChange={(v) => setBenchmark({ ...benchmark, ctr: { ...benchmark.ctr, min: v } })}
             onMaxChange={(v) => setBenchmark({ ...benchmark, ctr: { ...benchmark.ctr, max: v } })}
+            error={benchmarkErrors.ctr}
           />
           <RangeInput
             label="CPM"
@@ -507,6 +590,7 @@ function NewReviewPageContent() {
             maxValue={benchmark.cpm.max}
             onMinChange={(v) => setBenchmark({ ...benchmark, cpm: { ...benchmark.cpm, min: v } })}
             onMaxChange={(v) => setBenchmark({ ...benchmark, cpm: { ...benchmark.cpm, max: v } })}
+            error={benchmarkErrors.cpm}
           />
           <RangeInput
             label="CPC"
@@ -514,6 +598,7 @@ function NewReviewPageContent() {
             maxValue={benchmark.cpc.max}
             onMinChange={(v) => setBenchmark({ ...benchmark, cpc: { ...benchmark.cpc, min: v } })}
             onMaxChange={(v) => setBenchmark({ ...benchmark, cpc: { ...benchmark.cpc, max: v } })}
+            error={benchmarkErrors.cpc}
           />
           <RangeInput
             label="CPE"
@@ -521,6 +606,7 @@ function NewReviewPageContent() {
             maxValue={benchmark.cpe.max}
             onMinChange={(v) => setBenchmark({ ...benchmark, cpe: { ...benchmark.cpe, min: v } })}
             onMaxChange={(v) => setBenchmark({ ...benchmark, cpe: { ...benchmark.cpe, max: v } })}
+            error={benchmarkErrors.cpe}
           />
           <RangeInput
             label="互动率 (%)"
@@ -528,6 +614,7 @@ function NewReviewPageContent() {
             maxValue={benchmark.engagementRate.max}
             onMinChange={(v) => setBenchmark({ ...benchmark, engagementRate: { ...benchmark.engagementRate, min: v } })}
             onMaxChange={(v) => setBenchmark({ ...benchmark, engagementRate: { ...benchmark.engagementRate, max: v } })}
+            error={benchmarkErrors.engagementRate}
           />
         </div>
       </FormSection>
@@ -576,6 +663,7 @@ function NewReviewPageContent() {
             <Plus size={14} />
             添加层级
           </button>
+          {tierError && <p className="mt-2 text-xs text-rose-500">{tierError}</p>}
         </div>
       </FormSection>
 
@@ -804,6 +892,7 @@ function NewReviewPageContent() {
               <Plus size={14} />
               添加阶段
             </button>
+            {phaseError && <p className="mt-2 text-xs text-rose-500">{phaseError}</p>}
           </div>
         </FormSection>
       )}
@@ -1016,12 +1105,14 @@ function RangeInput({
   maxValue,
   onMinChange,
   onMaxChange,
+  error,
 }: {
   label: string;
   minValue: string;
   maxValue: string;
   onMinChange: (value: string) => void;
   onMaxChange: (value: string) => void;
+  error?: string | null;
 }) {
   const handleChange = (value: string, onChange: (v: string) => void) => {
     const result = validateRangeInput(value);
@@ -1056,6 +1147,7 @@ function RangeInput({
           />
         </div>
       </div>
+      {error && <p className="mt-1 text-xs text-rose-500">{error}</p>}
     </div>
   );
 }
