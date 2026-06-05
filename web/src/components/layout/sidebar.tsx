@@ -10,7 +10,7 @@ import {
   MessageCircle,
   UserRound,
   Settings,
-  PanelLeft,
+  PanelLeftOpen,
   PanelLeftClose,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -77,7 +77,7 @@ export function Sidebar({ collapsed = false, showToggle = false, onToggle }: Sid
             aria-label={collapsed ? '展开侧边栏' : '收起侧边栏'}
           >
             {collapsed ? (
-              <PanelLeft size={14} strokeWidth={1.75} />
+              <PanelLeftOpen size={14} strokeWidth={1.75} />
             ) : (
               <PanelLeftClose size={14} strokeWidth={1.75} />
             )}
