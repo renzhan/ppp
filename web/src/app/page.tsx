@@ -12,6 +12,10 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import {
   listEmptyClass,
   listErrorClass,
+  listFilterToDataGapClass,
+  listTableActionCellClass,
+  listTableActionHeadClass,
+  listTableCellClass,
   listTableHeadClass,
   listTableHeaderRowClass,
   listTableRowClass,
@@ -158,17 +162,18 @@ export default function ProjectListPage() {
 
       <div className="flex items-start justify-between space-y-0">
 
-          <h1 className="text-2xl font-bold tracking-tight text-gray-900">项目基础信息</h1>
+          <h1 className="text-2xl  tracking-tight text-gray-900">项目信息</h1>
 
 
           <Button variant="primary" size="sm" className="shrink-0 gap-1 px-4" asChild>
             <Link href="/projects/new">
               <Plus size={16} />
-              新建
+              新建项目
             </Link>
           </Button>
       </div>
 
+      <div className="">
       <div className="space-y-4">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <FilterField label="品类：">
@@ -234,34 +239,35 @@ export default function ProjectListPage() {
           </FilterField>
         </div>
 
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <FilterField label="立项日期：" className="min-w-0 flex-1 lg:max-w-xl">
-            <div className="flex items-center gap-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          
+          <FilterField label="开始执行日期：">
               <Input
                 variant="filter"
                 type="date"
-                className="w-44"
                 value={filters.dateFrom}
                 onChange={(e) => {
                   setFilters((prev) => ({ ...prev, dateFrom: e.target.value }));
                   setPage(1);
                 }}
               />
-              <span className="shrink-0 text-sm text-gray-500">至</span>
+            </FilterField>
+           <FilterField label="项目结束日期：">
               <Input
                 variant="filter"
                 type="date"
-                className="w-44"
+
                 value={filters.dateTo}
                 onChange={(e) => {
                   setFilters((prev) => ({ ...prev, dateTo: e.target.value }));
                   setPage(1);
                 }}
               />
-            </div>
+            
           </FilterField>
-
-          <div className="flex shrink-0 items-center gap-3">
+          <div>
+          </div>
+          <div className="flex shrink-0 items-center justify-end gap-3">
             <Button
               type="button"
               variant="primary"
@@ -282,75 +288,83 @@ export default function ProjectListPage() {
             </Button>
           </div>
         </div>
-
-        {isLoading ? (
-          <Loading size="lg" text="正在加载项目列表..." className="py-16" />
-        ) : isError ? (
-          <div className={listErrorClass}>{(error as Error).message || '获取项目列表失败'}</div>
-        ) : data?.items.length ? (
-          <div className={listTableWrapperClass}>
-            <Table className="min-w-[960px] text-sm">
-              <TableHeader >
-                <TableRow className={listTableHeaderRowClass}>
-                  <TableHead className={listTableHeadClass}>品类</TableHead>
-                  <TableHead className={listTableHeadClass}>品牌</TableHead>
-                  <TableHead className={listTableHeadClass}>业务线</TableHead>
-                  <TableHead className={cn(listTableHeadClass, 'min-w-[220px]')}>项目名称</TableHead>
-                  <TableHead className={listTableHeadClass}>创建者</TableHead>
-                  <TableHead className={listTableHeadClass}>笔记数量</TableHead>
-                  <TableHead className={listTableHeadClass}>项目结束日期</TableHead>
-                  <TableHead className={listTableHeadClass}>参与者</TableHead>
-                  <TableHead className={listTableHeadClass}>操作</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {data.items.map((project, index) => (
-                  <TableRow key={project.id} className={listTableRowClass(index)}>
-                    <TableCell className="whitespace-nowrap py-3">{project.category || '-'}</TableCell>
-                    <TableCell className="whitespace-nowrap py-3">{project.brand || '-'}</TableCell>
-                    <TableCell className="whitespace-nowrap py-3">
-                      {project.businessLine || '-'}
-                    </TableCell>
-                    <TableCell className="max-w-[280px] truncate py-3">
-                      {project.projectName}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap py-3">
-                      {project.createdByDisplayName || '-'}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap py-3">{project.noteCount ?? 0}</TableCell>
-                    <TableCell className="whitespace-nowrap py-3">
-                      {project.endDate ? formatDate(project.endDate) : '-'}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap py-3">
-                      {project.participants?.length > 0
-                        ? `${project.participants.length}人`
-                        : '-'}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap py-3">
-                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                        <Button variant="text-link" size="sm" className="h-auto px-0 text-xs" asChild>
-                          <Link href={`/projects/${project.id}/edit`}>编辑</Link>
-                        </Button>
-                        {/* 导出按钮暂时隐藏，待联调完成后启用 */}
-                        <Button variant="text-link" size="sm" className="h-auto px-0 text-xs" asChild>
-                          <Link href={`/review/new?projectId=${project.id}`}>复盘</Link>
-                        </Button>
-                        <Button variant="text-link" size="sm" className="h-auto px-0 text-xs" asChild>
-                          <Link href="/planning">策划</Link>
-                        </Button>
-                        <Button variant="text-link" size="sm" className="h-auto px-0 text-xs" asChild>
-                          <Link href={`/sentiment?projectId=${project.id}`}>舆情监控</Link>
-                        </Button>
-                      </div>
-                    </TableCell>
+        </div>
+        <div className={listFilterToDataGapClass}>
+          {isLoading ? (
+            <Loading size="lg" text="正在加载项目列表..." className="py-16" />
+          ) : isError ? (
+            <div className={listErrorClass}>{(error as Error).message || '获取项目列表失败'}</div>
+          ) : data?.items.length ? (
+            <div className={listTableWrapperClass}>
+              <Table className="min-w-[960px] text-sm">
+                <TableHeader>
+                  <TableRow className={listTableHeaderRowClass}>
+                    <TableHead className={listTableHeadClass}>品类</TableHead>
+                    <TableHead className={listTableHeadClass}>品牌</TableHead>
+                    <TableHead className={listTableHeadClass}>业务线</TableHead>
+                    <TableHead className={cn(listTableHeadClass, 'min-w-[220px]')}>项目名称</TableHead>
+                    <TableHead className={listTableHeadClass}>创建者</TableHead>
+                    <TableHead className={listTableHeadClass}>笔记数量</TableHead>
+                    <TableHead className={listTableHeadClass}>项目结束日期</TableHead>
+                    <TableHead className={listTableHeadClass}>参与者</TableHead>
+                    <TableHead className={listTableActionHeadClass}>操作</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        ) : (
-          <div className={listEmptyClass}>暂无项目数据</div>
-        )}
+                </TableHeader>
+                <TableBody>
+                  {data.items.map((project, index) => (
+                    <TableRow key={project.id} className={listTableRowClass(index)}>
+                      <TableCell className={cn(listTableCellClass, 'whitespace-nowrap')}>
+                        {project.category || '-'}
+                      </TableCell>
+                      <TableCell className={cn(listTableCellClass, 'whitespace-nowrap')}>
+                        {project.brand || '-'}
+                      </TableCell>
+                      <TableCell className={cn(listTableCellClass, 'whitespace-nowrap')}>
+                        {project.businessLine || '-'}
+                      </TableCell>
+                      <TableCell title={project.projectName} className={cn(listTableCellClass, 'max-w-[280px] truncate')}>
+                        {project.projectName}
+                      </TableCell>
+                      <TableCell className={cn(listTableCellClass, 'whitespace-nowrap')}>
+                        {project.createdByDisplayName || '-'}
+                      </TableCell>
+                      <TableCell className={cn(listTableCellClass, 'whitespace-nowrap')}>
+                        {project.noteCount ?? 0}
+                      </TableCell>
+                      <TableCell className={cn(listTableCellClass, 'whitespace-nowrap')}>
+                        {project.endDate ? formatDate(project.endDate) : '-'}
+                      </TableCell>
+                      <TableCell className={cn(listTableCellClass, 'whitespace-nowrap')}>
+                        {project.participants?.length > 0
+                          ? `${project.participants.length}人`
+                          : '-'}
+                      </TableCell>
+                      <TableCell className={cn(listTableActionCellClass, 'whitespace-nowrap')}>
+                        <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
+                          <Button variant="text-link" size="sm" className="h-auto px-0 text-xs" asChild>
+                            <Link href={`/projects/${project.id}/edit`}>编辑</Link>
+                          </Button>
+                          {/* 导出按钮暂时隐藏，待联调完成后启用 */}
+                          <Button variant="text-link" size="sm" className="h-auto px-0 text-xs" asChild>
+                            <Link href={`/review/new?projectId=${project.id}`}>复盘</Link>
+                          </Button>
+                          <Button variant="text-link" size="sm" className="h-auto px-0 text-xs" asChild>
+                            <Link href="/planning">策划</Link>
+                          </Button>
+                          <Button variant="text-link" size="sm" className="h-auto px-0 text-xs" asChild>
+                            <Link href={`/sentiment?projectId=${project.id}`}>舆情</Link>
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          ) : (
+            <div className={listEmptyClass}>暂无项目数据</div>
+          )}
+        </div>
       </div>
 
       {data?.items.length ? (

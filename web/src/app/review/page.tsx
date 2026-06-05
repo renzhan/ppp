@@ -11,6 +11,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import {
   listEmptyClass,
   listErrorClass,
+  listFilterToDataGapClass,
+  listTableActionCellClass,
+  listTableActionHeadClass,
+  listTableCellClass,
   listTableHeadClass,
   listTableHeaderRowClass,
   listTableRowClass,
@@ -100,75 +104,79 @@ export default function ReviewListPage() {
           />
         </div>
 
-        {isLoading ? (
-          <Loading size="lg" text="正在加载复盘列表..." className="py-16" />
-        ) : isError ? (
-          <div className={listErrorClass}>{(error as Error).message || '获取复盘列表失败'}</div>
-        ) : filteredItems.length ? (
-          <div className={listTableWrapperClass}>
-            <Table className="text-sm">
-              <TableHeader>
-                <TableRow className={listTableHeaderRowClass}>
-                  <TableHead className={listTableHeadClass}>项目名称</TableHead>
-                  <TableHead className={listTableHeadClass}>复盘者</TableHead>
-                  <TableHead className={listTableHeadClass}>更新时间</TableHead>
-                  <TableHead className={listTableHeadClass}>状态</TableHead>
-                  <TableHead className={listTableHeadClass}>操作</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredItems.map((review, index) => (
-                  <TableRow key={review.id} className={listTableRowClass(index)}>
-                    <TableCell className="max-w-[240px] truncate py-3 font-medium text-gray-900">
-                      {review.projectName}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap py-3">
-                      {review.createdByDisplayName || '-'}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap py-3">
-                      {formatDate(review.updatedAt)}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap py-3">
-                      <StatusBadge status={review.status} />
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap py-3">
-                      <div className="flex items-center gap-3">
-                        <Button
-                          variant="text-link"
-                          size="sm"
-                          className="h-auto gap-1 px-0 text-xs"
-                          asChild
-                        >
-                          <Link href={`/review/new?editId=${review.id}`}>
-                            <Pencil size={12} />
-                            编辑
-                          </Link>
-                        </Button>
-                        <Button
-                          variant="text-link"
-                          size="sm"
-                          className="h-auto gap-1 px-0 text-xs"
-                          asChild
-                        >
-                          <Link href={`/review/${review.id}/proofread`}>
-                            <BookOpen size={12} />
-                            审校台
-                          </Link>
-                        </Button>
-                      </div>
-                    </TableCell>
+        <div className={listFilterToDataGapClass}>
+          {isLoading ? (
+            <Loading size="lg" text="正在加载复盘列表..." className="py-16" />
+          ) : isError ? (
+            <div className={listErrorClass}>{(error as Error).message || '获取复盘列表失败'}</div>
+          ) : filteredItems.length ? (
+            <div className={listTableWrapperClass}>
+              <Table className="text-sm">
+                <TableHeader>
+                  <TableRow className={listTableHeaderRowClass}>
+                    <TableHead className={listTableHeadClass}>项目名称</TableHead>
+                    <TableHead className={listTableHeadClass}>复盘者</TableHead>
+                    <TableHead className={listTableHeadClass}>更新时间</TableHead>
+                    <TableHead className={listTableHeadClass}>状态</TableHead>
+                    <TableHead className={listTableActionHeadClass}>操作</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        ) : (
-          <div className={listEmptyClass}>
-            {search.trim()
-              ? '未找到匹配的复盘记录'
-              : '暂无复盘记录，点击「开始新的复盘」创建第一个复盘。'}
-          </div>
-        )}
+                </TableHeader>
+                <TableBody>
+                  {filteredItems.map((review, index) => (
+                    <TableRow key={review.id} className={listTableRowClass(index)}>
+                      <TableCell
+                        className={cn(listTableCellClass, 'max-w-[240px] truncate font-medium text-gray-900')}
+                      >
+                        {review.projectName}
+                      </TableCell>
+                      <TableCell className={cn(listTableCellClass, 'whitespace-nowrap')}>
+                        {review.createdByDisplayName || '-'}
+                      </TableCell>
+                      <TableCell className={cn(listTableCellClass, 'whitespace-nowrap')}>
+                        {formatDate(review.updatedAt)}
+                      </TableCell>
+                      <TableCell className={cn(listTableCellClass, 'whitespace-nowrap')}>
+                        <StatusBadge status={review.status} />
+                      </TableCell>
+                      <TableCell className={cn(listTableActionCellClass, 'whitespace-nowrap')}>
+                        <div className="flex items-center justify-end gap-3">
+                          <Button
+                            variant="text-link"
+                            size="sm"
+                            className="h-auto gap-1 px-0 text-xs"
+                            asChild
+                          >
+                            <Link href={`/review/new?editId=${review.id}`}>
+                              <Pencil size={12} />
+                              编辑
+                            </Link>
+                          </Button>
+                          <Button
+                            variant="text-link"
+                            size="sm"
+                            className="h-auto gap-1 px-0 text-xs"
+                            asChild
+                          >
+                            <Link href={`/review/${review.id}/proofread`}>
+                              <BookOpen size={12} />
+                              审校台
+                            </Link>
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          ) : (
+            <div className={listEmptyClass}>
+              {search.trim()
+                ? '未找到匹配的复盘记录'
+                : '暂无复盘记录，点击「开始新的复盘」创建第一个复盘。'}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

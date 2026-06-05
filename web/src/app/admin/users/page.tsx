@@ -22,6 +22,9 @@ import { Loading } from '@/components/ui/loading';
 import {
   listEmptyClass,
   listErrorClass,
+  listTableActionCellClass,
+  listTableActionHeadClass,
+  listTableCellClass,
   listTableHeadClass,
   listTableHeaderRowClass,
   listTableRowClass,
@@ -183,17 +186,19 @@ export default function AdminUsersPage() {
                     <TableHead className={listTableHeadClass}>角色</TableHead>
                     <TableHead className={listTableHeadClass}>状态</TableHead>
                     <TableHead className={listTableHeadClass}>最后登录</TableHead>
-                    <TableHead className={listTableHeadClass}>操作</TableHead>
+                    <TableHead className={listTableActionHeadClass}>操作</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {users.map((user, index) => (
                     <TableRow key={user.id} className={listTableRowClass(index)}>
-                      <TableCell className="py-3 font-medium">{user.username}</TableCell>
-                      <TableCell className="py-3 text-gray-600">
+                      <TableCell className={cn(listTableCellClass, 'font-medium')}>
+                        {user.username}
+                      </TableCell>
+                      <TableCell className={cn(listTableCellClass, 'text-gray-600')}>
                         {user.displayName || '-'}
                       </TableCell>
-                      <TableCell className="py-3">
+                      <TableCell className={listTableCellClass}>
                         <span
                           className={cn(
                             'inline-flex rounded-full px-2 py-0.5 text-xs font-medium',
@@ -205,7 +210,7 @@ export default function AdminUsersPage() {
                           {user.role === 'admin' ? '管理员' : user.role}
                         </span>
                       </TableCell>
-                      <TableCell className="py-3">
+                      <TableCell className={listTableCellClass}>
                         <span
                           className={cn(
                             'inline-flex rounded-full px-2 py-0.5 text-xs font-medium',
@@ -217,13 +222,13 @@ export default function AdminUsersPage() {
                           {user.isActive ? '正常' : '已禁用'}
                         </span>
                       </TableCell>
-                      <TableCell className="py-3 text-gray-500">
+                      <TableCell className={cn(listTableCellClass, 'text-gray-500')}>
                         {user.lastLoginAt
                           ? new Date(user.lastLoginAt).toLocaleString('zh-CN')
                           : '从未登录'}
                       </TableCell>
-                      <TableCell className="py-3">
-                        <div className="flex items-center gap-1">
+                      <TableCell className={listTableActionCellClass}>
+                        <div className="flex items-center justify-end gap-1">
                           <Button
                             variant="ghost"
                             size="icon-sm"
