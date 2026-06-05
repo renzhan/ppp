@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Plus,
   Upload,
@@ -22,6 +23,7 @@ import { Loading } from '@/components/ui/loading';
 import {
   listEmptyClass,
   listErrorClass,
+  listFilterToDataGapClass,
   listTableActionCellClass,
   listTableActionHeadClass,
   listTableCellClass,
@@ -71,8 +73,7 @@ const selectTriggerClass =
 
 export default function AdminUsersPage() {
   const router = useRouter();
-  const [users, setUsers] = useState<User[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [showAddModal, setShowAddModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -80,29 +81,32 @@ export default function AdminUsersPage() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  const fetchUsers = useCallback(async () => {
-    try {
+  const {
+    data: users = [],
+    isLoading,
+    isError,
+    error,
+  } = useQuery<User[]>({
+    queryKey: ['admin-users'],
+    queryFn: async () => {
       const res = await fetch('/api/admin/users');
       if (res.status === 401) {
         router.push('/login');
-        return;
+        throw new Error('未登录');
       }
       if (res.status === 403) {
         router.push('/');
-        return;
+        throw new Error('无权限');
       }
+      if (!res.ok) throw new Error('获取用户列表失败');
       const data = await res.json();
-      setUsers(data.users || []);
-    } catch {
-      setMessage({ type: 'error', text: '获取用户列表失败' });
-    } finally {
-      setLoading(false);
-    }
-  }, [router]);
+      return data.users || [];
+    },
+  });
 
-  useEffect(() => {
-    fetchUsers();
-  }, [fetchUsers]);
+  const refetchUsers = () => {
+    queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+  };
 
   const showMsg = (type: 'success' | 'error', text: string) => {
     setMessage({ type, text });
@@ -126,7 +130,7 @@ export default function AdminUsersPage() {
 
       if (res.ok) {
         showMsg('success', `${action}成功`);
-        fetchUsers();
+        refetchUsers();
       } else {
         const data = await res.json();
         showMsg('error', data.error || `${action}失败`);
@@ -136,32 +140,23 @@ export default function AdminUsersPage() {
     }
   };
 
-  if (loading) {
-    return <Loading size="lg" text="正在加载用户列表..." className="py-20" />;
-  }
-
   return (
-      <div className="space-y-6">
-
-
-        <div className="flex items-start justify-between space-y-0">
-          <div className="space-y-1">
-            <h1 className="text-2xl font-bold tracking-tight text-gray-900">用户管理</h1>
-            <p className="text-sm text-gray-500">管理系统账户，支持添加、编辑、禁用与批量导入。</p>
-          </div>
-         
-          <div className="flex shrink-0 gap-3">
-            <Button variant="secondary" size="sm" className="gap-2" onClick={() => setShowImportModal(true)}>
-              <Upload size={16} />
-              批量导入
-            </Button>
-            <Button variant="primary" size="sm" className="gap-2" onClick={() => setShowAddModal(true)}>
-              <Plus size={16} />
-              添加用户
-            </Button>
-          </div>
+    <div className="space-y-6">
+      <div className="flex items-start justify-between space-y-0">
+        <h1 className="text-2xl tracking-tight text-gray-900">用户管理</h1>
+        <div className="flex shrink-0 gap-3">
+          <Button variant="secondary" size="sm" className="gap-1 px-4" onClick={() => setShowImportModal(true)}>
+            <Upload size={16} />
+            批量导入
+          </Button>
+          <Button variant="primary" size="sm" className="gap-1 px-4" onClick={() => setShowAddModal(true)}>
+            <Plus size={16} />
+            添加用户
+          </Button>
         </div>
+      </div>
 
+      <div className="">
         <div className="space-y-4">
           {message && (
             <div
@@ -175,8 +170,13 @@ export default function AdminUsersPage() {
               {message.text}
             </div>
           )}
-
-          {users.length ? (
+        </div>
+        <div>
+          {isLoading ? (
+            <Loading size="lg" text="正在加载用户列表..." className="py-16" />
+          ) : isError ? (
+            <div className={listErrorClass}>{(error as Error).message || '获取用户列表失败'}</div>
+          ) : users.length ? (
             <div className={listTableWrapperClass}>
               <Table className="text-sm">
                 <TableHeader>
@@ -228,7 +228,7 @@ export default function AdminUsersPage() {
                           : '从未登录'}
                       </TableCell>
                       <TableCell className={listTableActionCellClass}>
-                        <div className="flex items-center justify-end gap-1">
+                        <div className="flex items-center justify-center gap-1">
                           <Button
                             variant="ghost"
                             size="icon-sm"
@@ -272,14 +272,15 @@ export default function AdminUsersPage() {
             <div className={listEmptyClass}>暂无用户</div>
           )}
         </div>
-      
+      </div>
+
       {showAddModal && (
         <AddUserModal
           onClose={() => setShowAddModal(false)}
           onSuccess={() => {
             setShowAddModal(false);
             showMsg('success', '用户创建成功');
-            fetchUsers();
+            refetchUsers();
           }}
         />
       )}
@@ -290,7 +291,7 @@ export default function AdminUsersPage() {
           onSuccess={(msg) => {
             setShowImportModal(false);
             showMsg('success', msg);
-            fetchUsers();
+            refetchUsers();
           }}
         />
       )}
@@ -306,7 +307,7 @@ export default function AdminUsersPage() {
             setShowEditModal(false);
             setSelectedUser(null);
             showMsg('success', '用户更新成功');
-            fetchUsers();
+            refetchUsers();
           }}
         />
       )}
@@ -322,7 +323,7 @@ export default function AdminUsersPage() {
             setShowResetModal(false);
             setSelectedUser(null);
             showMsg('success', '密码重置成功');
-            fetchUsers();
+            refetchUsers();
           }}
         />
       )}

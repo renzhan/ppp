@@ -340,7 +340,7 @@ export default function ProjectListPage() {
                           : '-'}
                       </TableCell>
                       <TableCell className={cn(listTableActionCellClass, 'whitespace-nowrap')}>
-                        <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
+                        <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
                           <Button variant="text-link" size="sm" className="h-auto px-0 text-xs" asChild>
                             <Link href={`/projects/${project.id}/edit`}>编辑</Link>
                           </Button>

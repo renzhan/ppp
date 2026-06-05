@@ -76,18 +76,17 @@ export default function ReviewListPage() {
     <div className="space-y-6">
 
       <div className="flex items-start justify-between space-y-0">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-bold tracking-tight text-gray-900">复盘系统</h1>
-          <p className="text-sm text-gray-500">管理所有复盘记录，查看复盘报告和进入审校台。</p>
-        </div>
-        <Button variant="primary" size="sm" className="shrink-0 gap-2" asChild>
+
+          <h1 className="text-2xl tracking-tight text-gray-900">复盘系统</h1>
+
+        <Button variant="primary" size="sm" className="shrink-0 gap-1 px-4" asChild>
           <Link href="/review/new">
             <Plus size={16} />
-            开始新的复盘
+            新建复盘
           </Link>
         </Button>
       </div>
-
+    <div className="">
       <div className="space-y-4">
         <div className="relative max-w-sm">
           <Search
@@ -103,7 +102,7 @@ export default function ReviewListPage() {
             className="pl-9"
           />
         </div>
-
+      </div>
         <div className={listFilterToDataGapClass}>
           {isLoading ? (
             <Loading size="lg" text="正在加载复盘列表..." className="py-16" />
@@ -115,6 +114,7 @@ export default function ReviewListPage() {
                 <TableHeader>
                   <TableRow className={listTableHeaderRowClass}>
                     <TableHead className={listTableHeadClass}>项目名称</TableHead>
+                    <TableHead className={listTableHeadClass}>复盘报告ID</TableHead>
                     <TableHead className={listTableHeadClass}>复盘者</TableHead>
                     <TableHead className={listTableHeadClass}>更新时间</TableHead>
                     <TableHead className={listTableHeadClass}>状态</TableHead>
@@ -125,9 +125,12 @@ export default function ReviewListPage() {
                   {filteredItems.map((review, index) => (
                     <TableRow key={review.id} className={listTableRowClass(index)}>
                       <TableCell
-                        className={cn(listTableCellClass, 'max-w-[240px] truncate font-medium text-gray-900')}
+                        className={cn(listTableCellClass, 'max-w-[200px] truncate text-gray-900')}
                       >
                         {review.projectName}
+                      </TableCell>
+                      <TableCell className={cn(listTableCellClass, 'whitespace-nowrap')}>
+                        {review.projectId}
                       </TableCell>
                       <TableCell className={cn(listTableCellClass, 'whitespace-nowrap')}>
                         {review.createdByDisplayName || '-'}
@@ -139,7 +142,7 @@ export default function ReviewListPage() {
                         <StatusBadge status={review.status} />
                       </TableCell>
                       <TableCell className={cn(listTableActionCellClass, 'whitespace-nowrap')}>
-                        <div className="flex items-center justify-end gap-3">
+                        <div className="flex items-center justify-center gap-3">
                           <Button
                             variant="text-link"
                             size="sm"
@@ -147,7 +150,6 @@ export default function ReviewListPage() {
                             asChild
                           >
                             <Link href={`/review/new?editId=${review.id}`}>
-                              <Pencil size={12} />
                               编辑
                             </Link>
                           </Button>
@@ -158,8 +160,7 @@ export default function ReviewListPage() {
                             asChild
                           >
                             <Link href={`/review/${review.id}/proofread`}>
-                              <BookOpen size={12} />
-                              审校台
+                              审校
                             </Link>
                           </Button>
                         </div>
