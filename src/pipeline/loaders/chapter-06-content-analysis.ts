@@ -38,6 +38,7 @@ export class ContentAnalysisDataLoader extends BaseChapterDataLoader {
     // ── 0. 加载复盘配置 ──
     let engagementMetric = 'exclude_follow';
     let viralMetric = 'like_comment_share';
+    let viralThreshold = 1000;
     let contentCostCaliber = 'consumption';
     let trafficCostCaliber = 'consumption';
     let influencerTiers: Array<{ name: string; fanRangeMin: number; fanRangeMax: number }> = [
@@ -50,12 +51,15 @@ export class ContentAnalysisDataLoader extends BaseChapterDataLoader {
     try {
       const reviewConfig = await this.prisma.reviewConfig.findFirst({
         where: { projectId },
-        select: { engagementMetric: true, viralMetric: true, influencerTiers: true },
+        select: { engagementMetric: true, viralMetric: true, viralThreshold: true, influencerTiers: true },
         orderBy: { createdAt: 'desc' },
       });
       if (reviewConfig) {
         if (reviewConfig.engagementMetric) engagementMetric = reviewConfig.engagementMetric as string;
         if (reviewConfig.viralMetric) viralMetric = reviewConfig.viralMetric as string;
+        if (reviewConfig.viralThreshold != null && reviewConfig.viralThreshold > 0) {
+          viralThreshold = reviewConfig.viralThreshold;
+        }
         if ((reviewConfig as any).contentCostCaliber) contentCostCaliber = (reviewConfig as any).contentCostCaliber;
         if ((reviewConfig as any).trafficCostCaliber) trafficCostCaliber = (reviewConfig as any).trafficCostCaliber;
         const tiers = reviewConfig.influencerTiers as any[];
@@ -205,11 +209,11 @@ export class ContentAnalysisDataLoader extends BaseChapterDataLoader {
       let isViral: boolean;
       let viralScore: number;
       if (viralMetric === 'like_only') {
-        isViral = note.likeNum >= 1000;
+        isViral = note.likeNum >= viralThreshold;
         viralScore = note.likeNum;
       } else {
         const interactionSum = note.likeNum + note.favNum + note.cmtNum;
-        isViral = interactionSum >= 1000;
+        isViral = interactionSum >= viralThreshold;
         viralScore = interactionSum;
       }
 
@@ -325,7 +329,7 @@ export class ContentAnalysisDataLoader extends BaseChapterDataLoader {
     // 统计信息
     variables['total_notes'] = String(enrichedNotes.length);
     variables['total_viral'] = String(enrichedNotes.filter((n) => n.isViral).length);
-    variables['viral_metric'] = viralMetric === 'like_only' ? '千赞（赞≥1000）' : '千互（赞+藏+评≥1000）';
+    variables['viral_metric'] = viralMetric === 'like_only' ? `千赞（赞≥${viralThreshold}）` : `千互（赞+藏+评≥${viralThreshold}）`;
 
     // ── 11. 构建溯源数据 ──
     // 溯源展示原始笔记数据行 + 分组聚合公式
@@ -365,7 +369,7 @@ export class ContentAnalysisDataLoader extends BaseChapterDataLoader {
         { metric: '分组聚合', formula: 'GROUP BY content_direction', inputs: { '分组数': byDirection.size }, result: `${byDirection.size}个内容方向` },
         { metric: 'CPE(每组)', formula: 'SUM(totalCost) / SUM(engagement)', inputs: {}, result: '按组聚合后计算' },
         { metric: 'CPTI(每组)', formula: 'SUM(totalCost) / SUM(tiUserNum)', inputs: {}, result: '按组聚合后计算' },
-        { metric: '爆文率(每组)', formula: 'COUNT(isViral=true) / COUNT(*) * 100', inputs: { '爆文标准': viralMetric === 'like_only' ? '赞≥1000' : '赞+藏+评≥1000' }, result: '按组统计' },
+        { metric: '爆文率(每组)', formula: 'COUNT(isViral=true) / COUNT(*) * 100', inputs: { '爆文标准': viralMetric === 'like_only' ? `赞≥${viralThreshold}` : `赞+藏+评≥${viralThreshold}` }, result: '按组统计' },
       ],
     });
 

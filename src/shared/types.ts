@@ -482,7 +482,7 @@ export interface DimensionAggregation {
  * KOL层级聚合结果
  */
 export interface KOLTierAggregation {
-  tier: KOLTier;
+  tier: KOLTier | string;
   noteCount: number;
   totalImpressions: number;
   totalReads: number;
