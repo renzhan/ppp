@@ -151,6 +151,15 @@ export async function PUT(
     if (body.participants !== undefined) {
       updateData.participants = Array.isArray(body.participants) ? body.participants : [];
     }
+    if (body.lingxiAccountId !== undefined) {
+      updateData.lingxiAccountId = typeof body.lingxiAccountId === 'string' ? body.lingxiAccountId.trim() || null : null;
+    }
+    if (body.lingxiTaxonomyCode !== undefined) {
+      updateData.lingxiTaxonomyCode = typeof body.lingxiTaxonomyCode === 'string' ? body.lingxiTaxonomyCode.trim() || null : null;
+    }
+    if (body.lingxiTaxonomyPath !== undefined) {
+      updateData.lingxiTaxonomyPath = typeof body.lingxiTaxonomyPath === 'string' ? body.lingxiTaxonomyPath.trim() || null : null;
+    }
 
     const updated = await prisma.project.update({
       where: { id: params.id },

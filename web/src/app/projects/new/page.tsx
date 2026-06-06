@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Loader2, X, ChevronDown } from 'lucide-react';
 import { PageHeader } from '@/components/layout/page-header';
 import { CascadeSelector, CascadeSelectorValue } from '@/components/form/cascade-selector';
+import { LingxiTaxonomySelector, LingxiTaxonomyValue } from '@/components/form/lingxi-taxonomy-selector';
 import { NoteBasePreview } from '@/components/form/note-base-preview';
 import { ParsedNoteBaseRow } from '@/lib/note-base-parser';
 
@@ -30,6 +31,7 @@ interface FormState {
   executionStartDate: string;
   endDate: string;
   participants: string[];
+  lingxiTaxonomy: LingxiTaxonomyValue;
 }
 
 type FormErrors = Record<string, string>;
@@ -42,6 +44,7 @@ export default function NewProjectPage() {
     executionStartDate: '',
     endDate: '',
     participants: [],
+    lingxiTaxonomy: { accountId: '', taxonomyCode: '', taxonomyPath: '' },
   });
   const [errors, setErrors] = useState<FormErrors>({});
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -153,6 +156,9 @@ export default function NewProjectPage() {
           endDate: form.endDate || null,
           createdBy: currentUser?.id,
           participants: form.participants,
+          lingxiAccountId: form.lingxiTaxonomy.accountId || null,
+          lingxiTaxonomyCode: form.lingxiTaxonomy.taxonomyCode || null,
+          lingxiTaxonomyPath: form.lingxiTaxonomy.taxonomyPath || null,
         }),
       });
 
@@ -290,6 +296,16 @@ export default function NewProjectPage() {
               )}
             </div>
             {errors.projectName && <p className="text-xs text-rose-500">{errors.projectName}</p>}
+          </div>
+
+          {/* 灵犀账号ID + 行业选择 */}
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-gray-900">灵犀账号ID</label>
+            <p className="text-xs text-gray-500">输入灵犀账号ID后点击"获取行业"，选择行业分类供灵犀数据爬取使用</p>
+            <LingxiTaxonomySelector
+              value={form.lingxiTaxonomy}
+              onChange={(val) => setForm((prev) => ({ ...prev, lingxiTaxonomy: val }))}
+            />
           </div>
 
           {/* 创建者 - auto-filled, read-only */}
