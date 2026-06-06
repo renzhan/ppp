@@ -87,20 +87,22 @@ export class DataIngestionService {
       errors.push(`Failed to fetch pugongying data: ${message}`);
     }
 
-    // 灵犀
+    // 灵犀（仅当项目配置了灵犀账号 ID 时才采集）
     let lingxiData: LingxiData | undefined;
-    try {
-      lingxiData = await this.paichachaClient.fetchLingxiData(
-        ctx.lingxiBrandId,
-        ctx.execStart,
-        ctx.currentEnd,
-        ctx.taxonomyNames,
-        ctx.preStart,
-        ctx.preEnd,
-      );
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      errors.push(`Failed to fetch lingxi data: ${message}`);
+    if (ctx.lingxiBrandId) {
+      try {
+        lingxiData = await this.paichachaClient.fetchLingxiData(
+          ctx.lingxiBrandId,
+          ctx.execStart,
+          ctx.currentEnd,
+          ctx.taxonomyNames,
+          ctx.preStart,
+          ctx.preEnd,
+        );
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        errors.push(`Failed to fetch lingxi data: ${message}`);
+      }
     }
 
     // 保留已有水下/水下价格
@@ -206,9 +208,12 @@ export class DataIngestionService {
     if (!project) throw new Error(`项目不存在: ${projectId}`);
     if (!project.executionStartDate) throw new Error(`项目缺少"开始执行日期"（executionStartDate），请先补充后再拉取数据`);
 
-    // const lingxiBrandId = project.lingxiBrandId;
-    const lingxiBrandId = "181252"; // todo 等待修改，以及下面的 taxonomyNames 也要修改
-    const taxonomyNames = [project.category];
+    const lingxiBrandId = project.lingxiAccountId || undefined;
+
+    // taxonomyNames 需要完整的 name 路径数组，如 ["食品饮料", "饮料冲调", "冲泡茶", "茶叶"]
+    const taxonomyNames = project.lingxiTaxonomyPath
+      ? project.lingxiTaxonomyPath.split(' > ').map(s => s.trim()).filter(Boolean)
+      : undefined;
 
     // T-1（下午 4 点爬取昨天数据）
     const now = new Date();

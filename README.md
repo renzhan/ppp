@@ -47,14 +47,17 @@
 - PostgreSQL 数据库
 - LLM API（OpenAI 兼容接口或通义千问）
 
-### 1. 安装依赖
+### 1. 安装依赖 & 初始化
 
 ```bash
-# 根目录
+# 根目录：安装后端依赖 + 生成 Prisma Client
 npm install
+npx prisma generate
 
-# 前端
-cd web && npm install && cd ..
+# web 目录：安装前端依赖
+cd web
+npm install
+cd ..
 ```
 
 ### 2. 配置环境变量
@@ -77,17 +80,10 @@ cp .env.example .env
 ### 3. 初始化数据库
 
 ```bash
-npx prisma generate
 npx prisma migrate dev
 ```
 
-### 4. 编译后端
-
-```bash
-npm run build
-```
-
-### 5. 启动开发服务器
+### 4. 启动开发服务器
 
 ```bash
 cd web

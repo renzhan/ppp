@@ -189,7 +189,14 @@ export class LingxiClient {
           signal: controller.signal,
         });
 
-        if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+        if (!res.ok) {
+          const err = new Error(`HTTP ${res.status}: ${res.statusText}`);
+          // 4xx 错误是客户端参数问题，重试也不会解决，直接抛出不重试
+          if (res.status >= 400 && res.status < 500) {
+            (err as any).noRetry = true;
+          }
+          throw err;
+        }
 
         const json = await res.json() as LingxiTaskResponse;
 
@@ -312,6 +319,8 @@ function getPeriod(): string {
 async function withRetry<T>(fn: () => Promise<T>, retries = MAX_RETRIES): Promise<T> {
   for (let attempt = 0; attempt <= retries; attempt++) {
     try { return await fn(); } catch (e) {
+      // 不重试标记为 noRetry 的错误（如 4xx 客户端错误）
+      if ((e as any)?.noRetry) throw e;
       if (attempt === retries) throw e;
       await new Promise((r) => setTimeout(r, 3000 * Math.pow(2, attempt)));
     }
