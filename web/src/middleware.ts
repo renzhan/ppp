@@ -21,6 +21,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Skip middleware for large file upload routes (avoid body buffering issues)
+  if (pathname.includes('/plan-upload')) {
+    return NextResponse.next();
+  }
+
   // Allow static files and Next.js internals
   if (
     pathname.startsWith('/_next') ||
@@ -89,8 +94,8 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
-     * - /api/reviews/*/plan-upload (large file uploads, skip middleware buffering)
+     * - api/reviews/:id/plan-upload (large file uploads, skip middleware buffering)
      */
-    '/((?!_next/static|_next/image|favicon.ico|api/reviews/[^/]+/plan-upload).*)',
+    '/((?!_next/static|_next/image|favicon.ico).*)',
   ],
 };

@@ -71,7 +71,7 @@ describe('OpenAILLMClient', () => {
           max_tokens: 500,
         }),
         expect.objectContaining({
-          timeout: 60000,
+          timeout: 120000,
         }),
       );
     });
@@ -92,7 +92,7 @@ describe('OpenAILLMClient', () => {
       );
     });
 
-    it('should use default 60s timeout when not specified', async () => {
+    it('should use default 120s timeout when not specified', async () => {
       mockCreate.mockResolvedValueOnce({
         choices: [{ message: { content: 'response' } }],
       });
@@ -103,7 +103,7 @@ describe('OpenAILLMClient', () => {
       expect(mockCreate).toHaveBeenCalledWith(
         expect.anything(),
         expect.objectContaining({
-          timeout: 60000,
+          timeout: 120000,
         }),
       );
     });

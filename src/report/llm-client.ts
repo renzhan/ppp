@@ -21,7 +21,7 @@ export interface LLMClient {
   chat(messages: ChatMessage[], options?: LLMOptions): Promise<string>;
 }
 
-const DEFAULT_TIMEOUT = 60000; // 60 seconds (increased for Qwen models)
+const DEFAULT_TIMEOUT = 120000; // 120 seconds default (Qwen models need more time for complex outputs)
 const FALLBACK_MESSAGE = 'AI生成失败，请稍后重试';
 
 /**

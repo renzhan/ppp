@@ -132,6 +132,10 @@ async function runBackgroundGeneration(reviewConfigId: string, projectId: string
             { role: 'user', content: userPrompt },
           ];
 
+          const totalPromptChars = systemPrompt.length + userPrompt.length;
+          const estimatedTokens = Math.ceil(totalPromptChars / 1.5); // 中文约1.5字符/token
+          console.log(`[ReportGen] ch${chapterDef.number}_${chapterDef.id} prompt大小: ${totalPromptChars}字符, 约${estimatedTokens} tokens (system=${systemPrompt.length}, user=${userPrompt.length})`);
+
           // Log prompts to file for debugging
           try {
             const logDir = path.resolve(process.cwd(), '..', 'logs', 'prompts', reviewConfigId);
@@ -140,14 +144,19 @@ async function runBackgroundGeneration(reviewConfigId: string, projectId: string
             const logFile = path.join(logDir, `ch${chapterDef.number}_${chapterDef.id}_${timestamp}.txt`);
             const logContent = `=== Chapter ${chapterDef.number}: ${chapterDef.id} ===\n` +
               `=== Timestamp: ${new Date().toISOString()} ===\n` +
-              `=== ReviewConfig: ${reviewConfigId} ===\n\n` +
+              `=== ReviewConfig: ${reviewConfigId} ===\n` +
+              `=== Prompt Size: ${totalPromptChars} chars, ~${estimatedTokens} tokens ===\n\n` +
               `--- SYSTEM PROMPT ---\n${systemPrompt}\n\n` +
               `--- USER PROMPT ---\n${userPrompt}\n`;
             fs.writeFileSync(logFile, logContent, 'utf-8');
           } catch { /* ignore logging errors */ }
 
+          // 动态超时：基础60s + 每1000 tokens加30s，上限300s
+          const dynamicTimeout = Math.min(300000, 60000 + Math.ceil(estimatedTokens / 1000) * 30000);
+          console.log(`[ReportGen] ch${chapterDef.number}_${chapterDef.id} timeout=${dynamicTimeout / 1000}s`);
+
           const rawResponse = await llmClient.chat(messages, {
-            timeout: 60000,
+            timeout: dynamicTimeout,
             temperature: 0.3,
           });
 
