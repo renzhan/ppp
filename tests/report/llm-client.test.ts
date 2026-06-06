@@ -71,7 +71,7 @@ describe('OpenAILLMClient', () => {
           max_tokens: 500,
         }),
         expect.objectContaining({
-          timeout: 30000,
+          timeout: 60000,
         }),
       );
     });
@@ -92,7 +92,7 @@ describe('OpenAILLMClient', () => {
       );
     });
 
-    it('should use default 30s timeout when not specified', async () => {
+    it('should use default 60s timeout when not specified', async () => {
       mockCreate.mockResolvedValueOnce({
         choices: [{ message: { content: 'response' } }],
       });
@@ -103,7 +103,7 @@ describe('OpenAILLMClient', () => {
       expect(mockCreate).toHaveBeenCalledWith(
         expect.anything(),
         expect.objectContaining({
-          timeout: 30000,
+          timeout: 60000,
         }),
       );
     });
@@ -141,20 +141,19 @@ describe('OpenAILLMClient', () => {
     });
   });
 
-  describe('chat - fallback behavior', () => {
-    it('should return fallback message when both attempts fail', async () => {
+  describe('chat - error behavior', () => {
+    it('should throw error when both attempts fail', async () => {
       mockCreate
         .mockRejectedValueOnce(new Error('First failure'))
         .mockRejectedValueOnce(new Error('Second failure'));
 
       const client = new OpenAILLMClient(testConfig);
-      const result = await client.chat(testMessages);
 
-      expect(result).toBe('AI生成失败，请稍后重试');
+      await expect(client.chat(testMessages)).rejects.toThrow('LLM调用失败(重试后仍失败): Second failure');
       expect(mockCreate).toHaveBeenCalledTimes(2);
     });
 
-    it('should return fallback when both attempts return empty content', async () => {
+    it('should throw error when both attempts return empty content', async () => {
       mockCreate
         .mockResolvedValueOnce({
           choices: [{ message: { content: null } }],
@@ -164,21 +163,19 @@ describe('OpenAILLMClient', () => {
         });
 
       const client = new OpenAILLMClient(testConfig);
-      const result = await client.chat(testMessages);
 
-      expect(result).toBe('AI生成失败，请稍后重试');
+      await expect(client.chat(testMessages)).rejects.toThrow('LLM调用失败(重试后仍失败)');
       expect(mockCreate).toHaveBeenCalledTimes(2);
     });
 
-    it('should return fallback when both attempts timeout', async () => {
+    it('should throw error when both attempts timeout', async () => {
       mockCreate
         .mockRejectedValueOnce(new Error('Request timed out'))
         .mockRejectedValueOnce(new Error('Request timed out'));
 
       const client = new OpenAILLMClient(testConfig);
-      const result = await client.chat(testMessages, { timeout: 1000 });
 
-      expect(result).toBe('AI生成失败，请稍后重试');
+      await expect(client.chat(testMessages, { timeout: 1000 })).rejects.toThrow('LLM调用失败(重试后仍失败): Request timed out');
       expect(mockCreate).toHaveBeenCalledTimes(2);
     });
   });

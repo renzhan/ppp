@@ -76,13 +76,19 @@ export async function parsePlanDocument(
   "timeline": null
 }`;
 
-  const response = await llmClient.chat(
-    [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: documentText },
-    ],
-    { temperature: 0.3 },
-  );
+  let response: string;
+  try {
+    response = await llmClient.chat(
+      [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: documentText },
+      ],
+      { temperature: 0.3 },
+    );
+  } catch (err) {
+    console.error('[AI-Service] parsePlanDocument LLM调用失败:', err instanceof Error ? err.message : err);
+    return getFallbackProjectBackground();
+  }
 
   // Check if LLM returned the fallback message
   if (response === FALLBACK_MESSAGE) {
@@ -163,13 +169,19 @@ ${metrics.kolTierAggregation
 ### 项目亮点
 ${highlights.map((h) => `- [${h.type}] ${h.description}`).join('\n')}`;
 
-  const response = await llmClient.chat(
-    [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: userContent },
-    ],
-    { temperature: 0.7 },
-  );
+  let response: string;
+  try {
+    response = await llmClient.chat(
+      [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userContent },
+      ],
+      { temperature: 0.7 },
+    );
+  } catch (err) {
+    console.error('[AI-Service] generateOptimizationSuggestions LLM调用失败:', err instanceof Error ? err.message : err);
+    return getFallbackOptimizationSuggestions();
+  }
 
   // Check if LLM returned the fallback message
   if (response === FALLBACK_MESSAGE) {
