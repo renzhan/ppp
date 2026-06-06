@@ -216,7 +216,13 @@ export default function ProofreadPage({ params }: { params: { id: string } }) {
             if (existing) {
               return prev.map((c) => (c.id === chapter.id ? chapter : c));
             }
-            return [...prev, chapter];
+            const updated = [...prev, chapter];
+            // If all chapters received, auto-transition to ready
+            if (updated.length >= CHAPTER_DEFS.length) {
+              eventSource.close();
+              setPageStatus('ready');
+            }
+            return updated;
           });
           // Mark chapter status as completed
           setChapterStatuses(prev => prev.map(cs =>

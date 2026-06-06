@@ -322,7 +322,7 @@ export async function GET(
 
       send({ type: 'start', totalChapters: CHAPTER_DEFS.length });
 
-      let lastSentCount = 0;
+      let sentChapterIds = new Set<string>();
       const POLL_INTERVAL = 1500; // 1.5s
       const MAX_POLLS = 200; // 5 minutes max
 
@@ -343,22 +343,23 @@ export async function GET(
         const content = current.reportContent as { type?: string; chapters?: Array<{ id: string; title: string; number: number; content: string; traceIds?: unknown }> } | null;
         const chapters = content?.chapters || [];
 
-        // Emit progress events for chapters being generated
-        // Any chapter beyond lastSentCount but not yet sent is "generating"
-        if (chapters.length > lastSentCount) {
-          for (let i = lastSentCount; i < chapters.length; i++) {
-            const ch = chapters[i];
-            // Emit progress (approximate token usage from content length)
+        // Emit chapter events for newly completed chapters (order-independent)
+        for (const ch of chapters) {
+          if (!sentChapterIds.has(ch.id)) {
             const tokensUsed = Math.ceil((ch.content?.length || 0) / 2);
             send({ type: 'progress', chapterId: ch.id, tokensUsed });
             send({ type: 'chapter', chapter: ch });
+            sentChapterIds.add(ch.id);
           }
-          lastSentCount = chapters.length;
-        } else if (current.status === 'generating' && chapters.length < CHAPTER_DEFS.length) {
-          // Emit progress event for the next chapter being generated (tokensUsed: 0)
-          const nextChapterId = CHAPTER_DEFS[chapters.length]?.id;
-          if (nextChapterId) {
-            send({ type: 'progress', chapterId: nextChapterId, tokensUsed: 0 });
+        }
+
+        // Emit progress event for chapters still being generated
+        if (current.status === 'generating' && chapters.length < CHAPTER_DEFS.length) {
+          for (const def of CHAPTER_DEFS) {
+            if (!sentChapterIds.has(def.id) && !chapters.find(c => c.id === def.id)) {
+              send({ type: 'progress', chapterId: def.id, tokensUsed: 0 });
+              break; // Only show one as "generating" at a time
+            }
           }
         }
 
