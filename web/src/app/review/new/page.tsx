@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Plus, Trash2, Upload, FileText, AlertCircle, ArrowLeft } from 'lucide-react';
@@ -155,6 +155,11 @@ function NewReviewPageContent() {
   const [benchmarkErrors, setBenchmarkErrors] = useState<Record<string, string | null>>({});
   const [tierError, setTierError] = useState<string | null>(null);
   const [phaseError, setPhaseError] = useState<string | null>(null);
+
+  // ─── Refs for scroll-to-error ────────────────────────────────────────────
+  const benchmarkSectionRef = useRef<HTMLDivElement>(null);
+  const tierSectionRef = useRef<HTMLDivElement>(null);
+  const phaseSectionRef = useRef<HTMLDivElement>(null);
 
   // ─── Data Fetching ───────────────────────────────────────────────────────
   // Fetch project info by projectId (from URL param or edit mode)
@@ -316,20 +321,9 @@ function NewReviewPageContent() {
         });
       }
 
-      // If advertiserIds were provided, wait for ingestion to complete before redirecting
-      // The POST /api/reviews already triggered ingestion server-side,
-      // but we also trigger pugongying base data fetch here and wait
-      if (advertiserIds.length > 0 || selectedProjectId) {
-        setSubmitError(null);
-        try {
-          // Trigger base data ingestion (pugongying notes) and wait
-          await fetch(`/api/upload/api-fetch?projectId=${selectedProjectId}`, {
-            method: 'POST',
-          });
-        } catch {
-          // Don't block on failure — data may still come from cron
-        }
-      }
+      // Note: Juguang ingestion is already triggered server-side in POST /api/reviews.
+      // Pugongying base data is handled by the daily cron job.
+      // No need for additional api-fetch call here.
 
       // Redirect to proofread page
       router.push(`/review/${review.id}/proofread`);
@@ -396,6 +390,20 @@ function NewReviewPageContent() {
   };
 
   // ─── Validation Helpers ─────────────────────────────────────────────────
+  const validateSingleBenchmark = (key: string, min: string, max: string) => {
+    const minVal = min.trim() ? parseFloat(min) : null;
+    const maxVal = max.trim() ? parseFloat(max) : null;
+    let error: string | null = null;
+    if (minVal !== null && minVal < 0) {
+      error = '最小值不能为负数';
+    } else if (maxVal !== null && maxVal < 0) {
+      error = '最大值不能为负数';
+    } else if (minVal !== null && maxVal !== null && minVal > maxVal) {
+      error = '最小值不能大于最大值';
+    }
+    setBenchmarkErrors((prev) => ({ ...prev, [key]: error }));
+  };
+
   const validateBenchmarks = (): boolean => {
     const errors: Record<string, string | null> = {};
     let valid = true;
@@ -484,7 +492,16 @@ function NewReviewPageContent() {
     const tiersValid = validateInfluencerTiers();
     const phasesValid = validateLaunchPhases();
     if (!benchmarkValid || !tiersValid || !phasesValid) {
+      console.warn('[复盘校验] 校验不通过 —— benchmarkValid:', benchmarkValid, 'tiersValid:', tiersValid, 'phasesValid:', phasesValid, 'benchmark state:', JSON.stringify(benchmark));
       setSubmitError('请修正表单中的错误后再提交');
+      // Scroll to first error section
+      if (!benchmarkValid && benchmarkSectionRef.current) {
+        benchmarkSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } else if (!tiersValid && tierSectionRef.current) {
+        tierSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } else if (!phasesValid && phaseSectionRef.current) {
+        phaseSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
       return;
     }
 
@@ -574,6 +591,7 @@ function NewReviewPageContent() {
 
 
       {/* Section: 大盘数据 */}
+      <div ref={benchmarkSectionRef}>
       <FormSection title="大盘数据">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <RangeInput
@@ -582,6 +600,7 @@ function NewReviewPageContent() {
             maxValue={benchmark.ctr.max}
             onMinChange={(v) => setBenchmark({ ...benchmark, ctr: { ...benchmark.ctr, min: v } })}
             onMaxChange={(v) => setBenchmark({ ...benchmark, ctr: { ...benchmark.ctr, max: v } })}
+            onBlur={() => validateSingleBenchmark('ctr', benchmark.ctr.min, benchmark.ctr.max)}
             error={benchmarkErrors.ctr}
           />
           <RangeInput
@@ -590,6 +609,7 @@ function NewReviewPageContent() {
             maxValue={benchmark.cpm.max}
             onMinChange={(v) => setBenchmark({ ...benchmark, cpm: { ...benchmark.cpm, min: v } })}
             onMaxChange={(v) => setBenchmark({ ...benchmark, cpm: { ...benchmark.cpm, max: v } })}
+            onBlur={() => validateSingleBenchmark('cpm', benchmark.cpm.min, benchmark.cpm.max)}
             error={benchmarkErrors.cpm}
           />
           <RangeInput
@@ -598,6 +618,7 @@ function NewReviewPageContent() {
             maxValue={benchmark.cpc.max}
             onMinChange={(v) => setBenchmark({ ...benchmark, cpc: { ...benchmark.cpc, min: v } })}
             onMaxChange={(v) => setBenchmark({ ...benchmark, cpc: { ...benchmark.cpc, max: v } })}
+            onBlur={() => validateSingleBenchmark('cpc', benchmark.cpc.min, benchmark.cpc.max)}
             error={benchmarkErrors.cpc}
           />
           <RangeInput
@@ -606,6 +627,7 @@ function NewReviewPageContent() {
             maxValue={benchmark.cpe.max}
             onMinChange={(v) => setBenchmark({ ...benchmark, cpe: { ...benchmark.cpe, min: v } })}
             onMaxChange={(v) => setBenchmark({ ...benchmark, cpe: { ...benchmark.cpe, max: v } })}
+            onBlur={() => validateSingleBenchmark('cpe', benchmark.cpe.min, benchmark.cpe.max)}
             error={benchmarkErrors.cpe}
           />
           <RangeInput
@@ -614,12 +636,15 @@ function NewReviewPageContent() {
             maxValue={benchmark.engagementRate.max}
             onMinChange={(v) => setBenchmark({ ...benchmark, engagementRate: { ...benchmark.engagementRate, min: v } })}
             onMaxChange={(v) => setBenchmark({ ...benchmark, engagementRate: { ...benchmark.engagementRate, max: v } })}
+            onBlur={() => validateSingleBenchmark('engagementRate', benchmark.engagementRate.min, benchmark.engagementRate.max)}
             error={benchmarkErrors.engagementRate}
           />
         </div>
       </FormSection>
+      </div>
 
       {/* Section: 达人层级配置 */}
+      <div ref={tierSectionRef}>
       <FormSection title="达人层级配置">
         <div className="space-y-3">
           {influencerTiers.map((tier) => (
@@ -666,6 +691,7 @@ function NewReviewPageContent() {
           {tierError && <p className="mt-2 text-xs text-rose-500">{tierError}</p>}
         </div>
       </FormSection>
+      </div>
 
       {/* Section: KPI目标配置 */}
       <FormSection title="复盘目标（KPI）">
@@ -851,6 +877,7 @@ function NewReviewPageContent() {
 
       {/* Section: 投流周期配置 */}
       {modules.launchAnalysis && (
+        <div ref={phaseSectionRef}>
         <FormSection title="投流周期配置">
           <div className="space-y-3">
             {launchPhases.map((phase) => (
@@ -895,6 +922,7 @@ function NewReviewPageContent() {
             {phaseError && <p className="mt-2 text-xs text-rose-500">{phaseError}</p>}
           </div>
         </FormSection>
+        </div>
       )}
 
       {/* Section: 投放ID */}
@@ -1105,6 +1133,7 @@ function RangeInput({
   maxValue,
   onMinChange,
   onMaxChange,
+  onBlur,
   error,
 }: {
   label: string;
@@ -1112,12 +1141,19 @@ function RangeInput({
   maxValue: string;
   onMinChange: (value: string) => void;
   onMaxChange: (value: string) => void;
+  onBlur?: () => void;
   error?: string | null;
 }) {
   const handleChange = (value: string, onChange: (v: string) => void) => {
-    const result = validateRangeInput(value);
+    // Only allow digits, dots, and minus sign for numeric input
+    const cleaned = value.replace(/[^\d.\-]/g, '');
+    const result = validateRangeInput(cleaned);
     onChange(result.sanitizedValue);
   };
+
+  const inputBaseClass = "block w-full rounded-sm border px-3 h-10 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2";
+  const inputNormalClass = `${inputBaseClass} border-gray-300 focus:border-brand focus:ring-brand/20`;
+  const inputErrorClass = `${inputBaseClass} border-rose-400 bg-rose-50/30 focus:border-rose-500 focus:ring-rose-200`;
 
   return (
     <div>
@@ -1126,24 +1162,26 @@ function RangeInput({
         <div className="flex-1">
           <span className="mb-0.5 block text-xs text-gray-500">最小值</span>
           <input
-            type="number"
-            step="any"
+            type="text"
+            inputMode="decimal"
             value={minValue}
             onChange={(e) => handleChange(e.target.value, onMinChange)}
+            onBlur={onBlur}
             placeholder="--"
-            className="block w-full rounded-sm border border-gray-300 px-3 h-10 text-sm text-gray-900 placeholder:text-gray-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+            className={error ? inputErrorClass : inputNormalClass}
           />
         </div>
         <span className="mt-5 text-gray-400">~</span>
         <div className="flex-1">
           <span className="mb-0.5 block text-xs text-gray-500">最大值</span>
           <input
-            type="number"
-            step="any"
+            type="text"
+            inputMode="decimal"
             value={maxValue}
             onChange={(e) => handleChange(e.target.value, onMaxChange)}
+            onBlur={onBlur}
             placeholder="--"
-            className="block w-full rounded-sm border border-gray-300 px-3 h-10 text-sm text-gray-900 placeholder:text-gray-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+            className={error ? inputErrorClass : inputNormalClass}
           />
         </div>
       </div>

@@ -79,7 +79,7 @@ export async function POST(
     }
     const uniqueRecords = Array.from(deduped.values());
 
-    // Transaction: deleteMany → createMany → update noteCount
+    // Transaction: deleteMany → createMany → update noteCount → clean stale notes
     const noteCount = await prisma.$transaction(async (tx) => {
       // 1. Delete all existing note_base records for this project
       await tx.noteBase.deleteMany({
@@ -114,6 +114,15 @@ export async function POST(
       await tx.project.update({
         where: { id: projectId },
         data: { noteCount: count },
+      });
+
+      // 4. Clean up notes table: remove records whose noteId is no longer in the new note_base
+      const newNoteIds = uniqueRecords.map((r) => r.noteId);
+      await tx.note.deleteMany({
+        where: {
+          projectId,
+          noteId: { notIn: newNoteIds },
+        },
       });
 
       return count;

@@ -97,10 +97,10 @@ export class ProjectReviewDataLoader extends BaseChapterDataLoader {
       console.warn(`[ProjectReviewDataLoader] Failed to load review_configs: ${error}`);
     }
 
-    // ── 3. 项目执行数据 (notes + business_annotations) ──
+    // ── 3. 项目执行数据 (note_base + business_annotations) ──
     try {
-      // 总笔记数
-      const noteCount = await this.prisma.note.count({
+      // 总笔记数（以业务底表为准）
+      const noteCount = await this.prisma.noteBase.count({
         where: { projectId },
       });
       variables['note_count'] = String(noteCount);
