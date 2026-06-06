@@ -253,6 +253,15 @@ export interface QianguaHotNotePublishData {
 // ---- 灵犀数据 ----
 
 /**
+ * 灵犀-品牌行业分类
+ */
+export interface LingxiBrandTaxonomyNode {
+  name: string;
+  code: string;
+  children?: LingxiBrandTaxonomyNode[];
+}
+
+/**
  * 灵犀-品牌数据
  */
 export interface BrandData {

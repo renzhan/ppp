@@ -5,7 +5,7 @@
  * Implements retry logic with exponential backoff and response validation.
  */
 
-import type { PugongyingNote, JuguangNote, LingxiData, CommentData, QianguaStatsData, QianguaHotNotePublishData } from '../shared/types.js';
+import type { LingxiBrandTaxonomyNode, PugongyingNote, JuguangNote, LingxiData, CommentData, QianguaStatsData, QianguaHotNotePublishData } from '../shared/types.js';
 import { PugongyingClient } from './pugongying-client.js';
 import type { PugongyingClientConfig, RawPugongyingNote } from './pugongying-client.js';
 import { JuguangClient } from './juguang-client.js';
@@ -22,6 +22,8 @@ export interface IPaichachaClient {
   fetchPugongyingData(noteIds: string[]): Promise<PugongyingNote[]>;
   /** 批量获取笔记原始数据（不做字段映射） */
   fetchRawNotes(noteIds: string[]): Promise<RawPugongyingNote[]>;
+  /** 获取品牌行业分类（原始数据，不入库） */
+  fetchLingxiBrandTaxonomy(brandId: number): Promise<LingxiBrandTaxonomyNode[]>;
   /** 获取聚光笔记层级离线报表 */
   fetchJuguangData(advertiserIds: number[], startDate: string, endDate: string): Promise<JuguangNote[]>;
   /** 获取灵犀数据（brandName + keyword + taxonomyNames） */
@@ -100,6 +102,11 @@ export class PaichachaClient implements IPaichachaClient {
   }
 
   // ── Lingxi ──
+
+  async fetchLingxiBrandTaxonomy(brandId: number): Promise<LingxiBrandTaxonomyNode[]> {
+    if (!this.lingxiClient) throw new Error('Lingxi client not configured');
+    return this.lingxiClient.fetchLingxiBrandTaxonomy(brandId);
+  }
 
   async fetchLingxiData(brandName: string, startDate: string, endDate: string, taxonomyNames?: string | string[], preStartDate?: string, preEndDate?: string): Promise<LingxiData> {
     if (!this.lingxiClient) throw new Error('Lingxi client not configured');

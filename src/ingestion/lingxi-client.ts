@@ -5,7 +5,7 @@
  * Phase 1: keyword_trend（月搜索指数）+ asset_analyse（品牌AIPS/TI）。
  */
 
-import type { BrandData, KeywordData, ScreenshotData, LingxiData } from '../shared/types.js';
+import type { BrandData, LingxiBrandTaxonomyNode, KeywordData, ScreenshotData, LingxiData } from '../shared/types.js';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
@@ -53,6 +53,16 @@ export class LingxiClient {
   }
 
   // ── 统一入口 ──
+
+  /** 获取品牌行业分类（原始数据，不入库） */
+  async fetchLingxiBrandTaxonomy(brandId: number): Promise<LingxiBrandTaxonomyNode[]> {
+    const url = `${this.config.baseUrl}/api/data/brand-taxonomy?profile_id=default&brand_id=${brandId}`;
+    const res = await fetch(url, { headers: { 'X-API-Key': this.config.apiKey } });
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+    const json = await res.json() as { code: number; data?: LingxiBrandTaxonomyNode[] };
+    if (json.code !== 0) throw new Error(`brand-taxonomy 错误: code=${json.code}`);
+    return json.data ?? [];
+  }
 
   async fetchLingxiData(brandName: string, startDate: string, endDate: string, taxonomyNames?: string | string[], preStartDate?: string, preEndDate?: string): Promise<LingxiData> {
     const brand = await this.fetchBrandData(brandName, startDate, endDate, taxonomyNames, preStartDate, preEndDate);

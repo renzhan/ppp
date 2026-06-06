@@ -176,6 +176,13 @@ export class DataIngestionService {
     return this.paichachaClient.fetchRawNotes(noteIds);
   }
 
+  /**
+   * 获取品牌行业分类（灵犀接口，原始数据不入库）。
+   */
+  async fetchLingxiBrandTaxonomy(brandId: number) {
+    return this.paichachaClient.fetchLingxiBrandTaxonomy(brandId);
+  }
+
   // ── private helpers ──
 
   /** 解析项目参数 + 计算统一日期，供各采集方法复用 */
