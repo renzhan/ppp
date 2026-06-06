@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense, useMemo, useState } from 'react';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'next/navigation';
 import {
   PieChart,
@@ -16,7 +16,7 @@ import {
   YAxis,
   CartesianGrid,
 } from 'recharts';
-import { Search, Download, FileText, MessageCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, MessageCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Loading } from '@/components/ui/loading';
 import { WordCloud } from '@/components/ui/word-cloud';
 import { formatDate } from '@/lib/project-meta';
@@ -30,6 +30,9 @@ interface TreeNode {
 interface Project {
   id: string;
   projectName: string;
+  category: string;
+  brand: string;
+  businessLine?: string | null;
 }
 
 interface SentimentDataItem {
@@ -55,16 +58,6 @@ interface CommentItem {
   date: string;
   sentiment: 'positive' | 'neutral' | 'negative';
   likes: number;
-}
-
-interface ExportRecord {
-  id: string;
-  projectId: string;
-  exportType: string;
-  fileName: string;
-  fileUrl: string | null;
-  exportedBy: string;
-  createdAt: string;
 }
 
 const SENTIMENT_COLORS: Record<string, string> = {
@@ -106,7 +99,6 @@ function SentimentPageContent() {
   });
   const [selectedProjectId, setSelectedProjectId] = useState(initialProjectId);
   const [activeProjectId, setActiveProjectId] = useState(initialProjectId);
-  const [showExportRecords, setShowExportRecords] = useState(false);
   const [commentFilter, setCommentFilter] = useState<'all' | 'positive' | 'negative' | 'neutral'>('all');
   const [commentPage, setCommentPage] = useState(1);
 
@@ -182,38 +174,6 @@ function SentimentPageContent() {
     enabled: !!activeProjectId,
   });
 
-  // Fetch export records
-  const { data: exportRecordsData, refetch: refetchExportRecords } = useQuery<{
-    records: ExportRecord[];
-  }>({
-    queryKey: ['sentiment-export-records', activeProjectId],
-    queryFn: async () => {
-      const params = new URLSearchParams();
-      if (activeProjectId) params.set('projectId', activeProjectId);
-      const response = await fetch(`/api/sentiment/export-records?${params.toString()}`);
-      if (!response.ok) throw new Error('获取导出记录失败');
-      return response.json();
-    },
-    enabled: showExportRecords && !!activeProjectId,
-  });
-
-  // Export mutation
-  const exportMutation = useMutation({
-    mutationFn: async () => {
-      const response = await fetch(`/api/sentiment/${activeProjectId}/export`, {
-        method: 'POST',
-      });
-      if (!response.ok) throw new Error('导出失败');
-      return response.json();
-    },
-    onSuccess: (data) => {
-      refetchExportRecords();
-      if (data.fileUrl) {
-        window.open(data.fileUrl, '_blank');
-      }
-    },
-  });
-
   const handleCategoryChange = (value: string) => {
     setFilters((prev) => ({ ...prev, category: value, brand: '', businessLine: '' }));
     setSelectedProjectId('');
@@ -227,6 +187,21 @@ function SentimentPageContent() {
   const handleBusinessLineChange = (value: string) => {
     setFilters((prev) => ({ ...prev, businessLine: value }));
     setSelectedProjectId('');
+  };
+
+  const handleProjectChange = (projectId: string) => {
+    setSelectedProjectId(projectId);
+    // Sync left-side filters (品类、品牌、业务线) based on selected project
+    if (projectId && projectsData?.items) {
+      const project = projectsData.items.find((p) => p.id === projectId);
+      if (project) {
+        setFilters({
+          category: project.category || '',
+          brand: project.brand || '',
+          businessLine: project.businessLine || '',
+        });
+      }
+    }
   };
 
   const handleViewSentiment = () => {
@@ -323,32 +298,9 @@ function SentimentPageContent() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-gray-900">舆情系统</h1>
-          <p className="mt-1 text-sm text-gray-500">查看项目评论分析、情感分布和关键词统计。</p>
-        </div>
-        {activeProjectId && (
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => exportMutation.mutate()}
-              disabled={exportMutation.isPending}
-              className="inline-flex h-10 items-center gap-2 rounded-lg bg-brand px-5 text-sm font-medium text-white transition hover:bg-brand-600 disabled:opacity-50"
-            >
-              <Download size={16} />
-              {exportMutation.isPending ? '导出中...' : '导出'}
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowExportRecords(!showExportRecords)}
-              className="inline-flex h-10 items-center gap-2 rounded-lg border border-gray-200 px-5 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
-            >
-              <FileText size={16} />
-              查看导出记录
-            </button>
-          </div>
-        )}
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight text-gray-900">舆情系统</h1>
+        <p className="mt-1 text-sm text-gray-500">查看项目评论分析、情感分布和关键词统计。</p>
       </div>
 
       {/* Filter Bar */}
@@ -399,7 +351,7 @@ function SentimentPageContent() {
             <label className="mb-1 block text-xs font-medium text-gray-600">项目名称</label>
             <select
               value={selectedProjectId}
-              onChange={(e) => setSelectedProjectId(e.target.value)}
+              onChange={(e) => handleProjectChange(e.target.value)}
               className="h-9 w-full rounded-md border border-gray-200 px-3 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
             >
               <option value="">选择项目</option>
@@ -419,47 +371,6 @@ function SentimentPageContent() {
           </button>
         </div>
       </div>
-
-      {/* Export Records Panel */}
-      {showExportRecords && (
-        <div className="rounded-lg border bg-white p-4">
-          <h3 className="mb-3 text-sm font-medium text-gray-900">导出记录</h3>
-          {exportRecordsData?.records?.length ? (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-gray-50 text-left">
-                    <th className="whitespace-nowrap px-3 py-2 font-medium text-gray-600">文件名</th>
-                    <th className="whitespace-nowrap px-3 py-2 font-medium text-gray-600">导出时间</th>
-                    <th className="whitespace-nowrap px-3 py-2 font-medium text-gray-600">操作</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {exportRecordsData.records.map((record) => (
-                    <tr key={record.id} className="hover:bg-gray-50">
-                      <td className="px-3 py-2 text-gray-700">{record.fileName}</td>
-                      <td className="whitespace-nowrap px-3 py-2 text-gray-700">{formatDate(record.createdAt)}</td>
-                      <td className="px-3 py-2">
-                        {record.fileUrl && (
-                          <a href={record.fileUrl} target="_blank" rel="noopener noreferrer" className="text-xs font-medium text-brand hover:underline">下载</a>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <p className="text-sm text-gray-500">暂无导出记录</p>
-          )}
-        </div>
-      )}
-
-      {exportMutation.isError && (
-        <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-600">
-          {(exportMutation.error as Error).message || '导出失败'}
-        </div>
-      )}
 
       {/* Sentiment Data Display */}
       {!activeProjectId ? (
