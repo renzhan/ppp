@@ -174,11 +174,19 @@ function NewReviewPageContent() {
   });
 
   // Redirect to project list if no projectId provided (and not in edit mode)
-  useEffect(() => {
-    if (!preselectedProjectId && !editFromId) {
-      router.push('/projects?message=请从项目列表选择项目进行复盘');
-    }
-  }, [preselectedProjectId, editFromId, router]);
+  // (No redirect — allow direct access and project selection in form)
+
+  // Fetch all projects for project selector
+  const { data: allProjects } = useQuery<Project[]>({
+    queryKey: ['all-projects-for-review'],
+    queryFn: async () => {
+      const res = await fetch('/api/projects?pageSize=500');
+      if (!res.ok) throw new Error('获取项目列表失败');
+      const data = await res.json();
+      return (data.items ?? []).filter((p: Project) => p.noteCount > 0);
+    },
+    enabled: !preselectedProjectId && !editFromId,
+  });
 
 
 
@@ -556,6 +564,101 @@ function NewReviewPageContent() {
 
       {/* Section: 项目信息 */}
       <FormSection title="项目信息">
+        {/* Project cascade selector (shown when no projectId pre-selected) */}
+        {!preselectedProjectId && !editFromId && (() => {
+          const projects = allProjects ?? [];
+          // Derive cascade options
+          const categories = [...new Set(projects.map(p => p.category))].sort();
+          const selectedCategory = projects.find(p => p.id === selectedProjectId)?.category || '';
+          const brandsForCategory = [...new Set(projects.filter(p => !selectedCategory || p.category === selectedCategory).map(p => p.brand))].sort();
+          const selectedBrand = projects.find(p => p.id === selectedProjectId)?.brand || '';
+          const linesForBrand = [...new Set(projects.filter(p => (!selectedCategory || p.category === selectedCategory) && (!selectedBrand || p.brand === selectedBrand)).map(p => p.businessLine || ''))].filter(Boolean).sort();
+          const selectedLine = projects.find(p => p.id === selectedProjectId)?.businessLine || '';
+          const filteredProjects = projects.filter(p => {
+            if (selectedCategory && p.category !== selectedCategory) return false;
+            if (selectedBrand && p.brand !== selectedBrand) return false;
+            if (selectedLine && (p.businessLine || '') !== selectedLine) return false;
+            return true;
+          });
+
+          return (
+            <div className="space-y-3 mb-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                {/* 品类 */}
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-600">品类</label>
+                  <select
+                    value={selectedCategory}
+                    onChange={(e) => {
+                      // Find the first project matching this category (or clear)
+                      if (!e.target.value) { setSelectedProjectId(''); return; }
+                      const first = projects.find(p => p.category === e.target.value);
+                      if (first) setSelectedProjectId(first.id);
+                    }}
+                    className="h-10 w-full rounded-lg border border-gray-200 px-3 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
+                  >
+                    <option value="">全部品类</option>
+                    {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                {/* 品牌 */}
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-600">品牌</label>
+                  <select
+                    value={selectedBrand}
+                    onChange={(e) => {
+                      if (!e.target.value) { setSelectedProjectId(''); return; }
+                      const first = projects.find(p => p.brand === e.target.value && (!selectedCategory || p.category === selectedCategory));
+                      if (first) setSelectedProjectId(first.id);
+                    }}
+                    className="h-10 w-full rounded-lg border border-gray-200 px-3 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
+                  >
+                    <option value="">全部品牌</option>
+                    {brandsForCategory.map(b => <option key={b} value={b}>{b}</option>)}
+                  </select>
+                </div>
+                {/* 业务线 */}
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-600">业务线</label>
+                  <select
+                    value={selectedLine}
+                    onChange={(e) => {
+                      if (!e.target.value) { return; }
+                      const first = projects.find(p =>
+                        (!selectedCategory || p.category === selectedCategory) &&
+                        (!selectedBrand || p.brand === selectedBrand) &&
+                        (p.businessLine || '') === e.target.value
+                      );
+                      if (first) setSelectedProjectId(first.id);
+                    }}
+                    className="h-10 w-full rounded-lg border border-gray-200 px-3 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
+                  >
+                    <option value="">全部业务线</option>
+                    {linesForBrand.map(l => <option key={l} value={l}>{l}</option>)}
+                  </select>
+                </div>
+              </div>
+              {/* 项目选择 */}
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-600">项目 <span className="text-rose-500">*</span></label>
+                <select
+                  value={selectedProjectId}
+                  onChange={(e) => setSelectedProjectId(e.target.value)}
+                  className="h-10 w-full rounded-lg border border-gray-200 px-3 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
+                >
+                  <option value="">请选择项目</option>
+                  {filteredProjects.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.projectName}（{p.noteCount}篇笔记）
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Project info display */}
         {(isProjectLoading || (editFromId && !selectedProjectId)) ? (
           <div className="flex items-center justify-center py-4">
             <Loading size="sm" />
@@ -580,12 +683,12 @@ function NewReviewPageContent() {
               <span className="text-sm font-medium text-gray-800">{projectInfo.businessLine || '-'}</span>
             </div>
           </div>
-        ) : (
+        ) : selectedProjectId ? (
           <div className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
             <AlertCircle size={16} />
-            <span>未找到项目信息，请从项目列表选择项目进行复盘</span>
+            <span>未找到项目信息</span>
           </div>
-        )}
+        ) : null}
       </FormSection>
 
 

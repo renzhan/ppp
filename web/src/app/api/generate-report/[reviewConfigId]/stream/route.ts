@@ -108,6 +108,8 @@ async function runBackgroundGeneration(reviewConfigId: string, projectId: string
     // Process a single chapter
     const processChapter = async (index: number) => {
       const chapterDef = CHAPTER_DEFS[index];
+      const chapterStartTime = Date.now();
+      console.log(`[ReportGen] 开始生成 ch${chapterDef.number}_${chapterDef.id} (${reviewConfigId})`);
       try {
         const template = templateLoader.loadTemplate(chapterDef.number);
         const title = template.metadata.chapter_name;
@@ -132,10 +134,10 @@ async function runBackgroundGeneration(reviewConfigId: string, projectId: string
 
           // Log prompts to file for debugging
           try {
-            const logDir = path.resolve(process.cwd(), '..', 'logs', 'prompts');
+            const logDir = path.resolve(process.cwd(), '..', 'logs', 'prompts', reviewConfigId);
             fs.mkdirSync(logDir, { recursive: true });
             const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-            const logFile = path.join(logDir, `${reviewConfigId}_ch${chapterDef.number}_${chapterDef.id}_${timestamp}.txt`);
+            const logFile = path.join(logDir, `ch${chapterDef.number}_${chapterDef.id}_${timestamp}.txt`);
             const logContent = `=== Chapter ${chapterDef.number}: ${chapterDef.id} ===\n` +
               `=== Timestamp: ${new Date().toISOString()} ===\n` +
               `=== ReviewConfig: ${reviewConfigId} ===\n\n` +
@@ -169,11 +171,19 @@ async function runBackgroundGeneration(reviewConfigId: string, projectId: string
           traceIds: (dataContext.traceItems || []).map((t) => ({ traceId: t.traceId, label: t.label })),
         };
 
+        const elapsed = ((Date.now() - chapterStartTime) / 1000).toFixed(1);
+        console.log(`[ReportGen] ✅ ch${chapterDef.number}_${chapterDef.id} 完成 (${elapsed}s, ${content.length}字符)`);
+
         if (dataContext.traceItems && dataContext.traceItems.length > 0) {
           allTraceItems.push(...dataContext.traceItems);
         }
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : '生成失败';
+        const elapsed = ((Date.now() - chapterStartTime) / 1000).toFixed(1);
+        console.error(`[ReportGen] ❌ ch${chapterDef.number}_${chapterDef.id} 失败 (${elapsed}s): ${errorMsg}`);
+        if (err instanceof Error && err.stack) {
+          console.error(`[ReportGen]    Stack: ${err.stack.split('\n').slice(0, 3).join(' | ')}`);
+        }
         const template = templateLoader.loadTemplate(chapterDef.number);
         chapterResults[index] = {
           id: chapterDef.id,

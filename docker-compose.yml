@@ -1,24 +1,6 @@
 version: "3.9"
 
 services:
-  db:
-    image: postgres:16-alpine
-    ports:
-      - "3010:5432"
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: abc.123.ABC
-      POSTGRES_DB: ppp
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-      - ./prisma/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-
   app:
     build:
       context: .
@@ -32,19 +14,20 @@ services:
       - NODE_ENV=production
       - NEXT_TELEMETRY_DISABLED=1
       - TZ=Asia/Shanghai
-      - DATABASE_URL=postgresql://postgres:abc.123.ABC@db:5432/ppp?connection_limit=10
+      - DATABASE_URL=postgresql://postgres:abc.123.ABC@ppp-postgres:5432/ppp?connection_limit=10
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:-ppp-agent-mgmt-encryption-key-2024-change-in-production}
       - LLM_BASE_URL=${LLM_BASE_URL:-}
       - LLM_API_KEY=${LLM_API_KEY:-}
       - LLM_MODEL=${LLM_MODEL:-gpt-5.1}
     volumes:
       - ./prisma:/app/prisma:ro
-      - app_data:/app_data
-    depends_on:
-      db:
-        condition: service_healthy
+      - ./logs:/app/logs
+      - ./data/uploads:/app/web/uploads
+      - ./data/note-media:/app/web/public/note-media
     restart: unless-stopped
+    networks:
+      - ppp-network
 
-volumes:
-  app_data:
-  pgdata:
+networks:
+  ppp-network:
+    external: true
