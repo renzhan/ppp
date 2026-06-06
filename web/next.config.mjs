@@ -9,6 +9,9 @@ const nextConfig = {
   experimental: {
     serverComponentsExternalPackages: ['@napi-rs/canvas', '@napi-rs/canvas-win32-x64-msvc', 'pdfjs-dist', 'pdf-to-img', '@react-pdf/renderer', '@react-pdf/reconciler'],
     instrumentationHook: true,
+    serverActions: {
+      bodySizeLimit: '50mb',
+    },
   },
   // Skip failing static generation for API routes that require a database connection
   output: undefined,
