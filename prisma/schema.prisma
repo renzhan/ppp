@@ -18,7 +18,10 @@ model User {
   username           String    @unique @db.VarChar(50)
   passwordHash       String    @map("password_hash") @db.VarChar(200)
   displayName        String?   @map("display_name") @db.VarChar(100)
-  role               String    @default("user") @db.VarChar(20) // Valid values: "admin" | "组长" | "AD" | "AM" | "投手" | "执行"
+  realName           String?   @map("real_name") @db.VarChar(100)
+  role               String    @default("AE") @db.VarChar(20) // Valid values: "admin" | "VP" | "AD" | "AM" | "组长" | "AE"
+  permissionLevel    Int       @default(5) @map("permission_level")
+  reportsTo          String?   @map("reports_to") @db.Uuid
   mustChangePassword Boolean   @default(true) @map("must_change_password")
   isActive           Boolean   @default(true) @map("is_active")
   lastLoginAt        DateTime? @map("last_login_at") @db.Timestamptz()

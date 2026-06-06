@@ -2,13 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSession, hashPassword } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import * as XLSX from 'xlsx';
-import crypto from 'crypto';
 
 /**
  * Column header mapping: Chinese headers → field names
  */
 const COLUMN_MAP: Record<string, string> = {
+  '花名': 'username',
   '用户名': 'username',
+  '真名': 'realName',
   '显示名': 'displayName',
   '角色': 'role',
 };
@@ -16,14 +17,12 @@ const COLUMN_MAP: Record<string, string> = {
 /**
  * Valid roles for batch import (excludes 'admin' which must be set manually)
  */
-const VALID_ROLES = ['组长', 'AD', 'AM', '投手', '执行'];
+const VALID_ROLES = ['VP', 'AD', 'AM', '组长', 'AE'];
 
 /**
- * Generate a random 8-character password
+ * Default password for new users: ppp666
  */
-function generateInitialPassword(): string {
-  return crypto.randomBytes(4).toString('hex'); // 8 hex chars
-}
+const DEFAULT_PASSWORD = 'ppp666';
 
 /**
  * POST /api/admin/import/users
@@ -121,7 +120,8 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      const displayName = mapped.displayName || null;
+      const displayName = mapped.displayName || mapped.username || null;
+      const realName = mapped.realName || null;
 
       // Check if username already exists
       try {
@@ -131,9 +131,11 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
-        // Generate random initial password and hash it
-        const initialPassword = generateInitialPassword();
-        const passwordHash = await hashPassword(initialPassword);
+        // Use default password and hash it
+        const passwordHash = await hashPassword(DEFAULT_PASSWORD);
+
+        // Derive permission level from role
+        const permissionLevel = role === 'VP' ? 1 : role === 'AD' ? 2 : role === 'AM' ? 3 : role === '组长' ? 4 : 5;
 
         // Create user record
         await prisma.user.create({
@@ -141,7 +143,9 @@ export async function POST(request: NextRequest) {
             username,
             passwordHash,
             displayName,
+            realName,
             role,
+            permissionLevel,
             mustChangePassword: true,
             isActive: true,
           },

@@ -33,7 +33,7 @@ export async function PUT(
       where: { id },
       data: {
         ...(displayName !== undefined && { displayName }),
-        ...(role !== undefined && { role: ['admin', '组长', 'AD', 'AM', '投手', '执行'].includes(role) ? role : '执行' }),
+        ...(role !== undefined && { role: ['admin', 'VP', 'AD', 'AM', '组长', 'AE'].includes(role) ? role : 'AE' }),
         ...(isActive !== undefined && { isActive }),
         updatedAt: new Date(),
       },

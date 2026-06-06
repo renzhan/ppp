@@ -35,16 +35,18 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { username, displayName, role, password } = await request.json();
+    const { username, displayName, realName, role, password } = await request.json();
 
-    if (!username || !password) {
+    if (!username) {
       return NextResponse.json(
-        { error: '用户名和密码不能为空' },
+        { error: '用户名（花名）不能为空' },
         { status: 400 }
       );
     }
 
-    if (password.length < 6) {
+    const actualPassword = password || 'ppp666';
+
+    if (actualPassword.length < 6) {
       return NextResponse.json(
         { error: '密码长度不能少于6位' },
         { status: 400 }
@@ -59,13 +61,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const passwordHash = await hashPassword(password);
+    const validRole = ['admin', 'VP', 'AD', 'AM', '组长', 'AE'].includes(role) ? role : 'AE';
+    const permissionLevel = validRole === 'admin' ? 0 : validRole === 'VP' ? 1 : validRole === 'AD' ? 2 : validRole === 'AM' ? 3 : validRole === '组长' ? 4 : 5;
+
+    const passwordHash = await hashPassword(actualPassword);
     const user = await prisma.user.create({
       data: {
         username,
         passwordHash,
-        displayName: displayName || null,
-        role: ['admin', '组长', 'AD', 'AM', '投手', '执行'].includes(role) ? role : '执行',
+        displayName: displayName || username,
+        realName: realName || null,
+        role: validRole,
+        permissionLevel,
         mustChangePassword: true,
         isActive: true,
       },
