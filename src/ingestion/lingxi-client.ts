@@ -55,7 +55,7 @@ export class LingxiClient {
   // ── 统一入口 ──
 
   /** 获取品牌行业分类（原始数据，不入库） */
-  async fetchLingxiBrandTaxonomy(brandId: number): Promise<LingxiBrandTaxonomyNode[]> {
+  async fetchLingxiBrandTaxonomy(brandId: string): Promise<LingxiBrandTaxonomyNode[]> {
     const url = `${this.config.baseUrl}/api/data/brand-taxonomy?profile_id=default&brand_id=${brandId}`;
     const res = await fetch(url, { headers: { 'X-API-Key': this.config.apiKey } });
     if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
@@ -64,15 +64,15 @@ export class LingxiClient {
     return json.data ?? [];
   }
 
-  async fetchLingxiData(brandName: string, startDate: string, endDate: string, taxonomyNames?: string | string[], preStartDate?: string, preEndDate?: string): Promise<LingxiData> {
-    const brand = await this.fetchBrandData(brandName, startDate, endDate, taxonomyNames, preStartDate, preEndDate);
+  async fetchLingxiData(brandId: string, startDate: string, endDate: string, taxonomyNames?: string | string[], preStartDate?: string, preEndDate?: string): Promise<LingxiData> {
+    const brand = await this.fetchBrandData(brandId, startDate, endDate, taxonomyNames, preStartDate, preEndDate);
     return { brand };
   }
 
   // ── asset_analyse + move_analyse → 品牌数据 ──
 
-  async fetchBrandData(brandName: string, startDate: string, endDate: string, taxonomyNames?: string | string[], preStartDate?: string, preEndDate?: string): Promise<BrandData> {
-    const res = await this.callTask('asset_analyse', brandName, { endDate });
+  async fetchBrandData(brandId: string, startDate: string, endDate: string, taxonomyNames?: string | string[], preStartDate?: string, preEndDate?: string): Promise<BrandData> {
+    const res = await this.callTask('asset_analyse', brandId, { endDate });
     const captured = res.data?.captured ?? [];
 
     const aips = extractAips(captured);
@@ -82,7 +82,7 @@ export class LingxiClient {
     let brandRank: number | undefined;
     if (taxonomyNames) {
       try {
-        const rankRes = await this.callTask('asset_analyse', brandName, { endDate, taxonomyNames });
+        const rankRes = await this.callTask('asset_analyse', brandId, { endDate, taxonomyNames });
         const rankCaptured = rankRes.data?.captured ?? [];
         brandRank = extractBrandRank(rankCaptured);
       } catch (e) {
@@ -94,7 +94,7 @@ export class LingxiClient {
     let rankData: Partial<BrandData> = {};
     if (taxonomyNames) {
       try {
-        const rankRes = await this.callTask('brand_rank', brandName, {
+        const rankRes = await this.callTask('brand_rank', brandId, {
           startTime: startDate, endTime: endDate, taxonomyNames,
         });
         const rankCaptured = rankRes.data?.captured ?? [];
@@ -106,7 +106,7 @@ export class LingxiClient {
       // 投前搜索量
       if (preStartDate && preEndDate) {
         try {
-          const preRes = await this.callTask('brand_rank', brandName, {
+          const preRes = await this.callTask('brand_rank', brandId, {
             startTime: preStartDate, endTime: preEndDate, taxonomyNames,
           });
           const preCaptured = preRes.data?.captured ?? [];
@@ -122,7 +122,7 @@ export class LingxiClient {
     // 人流流转数据
     let moveData: Partial<BrandData> = {};
     try {
-      const moveRes = await this.callTask('move_analyse', brandName, { startDate, endDate });
+      const moveRes = await this.callTask('move_analyse', brandId, { startDate, endDate });
       const moveCaptured = moveRes.data?.captured ?? [];
       moveData = extractMoveAnalyseData(moveCaptured, startDate, endDate);
     } catch (e) {
@@ -165,7 +165,7 @@ export class LingxiClient {
 
   private async callTask(
     biz: string,
-    brandName: string,
+    brandId: string,
     params: Record<string, unknown>,
   ): Promise<LingxiTaskResponse> {
     return withRetry(async () => {
@@ -183,7 +183,7 @@ export class LingxiClient {
           body: JSON.stringify({
             profile_id: 'default',
             biz,
-            brand_name: brandName,
+            brand_id: brandId,
             params,
           }),
           signal: controller.signal,

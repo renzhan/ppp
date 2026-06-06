@@ -91,7 +91,7 @@ export class DataIngestionService {
     let lingxiData: LingxiData | undefined;
     try {
       lingxiData = await this.paichachaClient.fetchLingxiData(
-        ctx.brandName,
+        ctx.lingxiBrandId,
         ctx.execStart,
         ctx.currentEnd,
         ctx.taxonomyNames,
@@ -179,7 +179,7 @@ export class DataIngestionService {
   /**
    * 获取品牌行业分类（灵犀接口，原始数据不入库）。
    */
-  async fetchLingxiBrandTaxonomy(brandId: number) {
+  async fetchLingxiBrandTaxonomy(brandId: string) {
     return this.paichachaClient.fetchLingxiBrandTaxonomy(brandId);
   }
 
@@ -193,7 +193,8 @@ export class DataIngestionService {
     if (!project) throw new Error(`项目不存在: ${projectId}`);
     if (!project.executionStartDate) throw new Error(`项目缺少"开始执行日期"（executionStartDate），请先补充后再拉取数据`);
 
-    const brandName = project.brand;
+    // const lingxiBrandId = project.lingxiBrandId;
+    const lingxiBrandId = "181252"; // todo 等待修改，以及下面的 taxonomyNames 也要修改
     const taxonomyNames = [project.category];
 
     // T-1（下午 4 点爬取昨天数据）
@@ -212,7 +213,7 @@ export class DataIngestionService {
     const preEnd = new Date(new Date(execStart).getTime() - 86400000).toISOString().slice(0, 10);
     const preStart = new Date(new Date(preEnd).getTime() - periodDays * 86400000 + 86400000).toISOString().slice(0, 10);
 
-    return { noteIds, brandName, taxonomyNames, execStart, execEnd, currentEnd, preStart, preEnd };
+    return { noteIds, lingxiBrandId, taxonomyNames, execStart, execEnd, currentEnd, preStart, preEnd };
   }
 
   /**

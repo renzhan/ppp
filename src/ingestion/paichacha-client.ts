@@ -23,11 +23,11 @@ export interface IPaichachaClient {
   /** 批量获取笔记原始数据（不做字段映射） */
   fetchRawNotes(noteIds: string[]): Promise<RawPugongyingNote[]>;
   /** 获取品牌行业分类（原始数据，不入库） */
-  fetchLingxiBrandTaxonomy(brandId: number): Promise<LingxiBrandTaxonomyNode[]>;
+  fetchLingxiBrandTaxonomy(brandId: string): Promise<LingxiBrandTaxonomyNode[]>;
   /** 获取聚光笔记层级离线报表 */
   fetchJuguangData(advertiserIds: number[], startDate: string, endDate: string): Promise<JuguangNote[]>;
   /** 获取灵犀数据（brandName + keyword + taxonomyNames） */
-  fetchLingxiData(brandName: string, startDate: string, endDate: string, taxonomyNames?: string | string[], preStartDate?: string, preEndDate?: string): Promise<LingxiData>;
+  fetchLingxiData(brandId: string, startDate: string, endDate: string, taxonomyNames?: string | string[], preStartDate?: string, preEndDate?: string): Promise<LingxiData>;
   /** 获取评论数据（全量评论，用于舆情分析，按日期范围过滤） */
   fetchCommentData(noteIds: string[], startDate: string, endDate: string): Promise<CommentData[]>;
   /** 获取千瓜数据（品牌数据卡片 + 爆文发布时间分布） */
@@ -103,14 +103,14 @@ export class PaichachaClient implements IPaichachaClient {
 
   // ── Lingxi ──
 
-  async fetchLingxiBrandTaxonomy(brandId: number): Promise<LingxiBrandTaxonomyNode[]> {
+  async fetchLingxiBrandTaxonomy(brandId: string): Promise<LingxiBrandTaxonomyNode[]> {
     if (!this.lingxiClient) throw new Error('Lingxi client not configured');
     return this.lingxiClient.fetchLingxiBrandTaxonomy(brandId);
   }
 
-  async fetchLingxiData(brandName: string, startDate: string, endDate: string, taxonomyNames?: string | string[], preStartDate?: string, preEndDate?: string): Promise<LingxiData> {
+  async fetchLingxiData(brandId: string, startDate: string, endDate: string, taxonomyNames?: string | string[], preStartDate?: string, preEndDate?: string): Promise<LingxiData> {
     if (!this.lingxiClient) throw new Error('Lingxi client not configured');
-    return this.lingxiClient.fetchLingxiData(brandName, startDate, endDate, taxonomyNames, preStartDate, preEndDate);
+    return this.lingxiClient.fetchLingxiData(brandId, startDate, endDate, taxonomyNames, preStartDate, preEndDate);
   }
 
   // ── Comments ──
