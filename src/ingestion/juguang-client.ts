@@ -23,6 +23,7 @@ const MAX_RETRIES = 3;
 
 /** 聚光笔记报表 API 返回的原始记录（值均为 string） */
 interface RawJuguangNote {
+  time?: string;                 // 客户端填充：数据所属日期
   note_id?: string;
   placement?: string;             // 广告类型：1-信息流、2-搜索、4-全站智投、7-视频流
   targets_detail?: string;        // 精准定向名称
@@ -73,19 +74,25 @@ export class JuguangClient {
       { splitColumns: ['keyword'] },
     ];
 
+    const dates = dateRange(startDate, endDate);
+
     const results = await Promise.all(
       advertiserIds.flatMap(advertiserId =>
-        variants.map(v =>
-          this.fetchAllPages(advertiserId, startDate, endDate, v.splitColumns)
-            .catch(e => {
-              console.error(`[juguang] advertiserId=${advertiserId} split=${v.splitColumns?.join(',') || 'none'} 失败:`, (e as Error).message);
-              return [] as RawJuguangNote[];
-            })
+        dates.flatMap(date =>
+          variants.map(async v => {
+            const rows = await this.fetchAllPages(advertiserId, date, date, v.splitColumns)
+              .catch(e => {
+                console.error(`[juguang] advertiserId=${advertiserId} date=${date} split=${v.splitColumns?.join(',') || 'none'} 失败:`, (e as Error).message);
+                return [] as RawJuguangNote[];
+              });
+            for (const r of rows) r.time = date;
+            return rows;
+          })
         )
       )
     );
 
-    return results.flat().map(mapToJuguangNote);
+    return (await Promise.all(results)).flat().map(mapToJuguangNote);
   }
 
   private async fetchAllPages(
@@ -157,6 +164,7 @@ function parseNum(val?: string): number {
 
 function mapToJuguangNote(raw: RawJuguangNote): JuguangNote {
   return {
+    time: raw.time,
     noteId: raw.note_id || undefined,
     placement: raw.placement || undefined,
     targetsDetail: raw.targets_detail || undefined,
@@ -180,6 +188,17 @@ function mapToJuguangNote(raw: RawJuguangNote): JuguangNote {
 }
 
 // ── Utilities ──
+
+function dateRange(start: string, end: string): string[] {
+  const dates: string[] = [];
+  const cur = new Date(start);
+  const last = new Date(end);
+  while (cur <= last) {
+    dates.push(cur.toISOString().slice(0, 10));
+    cur.setDate(cur.getDate() + 1);
+  }
+  return dates;
+}
 
 async function withRetry<T>(fn: () => Promise<T>, retries = MAX_RETRIES): Promise<T> {
   for (let attempt = 0; attempt <= retries; attempt++) {
