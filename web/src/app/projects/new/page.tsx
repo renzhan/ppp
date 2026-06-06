@@ -23,6 +23,7 @@ interface ImportedProject {
   category: string;
   brand: string;
   businessLine: string | null;
+  lingxiAccountId: string | null;
 }
 
 interface FormState {
@@ -84,12 +85,13 @@ export default function NewProjectPage() {
       const res = await fetch('/api/projects?pageSize=500');
       if (!res.ok) throw new Error('获取项目列表失败');
       const data = await res.json();
-      return (data.items ?? []).map((p: { id: string; projectName: string; category: string; brand: string; businessLine: string | null }) => ({
+      return (data.items ?? []).map((p: { id: string; projectName: string; category: string; brand: string; businessLine: string | null; lingxiAccountId?: string | null }) => ({
         id: p.id,
         projectName: p.projectName,
         category: p.category,
         brand: p.brand,
         businessLine: p.businessLine,
+        lingxiAccountId: p.lingxiAccountId || null,
       }));
     },
   });
@@ -284,7 +286,13 @@ export default function NewProjectPage() {
                       key={project.id}
                       type="button"
                       onClick={() => {
-                        setForm((prev) => ({ ...prev, projectName: project.projectName }));
+                        setForm((prev) => ({
+                          ...prev,
+                          projectName: project.projectName,
+                          lingxiTaxonomy: project.lingxiAccountId
+                            ? { accountId: project.lingxiAccountId, taxonomyCode: '', taxonomyPath: '' }
+                            : prev.lingxiTaxonomy,
+                        }));
                         setShowSuggestions(false);
                       }}
                       className="w-full px-3 py-2 text-left text-sm text-gray-700 transition hover:bg-brand-50 hover:text-brand"

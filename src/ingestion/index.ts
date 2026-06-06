@@ -130,6 +130,19 @@ export class DataIngestionService {
       }
     }
 
+    // 非官方合作笔记回填：对于蒲公英未返回数据的 noteId，从 note_base 拷贝数据到 notes 表
+    try {
+      const fetchedNoteIds = new Set(pugongyingNotes.map((n) => n.noteId));
+      const missingNoteIds = ctx.noteIds.filter((id) => !fetchedNoteIds.has(id));
+      if (missingNoteIds.length > 0) {
+        await this.persistenceService.fillNotesFromNoteBase(projectId, missingNoteIds);
+        console.log(`[ingestBaseData] 从 note_base 回填 ${missingNoteIds.length} 条非官方合作笔记到 notes 表`);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      errors.push(`Failed to fill notes from note_base: ${message}`);
+    }
+
     if (lingxiData) {
       try {
         await this.persistenceService.saveLingxiData(projectId, lingxiData);

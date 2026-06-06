@@ -29,6 +29,8 @@ const COLUMN_MAP: Record<string, string> = {
   // 创建者 (createdBy)
   'AD': 'createdBy',
   '创建者': 'createdBy',
+  // 灵犀账号ID
+  '灵犀ID': 'lingxiAccountId',
 };
 
 const REQUIRED_FIELDS = ['category', 'brand', 'businessLine', 'projectName'];
@@ -40,6 +42,7 @@ interface ParsedRow {
   projectName: string;
   startDate: string | null;
   createdBy: string | null;
+  lingxiAccountId: string | null;
 }
 
 /**
@@ -152,6 +155,7 @@ export async function POST(request: Request) {
         projectName: mapped.projectName!,
         startDate: mapped.startDate || null,
         createdBy: mapped.createdBy || null,
+        lingxiAccountId: mapped.lingxiAccountId || null,
       });
     }
 
@@ -184,6 +188,7 @@ export async function POST(request: Request) {
           update: {
             businessLine: row.businessLine,
             isImported: true,
+            lingxiAccountId: row.lingxiAccountId || undefined,
           },
           create: {
             category: row.category,
@@ -193,6 +198,7 @@ export async function POST(request: Request) {
             startDate: startDate,
             endDate: startDate, // Default endDate same as startDate for imported projects
             isImported: true,
+            lingxiAccountId: row.lingxiAccountId || null,
           },
         });
         importedCount++;

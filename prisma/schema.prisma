@@ -135,6 +135,7 @@ model Note {
   cpcp              Decimal  @default(0) @db.Decimal(12, 2)
   orderId           String?  @map("order_id") @db.VarChar(100)
   effect            String?  @db.VarChar(10)
+  dataSource        String   @default("api") @map("data_source") @db.VarChar(20)  // "api" = 蒲公英爬取, "note_base" = 底表导入(非官方合作)
   createdAt         DateTime? @default(now()) @map("created_at") @db.Timestamptz()
 
   // Relations
@@ -161,6 +162,7 @@ model NoteBase {
   contentCost           Decimal   @default(0) @map("content_cost") @db.Decimal(12, 2)           // 内容实际消耗金额
   contentSettlement     Decimal   @default(0) @map("content_settlement") @db.Decimal(12, 2)     // 内容实际结算金额
   adSpend               Decimal   @default(0) @map("ad_spend") @db.Decimal(12, 2)               // 投流实际消耗
+  adSettlement          Decimal   @default(0) @map("ad_settlement") @db.Decimal(12, 2)          // 投流实际结算金额
   totalCost             Decimal   @default(0) @map("total_cost") @db.Decimal(12, 2)             // 总费用
   metrics               Json?                                                                   // 所有数据指标（曝光量、CPM、投流等额外列，JSON存储）
   createdAt             DateTime? @default(now()) @map("created_at") @db.Timestamptz()

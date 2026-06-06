@@ -102,6 +102,7 @@ export async function POST(
           contentCost: record.contentCost,
           contentSettlement: record.contentSettlement,
           adSpend: record.adSpend,
+          adSettlement: record.adSettlement,
           totalCost: record.totalCost,
           metrics: record.displayMetrics && Object.keys(record.displayMetrics).length > 0
             ? record.displayMetrics

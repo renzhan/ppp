@@ -46,6 +46,8 @@ export interface DataPersistenceService {
   findProject(projectId: string): Promise<{ startDate: Date; endDate: Date; brand: string; category: string; executionStartDate: Date | null } | null>;
   /** 查找项目底表中的所有 noteId */
   findNoteIdsByProject(projectId: string): Promise<string[]>;
+  /** 从 note_base 回填数据到 notes 表（非官方合作笔记，蒲公英未爬到的） */
+  fillNotesFromNoteBase(projectId: string, noteIds: string[]): Promise<void>;
 }
 
 /**
@@ -435,4 +437,80 @@ export class PrismaDataPersistenceService implements DataPersistenceService {
       )
     );
   }
+
+  /**
+   * 从 note_base 回填数据到 notes 表。
+   * 用于非官方合作笔记——蒲公英 API 无法爬取这些笔记的数据，
+   * 需要将底表中的指标数据拷贝到 notes 表供报告生成使用。
+   * 标记 dataSource = 'note_base' 以区分。
+   */
+  async fillNotesFromNoteBase(projectId: string, noteIds: string[]): Promise<void> {
+    if (noteIds.length === 0) return;
+
+    const noteBaseRecords = await prisma.noteBase.findMany({
+      where: { projectId, noteId: { in: noteIds } },
+    });
+
+    if (noteBaseRecords.length === 0) return;
+
+    await prisma.$transaction(
+      noteBaseRecords.map((nb) => {
+        const metrics = (nb.metrics as Record<string, number | string> | null) ?? {};
+
+        return prisma.note.upsert({
+          where: {
+            projectId_noteId: { projectId, noteId: nb.noteId },
+          },
+          create: {
+            projectId,
+            noteId: nb.noteId,
+            noteLink: nb.noteLink ?? undefined,
+            kolNickName: nb.kolNickName ?? undefined,
+            kolFanNum: nb.kolFanNum ?? undefined,
+            noteType: nb.kolType ?? undefined,
+            spuName: nb.spuName ?? undefined,
+            kolPrice: nb.contentCost,
+            serviceFee: nb.contentSettlement,
+            impNum: toInt(metrics.impNum),
+            readNum: toInt(metrics.readNum),
+            engageNum: toInt(metrics.engageNum),
+            likeNum: toInt(metrics.likeNum),
+            favNum: toInt(metrics.favNum),
+            cmtNum: toInt(metrics.cmtNum),
+            shareNum: toInt(metrics.shareNum),
+            isUnderwater: !(nb.isRegistered),  // 非报备 = 水下
+            underwaterPrice: nb.contentCost,
+            dataSource: 'note_base',
+          },
+          update: {
+            // Only update if current record is also from note_base (don't overwrite API data)
+            noteLink: nb.noteLink ?? undefined,
+            kolNickName: nb.kolNickName ?? undefined,
+            kolFanNum: nb.kolFanNum ?? undefined,
+            noteType: nb.kolType ?? undefined,
+            spuName: nb.spuName ?? undefined,
+            kolPrice: nb.contentCost,
+            serviceFee: nb.contentSettlement,
+            impNum: toInt(metrics.impNum),
+            readNum: toInt(metrics.readNum),
+            engageNum: toInt(metrics.engageNum),
+            likeNum: toInt(metrics.likeNum),
+            favNum: toInt(metrics.favNum),
+            cmtNum: toInt(metrics.cmtNum),
+            shareNum: toInt(metrics.shareNum),
+            isUnderwater: !(nb.isRegistered),
+            underwaterPrice: nb.contentCost,
+            dataSource: 'note_base',
+          },
+        });
+      })
+    );
+  }
+}
+
+/** Helper: convert metric value to integer */
+function toInt(val: unknown): number {
+  if (val == null) return 0;
+  const n = Number(val);
+  return isNaN(n) ? 0 : Math.round(n);
 }

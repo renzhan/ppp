@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { Loader2, Search, ChevronRight, Check } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -29,6 +29,7 @@ export function LingxiTaxonomySelector({ value, onChange }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [taxonomyTree, setTaxonomyTree] = useState<TaxonomyNode[] | null>(null);
+  const prevAccountIdRef = useRef(value.accountId || '');
 
   // Each level tracks the selected node at that depth
   const [selectedPath, setSelectedPath] = useState<TaxonomyNode[]>(() => {
@@ -36,12 +37,21 @@ export function LingxiTaxonomySelector({ value, onChange }: Props) {
     return [];
   });
 
-  const fetchTaxonomy = useCallback(async () => {
-    const trimmed = accountId.trim();
-    if (!trimmed) {
-      setError('请输入灵犀账号ID');
-      return;
+  // Sync accountId from parent when it changes externally (e.g., imported project selection)
+  useEffect(() => {
+    if (value.accountId && value.accountId !== prevAccountIdRef.current) {
+      prevAccountIdRef.current = value.accountId;
+      setAccountId(value.accountId);
+      // Auto-fetch taxonomy if accountId was set externally and tree not loaded
+      if (!taxonomyTree) {
+        doFetch(value.accountId);
+      }
     }
+  }, [value.accountId]);
+
+  const doFetch = async (id: string) => {
+    const trimmed = id.trim();
+    if (!trimmed) return;
 
     setLoading(true);
     setError(null);
@@ -63,13 +73,22 @@ export function LingxiTaxonomySelector({ value, onChange }: Props) {
       }
 
       setTaxonomyTree(json.data);
-      // Update accountId in parent
-      onChange({ ...value, accountId: trimmed, taxonomyCode: '', taxonomyPath: '' });
     } catch {
       setError('请求失败，请检查网络');
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchTaxonomy = useCallback(async () => {
+    const trimmed = accountId.trim();
+    if (!trimmed) {
+      setError('请输入灵犀账号ID');
+      return;
+    }
+
+    onChange({ ...value, accountId: trimmed, taxonomyCode: '', taxonomyPath: '' });
+    await doFetch(trimmed);
   }, [accountId, value, onChange]);
 
   const handleSelectNode = (node: TaxonomyNode, depth: number) => {
