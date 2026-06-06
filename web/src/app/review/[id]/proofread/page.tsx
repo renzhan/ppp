@@ -330,81 +330,19 @@ export default function ProofreadPage({ params }: { params: { id: string } }) {
     const { buildFullExportHtml } = await import('@/lib/report-export');
     const fullHtml = buildFullExportHtml(chapters, review?.project.projectName + '-复盘' || '复盘报告');
 
-    // Open a hidden iframe to render the HTML with ECharts, then capture as PDF
-    const iframe = document.createElement('iframe');
-    iframe.style.position = 'fixed';
-    iframe.style.left = '-9999px';
-    iframe.style.top = '-9999px';
-    iframe.style.width = '900px';
-    iframe.style.height = '1200px';
-    document.body.appendChild(iframe);
-
-    const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
-    if (!iframeDoc) {
-      document.body.removeChild(iframe);
+    // Use browser's native print engine which properly handles CSS page-break rules.
+    // User selects "Save as PDF" in the print dialog.
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert('请允许弹出窗口以导出 PDF');
       return;
     }
-
-    iframeDoc.open();
-    iframeDoc.write(fullHtml);
-    iframeDoc.close();
-
-    // Wait for ECharts to render, then capture with html2canvas + jsPDF
-    setTimeout(async () => {
-      try {
-        const html2canvas = (await import('html2canvas')).default;
-        const { jsPDF } = await import('jspdf');
-
-        const container = iframeDoc.querySelector('.report-container') as HTMLElement;
-        if (!container) {
-          document.body.removeChild(iframe);
-          return;
-        }
-
-        const canvas = await html2canvas(container, {
-          scale: 2,
-          useCORS: true,
-          logging: false,
-          width: 900,
-          windowWidth: 900,
-        });
-
-        const imgData = canvas.toDataURL('image/png');
-        const imgWidth = 210; // A4 width in mm
-        const pageHeight = 297; // A4 height in mm
-        const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-        const pdf = new jsPDF('p', 'mm', 'a4');
-        let heightLeft = imgHeight;
-        let position = 0;
-
-        // First page
-        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
-
-        // Additional pages if content overflows
-        while (heightLeft > 0) {
-          position = -(imgHeight - heightLeft);
-          pdf.addPage();
-          pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-          heightLeft -= pageHeight;
-        }
-
-        const filename = `${review?.project.projectName || '复盘报告'}.pdf`;
-        pdf.save(filename);
-      } catch (err) {
-        console.error('PDF export failed:', err);
-        // Fallback to print
-        const win = window.open('', '_blank');
-        if (win) {
-          win.document.write(fullHtml);
-          win.document.close();
-          setTimeout(() => win.print(), 1500);
-        }
-      } finally {
-        document.body.removeChild(iframe);
-      }
-    }, 2000); // Wait 2s for ECharts to render
+    printWindow.document.write(fullHtml);
+    printWindow.document.close();
+    // Wait for ECharts to render then trigger print
+    setTimeout(() => {
+      printWindow.print();
+    }, 2500);
   };
 
   const handleExportWord = async () => {
