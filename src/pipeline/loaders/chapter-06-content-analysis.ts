@@ -91,6 +91,8 @@ export class ContentAnalysisDataLoader extends BaseChapterDataLoader {
       shareNum: number;
       kolPrice: any;
       serviceFee: any;
+      coverImages: any;
+      noteLink: string | null;
     }
 
     let notes: NoteRow[] = [];
@@ -112,6 +114,8 @@ export class ContentAnalysisDataLoader extends BaseChapterDataLoader {
           shareNum: true,
           kolPrice: true,
           serviceFee: true,
+          coverImages: true,
+          noteLink: true,
         },
       });
     } catch (error) {
@@ -180,6 +184,8 @@ export class ContentAnalysisDataLoader extends BaseChapterDataLoader {
       cpti: number;
       isViral: boolean;
       viralScore: number; // 用于排序
+      coverImage: string | null; // 封面图路径
+      noteLink: string | null;
     }
 
     const enrichedNotes: EnrichedNote[] = [];
@@ -252,6 +258,8 @@ export class ContentAnalysisDataLoader extends BaseChapterDataLoader {
         cpti,
         isViral,
         viralScore,
+        coverImage: Array.isArray(note.coverImages) && note.coverImages.length > 0 ? note.coverImages[0] : null,
+        noteLink: note.noteLink ?? null,
       });
     }
 
@@ -321,10 +329,32 @@ export class ContentAnalysisDataLoader extends BaseChapterDataLoader {
 
     // ── 10. 优质笔记TOP5 ──
     const sortedNotes = [...enrichedNotes].sort((a, b) => b.viralScore - a.viralScore);
-    const top5 = sortedNotes.slice(0, 5).map((n, i) =>
-      `${i + 1}. ${n.kolNickName}（${n.noteType}/${n.contentDirection}）：曝光${n.impNum}, 互动${n.engagement}, CPE=${n.cpe.toFixed(2)}, 赞${n.likeNum}/藏${n.favNum}/评${n.cmtNum}`
-    );
-    variables['top5_notes'] = top5.join('\n');
+    const top5 = sortedNotes.slice(0, 5).map((n, i) => {
+      const coverHtml = n.coverImage
+        ? `[封面图: ${n.coverImage}]`
+        : '[无封面图]';
+      return `${i + 1}. ${n.kolNickName}（${n.noteType}/${n.contentDirection}）：曝光${n.impNum}, 互动${n.engagement}, CPE=${n.cpe.toFixed(2)}, 赞${n.likeNum}/藏${n.favNum}/评${n.cmtNum}\n   标题: ${n.noteTitle || '无标题'}\n   封面: ${coverHtml}\n   链接: ${n.noteLink || '无'}`;
+    });
+    variables['top5_notes'] = top5.join('\n\n');
+
+    // 同时提供结构化的TOP5数据供prompt直接生成img标签
+    const top5Structured = sortedNotes.slice(0, 5).map((n) => ({
+      noteId: n.noteId,
+      kolNickName: n.kolNickName,
+      noteType: n.noteType,
+      contentDirection: n.contentDirection,
+      noteTitle: n.noteTitle,
+      impNum: n.impNum,
+      readNum: n.readNum,
+      engagement: n.engagement,
+      likeNum: n.likeNum,
+      favNum: n.favNum,
+      cmtNum: n.cmtNum,
+      cpe: Number(n.cpe.toFixed(2)),
+      coverImage: n.coverImage,
+      noteLink: n.noteLink,
+    }));
+    variables['top5_notes_json'] = JSON.stringify(top5Structured);
 
     // 统计信息
     variables['total_notes'] = String(enrichedNotes.length);

@@ -135,7 +135,7 @@ async function runBackgroundGeneration(reviewConfigId: string, projectId: string
             const logDir = path.resolve(process.cwd(), '..', 'logs', 'prompts');
             fs.mkdirSync(logDir, { recursive: true });
             const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-            const logFile = path.join(logDir, `ch${chapterDef.number}_${chapterDef.id}_${timestamp}.txt`);
+            const logFile = path.join(logDir, `${reviewConfigId}_ch${chapterDef.number}_${chapterDef.id}_${timestamp}.txt`);
             const logContent = `=== Chapter ${chapterDef.number}: ${chapterDef.id} ===\n` +
               `=== Timestamp: ${new Date().toISOString()} ===\n` +
               `=== ReviewConfig: ${reviewConfigId} ===\n\n` +
