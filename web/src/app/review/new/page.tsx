@@ -319,19 +319,26 @@ function NewReviewPageContent() {
       return res.json();
     },
     onSuccess: async (review) => {
-      // Upload plan file if selected
+      // Upload plan file if selected (non-blocking for navigation)
       if (planFile) {
-        const formData = new FormData();
-        formData.append('file', planFile);
-        await fetch(`/api/reviews/${review.id}/plan-upload`, {
-          method: 'POST',
-          body: formData,
-        });
+        try {
+          const formData = new FormData();
+          formData.append('file', planFile);
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 30000); // 30s timeout
+          const uploadRes = await fetch(`/api/reviews/${review.id}/plan-upload`, {
+            method: 'POST',
+            body: formData,
+            signal: controller.signal,
+          });
+          clearTimeout(timeout);
+          if (!uploadRes.ok) {
+            console.error('[plan-upload] 上传失败:', await uploadRes.text());
+          }
+        } catch (err) {
+          console.error('[plan-upload] 上传异常:', err);
+        }
       }
-
-      // Note: Juguang ingestion is already triggered server-side in POST /api/reviews.
-      // Pugongying base data is handled by the daily cron job.
-      // No need for additional api-fetch call here.
 
       // Redirect to proofread page
       router.push(`/review/${review.id}/proofread`);

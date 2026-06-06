@@ -5,6 +5,10 @@ import path from 'path';
 import fs from 'fs/promises';
 import crypto from 'crypto';
 
+// Allow larger file uploads (default is 4MB, increase to 50MB for plan documents)
+export const runtime = 'nodejs';
+export const maxDuration = 60; // 60 seconds timeout
+
 /**
  * Allowed file extensions for plan uploads.
  */
