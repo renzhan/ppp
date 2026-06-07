@@ -13,7 +13,7 @@ done > /app/.env
 echo "Waiting for database to be ready..."
 MAX_RETRIES=30
 RETRY=0
-until npx prisma db execute --stdin --config prisma.config.ts <<< "SELECT 1" > /dev/null 2>&1; do
+until echo "SELECT 1" | npx prisma db execute --stdin --config prisma.config.ts > /dev/null 2>&1; do
   RETRY=$((RETRY + 1))
   if [ $RETRY -ge $MAX_RETRIES ]; then
     echo "ERROR: Database not reachable after ${MAX_RETRIES}s. Continuing anyway..."
