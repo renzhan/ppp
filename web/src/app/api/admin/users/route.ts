@@ -1,30 +1,79 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { Prisma } from '../../../../../generated/prisma';
 import { getSession, hashPassword } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
-// GET /api/admin/users - List all users
+const USER_SELECT = {
+  id: true,
+  username: true,
+  displayName: true,
+  role: true,
+  mustChangePassword: true,
+  isActive: true,
+  lastLoginAt: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
+
+// GET /api/admin/users - List users; paginate when page/pageSize are provided, otherwise return all
 export async function GET(request: NextRequest) {
   const session = await getSession(request);
   if (!session || session.role !== 'admin') {
     return NextResponse.json({ error: '无权限' }, { status: 403 });
   }
 
-  const users = await prisma.user.findMany({
-    select: {
-      id: true,
-      username: true,
-      displayName: true,
-      role: true,
-      mustChangePassword: true,
-      isActive: true,
-      lastLoginAt: true,
-      createdAt: true,
-      updatedAt: true,
-    },
+  const { searchParams } = new URL(request.url);
+  const role = searchParams.get('role');
+  const search = searchParams.get('search')?.trim();
+  const paginate = searchParams.has('page') || searchParams.has('pageSize');
+
+  const where: Prisma.UserWhereInput = {};
+
+  if (role) {
+    where.role = role;
+  }
+
+  if (search) {
+    where.OR = [
+      { username: { contains: search, mode: 'insensitive' } },
+      { displayName: { contains: search, mode: 'insensitive' } },
+    ];
+  }
+
+  if (paginate) {
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
+    const pageSize = Math.max(1, Math.min(500, parseInt(searchParams.get('pageSize') || '20', 10)));
+
+    const [items, totalItems] = await Promise.all([
+      prisma.user.findMany({
+        where,
+        select: USER_SELECT,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      prisma.user.count({ where }),
+    ]);
+
+    return NextResponse.json({
+      items,
+      page,
+      pageSize,
+      totalItems,
+      totalPages: Math.ceil(totalItems / pageSize),
+    });
+  }
+
+  const items = await prisma.user.findMany({
+    where,
+    select: USER_SELECT,
     orderBy: { createdAt: 'desc' },
   });
 
-  return NextResponse.json({ users });
+  return NextResponse.json({
+    items,
+    totalItems: items.length,
+  });
 }
 
 // POST /api/admin/users - Create user

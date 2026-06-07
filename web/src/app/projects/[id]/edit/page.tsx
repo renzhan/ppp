@@ -64,7 +64,7 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
   });
 
   // Fetch all users for participant selector
-  const { data: usersData } = useQuery<{ users: User[] }>({
+  const { data: usersData } = useQuery<{ items: User[] }>({
     queryKey: ['all-users'],
     queryFn: async () => {
       const res = await fetch('/api/admin/users');
@@ -73,7 +73,7 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
     },
   });
 
-  const allUsers = usersData?.users ?? [];
+  const allUsers = usersData?.items ?? [];
 
   // Initialize form when project loads
   useEffect(() => {

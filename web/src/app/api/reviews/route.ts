@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { Prisma } from '../../../../../generated/prisma';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
 import { DataIngestionService } from '@/ingestion/index';
@@ -13,32 +14,75 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    const { searchParams } = new URL(request.url);
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
+    const pageSize = Math.max(1, Math.min(100, parseInt(searchParams.get('pageSize') || '20', 10)));
+    const search = searchParams.get('search')?.trim();
+
+    const where: Prisma.ReviewConfigWhereInput = {};
+
     // Data permission filtering
-    const where: Record<string, unknown> = {};
-    if (session.role !== 'admin') {
-      where.project = {
-        OR: [
-          { createdBy: session.sub },
-          { participants: { has: session.sub } },
-        ],
-      };
+    const permissionFilter: Prisma.ProjectWhereInput | undefined =
+      session.role !== 'admin'
+        ? {
+            OR: [
+              { createdBy: session.sub },
+              { participants: { has: session.sub } },
+            ],
+          }
+        : undefined;
+
+    if (permissionFilter) {
+      where.project = permissionFilter;
     }
 
-    const reviews = await prisma.reviewConfig.findMany({
-      where,
-      orderBy: { updatedAt: 'desc' },
-      include: {
-        project: {
-          select: {
-            id: true,
-            projectName: true,
-            category: true,
-            brand: true,
-            businessLine: true,
+    if (search) {
+      const matchingUsers = await prisma.user.findMany({
+        where: {
+          OR: [
+            { displayName: { contains: search, mode: 'insensitive' } },
+            { username: { contains: search, mode: 'insensitive' } },
+          ],
+        },
+        select: { id: true },
+      });
+      const matchingUserIds = matchingUsers.map((u) => u.id);
+
+      const searchConditions: Prisma.ReviewConfigWhereInput[] = [
+        { project: { projectName: { contains: search, mode: 'insensitive' } } },
+      ];
+      if (matchingUserIds.length > 0) {
+        searchConditions.push({ createdBy: { in: matchingUserIds } });
+      }
+
+      if (permissionFilter) {
+        where.AND = [{ project: permissionFilter }, { OR: searchConditions }];
+        delete where.project;
+      } else {
+        where.OR = searchConditions;
+      }
+    }
+
+    const [reviews, totalItems] = await Promise.all([
+      prisma.reviewConfig.findMany({
+        where,
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        orderBy: { updatedAt: 'desc' },
+        include: {
+          project: {
+            select: {
+              id: true,
+              projectName: true,
+              category: true,
+              brand: true,
+              businessLine: true,
+            },
           },
         },
-      },
-    });
+      }),
+      prisma.reviewConfig.count({ where }),
+    ]);
 
     // Resolve createdBy user IDs to display names
     const createdByIds = reviews.map((r) => r.createdBy).filter(Boolean);
@@ -67,7 +111,13 @@ export async function GET(request: NextRequest) {
       updatedAt: r.updatedAt,
     }));
 
-    return NextResponse.json({ items });
+    return NextResponse.json({
+      items,
+      page,
+      pageSize,
+      totalItems,
+      totalPages: Math.ceil(totalItems / pageSize),
+    });
   } catch (error) {
     console.error('GET /api/reviews error:', error);
     return NextResponse.json(

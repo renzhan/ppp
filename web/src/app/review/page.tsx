@@ -3,11 +3,11 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
-import { Plus, Pencil, BookOpen, Search } from 'lucide-react';
+import { Plus, ChevronLeft, ChevronRight, Search } from 'lucide-react';
 import { Loading } from '@/components/ui/loading';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { CardFooter } from '@/components/ui/card';
 import {
   listEmptyClass,
   listErrorClass,
@@ -29,6 +29,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { formatDate } from '@/lib/project-meta';
+import { generatePageNumbers } from '@/lib/pagination';
 import { cn } from '@/lib/utils';
 
 interface ReviewItem {
@@ -47,30 +48,36 @@ interface ReviewItem {
 
 interface ReviewsResponse {
   items: ReviewItem[];
+  totalItems: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
 }
 
 export default function ReviewListPage() {
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const pageSize = 20;
+
+  const queryString = useMemo(() => {
+    const params = new URLSearchParams();
+    params.set('page', String(page));
+    params.set('pageSize', String(pageSize));
+    if (search.trim()) params.set('search', search.trim());
+    return params.toString();
+  }, [page, search]);
 
   const { data, isLoading, isError, error } = useQuery<ReviewsResponse>({
-    queryKey: ['reviews'],
+    queryKey: ['reviews', queryString],
     queryFn: async () => {
-      const response = await fetch('/api/reviews');
+      const response = await fetch(`/api/reviews?${queryString}`);
       if (!response.ok) throw new Error('获取复盘列表失败');
       return response.json();
     },
   });
 
-  const filteredItems = useMemo(() => {
-    const items = data?.items ?? [];
-    const keyword = search.trim().toLowerCase();
-    if (!keyword) return items;
-    return items.filter(
-      (item) =>
-        item.projectName.toLowerCase().includes(keyword) ||
-        (item.createdByDisplayName ?? '').toLowerCase().includes(keyword)
-    );
-  }, [data?.items, search]);
+  const totalPages = data?.totalPages ?? 1;
+  const items = data?.items ?? [];
 
   return (
     <div className="space-y-6">
@@ -97,7 +104,10 @@ export default function ReviewListPage() {
           <Input
             variant="filter"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
             placeholder="搜索项目名称或复盘者"
             className="pl-9"
           />
@@ -108,7 +118,7 @@ export default function ReviewListPage() {
             <Loading size="lg" text="正在加载复盘列表..." className="py-16" />
           ) : isError ? (
             <div className={listErrorClass}>{(error as Error).message || '获取复盘列表失败'}</div>
-          ) : filteredItems.length ? (
+          ) : items.length ? (
             <div className={listTableWrapperClass}>
               <Table className="text-sm">
                 <TableHeader>
@@ -122,7 +132,7 @@ export default function ReviewListPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredItems.map((review, index) => (
+                  {items.map((review, index) => (
                     <TableRow key={review.id} className={listTableRowClass(index)}>
                       <TableCell
                         className={cn(listTableCellClass, 'max-w-[200px] truncate text-gray-900')}
@@ -179,6 +189,52 @@ export default function ReviewListPage() {
           )}
         </div>
       </div>
+
+      {items.length ? (
+        <CardFooter className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-gray-500">
+            共 {data?.totalItems ?? 0} 条记录，第 {data?.page ?? page}/{totalPages} 页
+          </p>
+          <div className="flex items-center gap-1">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon-sm"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1}
+            >
+              <ChevronLeft size={16} />
+            </Button>
+            {generatePageNumbers(page, totalPages).map((p, idx) =>
+              p === '...' ? (
+                <span key={`ellipsis-${idx}`} className="px-1 text-gray-400">
+                  ...
+                </span>
+              ) : (
+                <Button
+                  key={p}
+                  type="button"
+                  variant={page === p ? 'primary' : 'outline'}
+                  size="icon-sm"
+                  onClick={() => setPage(p as number)}
+                  className={cn('text-sm', page === p && 'pointer-events-none')}
+                >
+                  {p}
+                </Button>
+              )
+            )}
+            <Button
+              type="button"
+              variant="outline"
+              size="icon-sm"
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page >= totalPages}
+            >
+              <ChevronRight size={16} />
+            </Button>
+          </div>
+        </CardFooter>
+      ) : null}
     </div>
   );
 }

@@ -69,7 +69,7 @@ export default function NewProjectPage() {
   });
 
   // Fetch all users for participant selector
-  const { data: usersData } = useQuery<{ users: User[] }>({
+  const { data: usersData } = useQuery<{ items: User[] }>({
     queryKey: ['all-users'],
     queryFn: async () => {
       const res = await fetch('/api/admin/users');
@@ -97,7 +97,7 @@ export default function NewProjectPage() {
   });
 
   const currentUser = meData?.user;
-  const allUsers = usersData?.users ?? [];
+  const allUsers = usersData?.items ?? [];
 
   // Filter suggestions based on cascade selection and input text
   const filteredSuggestions = useMemo(() => {

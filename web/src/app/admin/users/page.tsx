@@ -1,22 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  Plus,
-  Upload,
-  Edit2,
-  KeyRound,
-  UserX,
-  UserCheck,
-  User,
-  Lock,
-  X,
-} from 'lucide-react';
+import { Plus, Upload, User, Lock, UserX, UserCheck, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { FilterField } from '@/components/ui/filter-field';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import { Loading } from '@/components/ui/loading';
@@ -46,6 +38,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { showToast } from '@/lib/notification';
+import { generatePageNumbers } from '@/lib/pagination';
 import { cn } from '@/lib/utils';
 
 interface User {
@@ -59,6 +53,14 @@ interface User {
   createdAt: string;
 }
 
+interface UsersResponse {
+  items: User[];
+  totalItems: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
 const ROLE_OPTIONS = [
   { value: 'VP', label: 'VP' },
   { value: 'AD', label: 'AD' },
@@ -68,8 +70,25 @@ const ROLE_OPTIONS = [
   { value: 'admin', label: '管理员' },
 ] as const;
 
+const ROLE_FILTER_OPTIONS = [
+  { value: '', label: '全部' },
+  { value: 'admin', label: '管理员' },
+  { value: 'VP', label: 'VP' },
+  { value: 'AD', label: 'AD' },
+  { value: 'AM', label: 'AM' },
+  { value: '组长', label: '组长' },
+  { value: 'AE', label: 'AE' },
+] as const;
+
 const selectTriggerClass =
+  'h-9 rounded border-gray-200 bg-white text-gray-900 focus-visible:ring-brand/25 disabled:bg-gray-50 disabled:text-gray-400';
+
+const modalSelectTriggerClass =
   'h-10 rounded-lg border-gray-300 bg-white text-gray-900 focus-visible:ring-brand/20';
+
+function formatRole(role: string) {
+  return role === 'admin' ? '管理员' : role;
+}
 
 export default function AdminUsersPage() {
   const router = useRouter();
@@ -78,18 +97,32 @@ export default function AdminUsersPage() {
   const [showImportModal, setShowImportModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showResetModal, setShowResetModal] = useState(false);
+  const [showToggleModal, setShowToggleModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [roleFilter, setRoleFilter] = useState('');
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const pageSize = 20;
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  const queryString = useMemo(() => {
+    const params = new URLSearchParams();
+    params.set('page', String(page));
+    params.set('pageSize', String(pageSize));
+    if (roleFilter) params.set('role', roleFilter);
+    if (search.trim()) params.set('search', search.trim());
+    return params.toString();
+  }, [page, pageSize, roleFilter, search]);
+
   const {
-    data: users = [],
+    data,
     isLoading,
     isError,
     error,
-  } = useQuery<User[]>({
-    queryKey: ['admin-users'],
+  } = useQuery<UsersResponse>({
+    queryKey: ['admin-users', queryString],
     queryFn: async () => {
-      const res = await fetch('/api/admin/users');
+      const res = await fetch(`/api/admin/users?${queryString}`);
       if (res.status === 401) {
         router.push('/login');
         throw new Error('未登录');
@@ -99,8 +132,7 @@ export default function AdminUsersPage() {
         throw new Error('无权限');
       }
       if (!res.ok) throw new Error('获取用户列表失败');
-      const data = await res.json();
-      return data.users || [];
+      return res.json();
     },
   });
 
@@ -108,50 +140,27 @@ export default function AdminUsersPage() {
     queryClient.invalidateQueries({ queryKey: ['admin-users'] });
   };
 
+  const totalPages = data?.totalPages ?? 1;
+  const users = data?.items ?? [];
+  const hasFilters = Boolean(roleFilter || search.trim());
+
   const showMsg = (type: 'success' | 'error', text: string) => {
     setMessage({ type, text });
     setTimeout(() => setMessage(null), 3000);
   };
 
-  const handleToggleActive = async (user: User) => {
-    const action = user.isActive ? '禁用' : '启用';
-    if (!confirm(`确定要${action}用户 "${user.username}" 吗？`)) return;
-
-    try {
-      const method = user.isActive ? 'DELETE' : 'PUT';
-      const url = `/api/admin/users/${user.id}`;
-      const res = await fetch(url, {
-        method,
-        ...(method === 'PUT' && {
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ isActive: !user.isActive }),
-        }),
-      });
-
-      if (res.ok) {
-        showMsg('success', `${action}成功`);
-        refetchUsers();
-      } else {
-        const data = await res.json();
-        showMsg('error', data.error || `${action}失败`);
-      }
-    } catch {
-      showMsg('error', '操作失败');
-    }
-  };
-
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between space-y-0">
-        <h1 className="text-2xl tracking-tight text-gray-900">用户管理</h1>
+        <h1 className="text-2xl tracking-tight text-gray-900">账户信息</h1>
         <div className="flex shrink-0 gap-3">
           <Button variant="secondary" size="sm" className="gap-1 px-4" onClick={() => setShowImportModal(true)}>
             <Upload size={16} />
             批量导入
           </Button>
-          <Button variant="primary" size="sm" className="gap-1 px-4" onClick={() => setShowAddModal(true)}>
+          <Button variant="primary" size="sm" className="shrink-0 gap-1 px-4" onClick={() => setShowAddModal(true)}>
             <Plus size={16} />
-            添加用户
+            新建用户
           </Button>
         </div>
       </div>
@@ -170,8 +179,39 @@ export default function AdminUsersPage() {
               {message.text}
             </div>
           )}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <FilterField label="角色：">
+              <Select
+                value={roleFilter}
+                onValueChange={(value) => {
+                  setRoleFilter(value);
+                  setPage(1);
+                }}
+              >
+                <SelectTrigger className={selectTriggerClass} />
+                <SelectContent>
+                  {ROLE_FILTER_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value || 'all'} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FilterField>
+            <FilterField label="真名或花名：">
+              <Input
+                variant="filter"
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setPage(1);
+                }}
+                placeholder="请输入"
+              />
+            </FilterField>
+          </div>
         </div>
-        <div>
+        <div className={listFilterToDataGapClass}>
           {isLoading ? (
             <Loading size="lg" text="正在加载用户列表..." className="py-16" />
           ) : isError ? (
@@ -181,8 +221,8 @@ export default function AdminUsersPage() {
               <Table className="text-sm">
                 <TableHeader>
                   <TableRow className={listTableHeaderRowClass}>
-                    <TableHead className={listTableHeadClass}>花名</TableHead>
                     <TableHead className={listTableHeadClass}>真名</TableHead>
+                    <TableHead className={listTableHeadClass}>花名</TableHead>
                     <TableHead className={listTableHeadClass}>角色</TableHead>
                     <TableHead className={listTableHeadClass}>状态</TableHead>
                     <TableHead className={listTableHeadClass}>最后登录</TableHead>
@@ -192,24 +232,11 @@ export default function AdminUsersPage() {
                 <TableBody>
                   {users.map((user, index) => (
                     <TableRow key={user.id} className={listTableRowClass(index)}>
-                      <TableCell className={cn(listTableCellClass)}>
-                        {user.username}
-                      </TableCell>
                       <TableCell className={cn(listTableCellClass, 'text-gray-600')}>
                         {user.displayName || '-'}
                       </TableCell>
-                      <TableCell className={listTableCellClass}>
-                        <span
-                          className={cn(
-                            'inline-flex rounded-full px-2 py-0.5 text-xs font-medium',
-                            user.role === 'admin'
-                              ? 'bg-purple-100 text-purple-700'
-                              : 'bg-brand-100 text-brand-700'
-                          )}
-                        >
-                          {user.role === 'admin' ? '管理员' : user.role}
-                        </span>
-                      </TableCell>
+                      <TableCell className={listTableCellClass}>{user.username}</TableCell>
+                      <TableCell className={listTableCellClass}>{formatRole(user.role)}</TableCell>
                       <TableCell className={listTableCellClass}>
                         <span
                           className={cn(
@@ -227,39 +254,40 @@ export default function AdminUsersPage() {
                           ? new Date(user.lastLoginAt).toLocaleString('zh-CN')
                           : '从未登录'}
                       </TableCell>
-                      <TableCell className={listTableActionCellClass}>
-                        <div className="flex items-center justify-center gap-1">
+                      <TableCell className={cn(listTableActionCellClass, 'whitespace-nowrap')}>
+                        <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
                           <Button
-                            variant="ghost"
-                            size="icon-sm"
+                            variant="text-link"
+                            size="sm"
+                            className="h-auto px-0 text-xs"
                             onClick={() => {
                               setSelectedUser(user);
                               setShowEditModal(true);
                             }}
-                            title="编辑"
                           >
-                            <Edit2 size={15} />
+                            编辑
                           </Button>
                           <Button
-                            variant="ghost"
-                            size="icon-sm"
+                            variant="text-link"
+                            size="sm"
+                            className="h-auto px-0 text-xs"
                             onClick={() => {
                               setSelectedUser(user);
                               setShowResetModal(true);
                             }}
-                            title="重置密码"
-                            className="hover:text-orange-600"
                           >
-                            <KeyRound size={15} />
+                            重置密码
                           </Button>
                           <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            onClick={() => handleToggleActive(user)}
-                            title={user.isActive ? '禁用' : '启用'}
-                            className={user.isActive ? 'hover:text-red-600' : 'hover:text-green-600'}
+                            variant="text-link"
+                            size="sm"
+                            className="h-auto px-0 text-xs"
+                            onClick={() => {
+                              setSelectedUser(user);
+                              setShowToggleModal(true);
+                            }}
                           >
-                            {user.isActive ? <UserX size={15} /> : <UserCheck size={15} />}
+                            {user.isActive ? '禁用' : '启用'}
                           </Button>
                         </div>
                       </TableCell>
@@ -269,10 +297,58 @@ export default function AdminUsersPage() {
               </Table>
             </div>
           ) : (
-            <div className={listEmptyClass}>暂无用户</div>
+            <div className={listEmptyClass}>
+              {hasFilters ? '未找到匹配的账户' : '暂无用户'}
+            </div>
           )}
         </div>
       </div>
+
+      {users.length ? (
+        <CardFooter className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-gray-500">
+            共 {data?.totalItems ?? 0} 条记录，第 {data?.page ?? page}/{totalPages} 页
+          </p>
+          <div className="flex items-center gap-1">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon-sm"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1}
+            >
+              <ChevronLeft size={16} />
+            </Button>
+            {generatePageNumbers(page, totalPages).map((p, idx) =>
+              p === '...' ? (
+                <span key={`ellipsis-${idx}`} className="px-1 text-gray-400">
+                  ...
+                </span>
+              ) : (
+                <Button
+                  key={p}
+                  type="button"
+                  variant={page === p ? 'primary' : 'outline'}
+                  size="icon-sm"
+                  onClick={() => setPage(p as number)}
+                  className={cn('text-sm', page === p && 'pointer-events-none')}
+                >
+                  {p}
+                </Button>
+              )
+            )}
+            <Button
+              type="button"
+              variant="outline"
+              size="icon-sm"
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page >= totalPages}
+            >
+              <ChevronRight size={16} />
+            </Button>
+          </div>
+        </CardFooter>
+      ) : null}
 
       {showAddModal && (
         <AddUserModal
@@ -327,6 +403,27 @@ export default function AdminUsersPage() {
           }}
         />
       )}
+
+      {showToggleModal && selectedUser && (
+        <ToggleActiveModal
+          user={selectedUser}
+          onClose={() => {
+            setShowToggleModal(false);
+            setSelectedUser(null);
+          }}
+          onSuccess={() => {
+            const action = selectedUser.isActive ? '禁用' : '启用';
+            setShowToggleModal(false);
+            setSelectedUser(null);
+            showToast({
+              type: 'success',
+              title: `${action}成功`,
+              message: `账户「${selectedUser.username}」已${action}`,
+            });
+            refetchUsers();
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -342,8 +439,19 @@ function ModalWrapper({
   onClose: () => void;
   children: React.ReactNode;
 }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, []);
+
+  const modal = (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
       <Card className="w-full max-w-md shadow-2xl">
         <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
           <div className="flex items-center gap-2">
@@ -358,6 +466,10 @@ function ModalWrapper({
       </Card>
     </div>
   );
+
+  if (!mounted) return null;
+
+  return createPortal(modal, document.body);
 }
 
 function RoleSelect({
@@ -369,7 +481,7 @@ function RoleSelect({
 }) {
   return (
     <Select value={value} onValueChange={onValueChange}>
-      <SelectTrigger className={selectTriggerClass} />
+      <SelectTrigger className={modalSelectTriggerClass} />
       <SelectContent>
         {ROLE_OPTIONS.map((opt) => (
           <SelectItem key={opt.value} value={opt.value}>
@@ -539,7 +651,7 @@ function EditUserModal({
   };
 
   return (
-    <ModalWrapper title='编辑用户' icon={User} onClose={onClose}>
+    <ModalWrapper title="编辑账户" icon={User} onClose={onClose}>
       <ModalError error={error} />
       <form onSubmit={handleSubmit} className="space-y-4">
       <FormField label="花名" htmlFor="edit-displayName">
@@ -611,13 +723,12 @@ function ResetPasswordModal({
   };
 
   return (
-    <ModalWrapper title='重置密码' icon={Lock} onClose={onClose}>
+    <ModalWrapper title="重置密码" icon={Lock} onClose={onClose}>
       <ModalError error={error} />
       <form onSubmit={handleSubmit} className="space-y-4">
-        <p className="text-sm text-gray-500">重置后用户下次登录需要重新设置密码。</p>
-        <FormField label="花名" htmlFor="edit-displayName">
+        <FormField label="花名" htmlFor="reset-username">
           <Input
-            id="displayName"
+            id="reset-username"
             variant="form"
             disabled
             value={user.username}
@@ -638,10 +749,68 @@ function ResetPasswordModal({
         <ModalActions
           onClose={onClose}
           loading={loading}
-          submitLabel="确认重置"
+          submitLabel="确认"
           loadingLabel="重置中..."
         />
       </form>
+    </ModalWrapper>
+  );
+}
+
+function ToggleActiveModal({
+  user,
+  onClose,
+  onSuccess,
+}: {
+  user: User;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const action = user.isActive ? '禁用' : '启用';
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleConfirm = async () => {
+    setError('');
+    setLoading(true);
+
+    try {
+      const method = user.isActive ? 'DELETE' : 'PUT';
+      const res = await fetch(`/api/admin/users/${user.id}`, {
+        method,
+        ...(method === 'PUT' && {
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ isActive: !user.isActive }),
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || `${action}失败`);
+        return;
+      }
+      onSuccess();
+    } catch {
+      setError('操作失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <ModalWrapper title={`${action}账户`} icon={user.isActive ? UserX : UserCheck} onClose={onClose}>
+      <ModalError error={error} />
+      <p className="text-sm text-gray-700">
+        确定要{action}账户&ldquo;{user.username}&rdquo;吗？
+      </p>
+      <div className="flex justify-end gap-3 pt-6">
+        <Button type="button" variant="secondary" onClick={onClose}>
+          取消
+        </Button>
+        <Button type="button" variant="primary" disabled={loading} onClick={handleConfirm}>
+          {loading ? `${action}中...` : '确认'}
+        </Button>
+      </div>
     </ModalWrapper>
   );
 }

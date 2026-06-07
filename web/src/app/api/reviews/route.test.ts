@@ -6,6 +6,7 @@ vi.mock('@/lib/prisma', () => ({
   prisma: {
     reviewConfig: {
       findMany: vi.fn(),
+      count: vi.fn(),
       create: vi.fn(),
     },
     project: {
@@ -35,6 +36,7 @@ import { getSession } from '@/lib/auth';
 
 const mockGetSession = getSession as ReturnType<typeof vi.fn>;
 const mockReviewConfigFindMany = prisma.reviewConfig.findMany as ReturnType<typeof vi.fn>;
+const mockReviewConfigCount = prisma.reviewConfig.count as ReturnType<typeof vi.fn>;
 const mockReviewConfigCreate = prisma.reviewConfig.create as ReturnType<typeof vi.fn>;
 const mockProjectFindUnique = prisma.project.findUnique as ReturnType<typeof vi.fn>;
 const mockUserFindMany = prisma.user.findMany as ReturnType<typeof vi.fn>;
@@ -85,6 +87,7 @@ describe('GET /api/reviews', () => {
         },
       },
     ]);
+    mockReviewConfigCount.mockResolvedValue(1);
     mockUserFindMany.mockResolvedValue([
       { id: 'user-1', displayName: '管理员', username: 'admin' },
     ]);
@@ -100,11 +103,80 @@ describe('GET /api/reviews', () => {
       createdByDisplayName: '管理员',
       status: 'draft',
     });
+    expect(json).toMatchObject({
+      page: 1,
+      pageSize: 20,
+      totalItems: 1,
+      totalPages: 1,
+    });
+    expect(mockReviewConfigFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        skip: 0,
+        take: 20,
+      })
+    );
+  });
+
+  it('returns paginated results with custom page and pageSize', async () => {
+    mockGetSession.mockResolvedValue({ sub: 'user-1', role: 'admin', username: 'admin' });
+    mockReviewConfigFindMany.mockResolvedValue([]);
+    mockReviewConfigCount.mockResolvedValue(45);
+    mockUserFindMany.mockResolvedValue([]);
+
+    const res = await GET(makeGetRequest('http://localhost/api/reviews?page=2&pageSize=20'));
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(json).toMatchObject({
+      page: 2,
+      pageSize: 20,
+      totalItems: 45,
+      totalPages: 3,
+    });
+    expect(mockReviewConfigFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        skip: 20,
+        take: 20,
+      })
+    );
+  });
+
+  it('applies search filter for project name and reviewer', async () => {
+    mockGetSession.mockResolvedValue({ sub: 'user-1', role: 'admin', username: 'admin' });
+    mockUserFindMany
+      .mockResolvedValueOnce([{ id: 'user-2' }])
+      .mockResolvedValueOnce([]);
+    mockReviewConfigFindMany.mockResolvedValue([]);
+    mockReviewConfigCount.mockResolvedValue(0);
+
+    await GET(makeGetRequest('http://localhost/api/reviews?search=测试'));
+
+    expect(mockUserFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          OR: [
+            { displayName: { contains: '测试', mode: 'insensitive' } },
+            { username: { contains: '测试', mode: 'insensitive' } },
+          ],
+        },
+      })
+    );
+    expect(mockReviewConfigFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          OR: [
+            { project: { projectName: { contains: '测试', mode: 'insensitive' } } },
+            { createdBy: { in: ['user-2'] } },
+          ],
+        },
+      })
+    );
   });
 
   it('applies data permission filter for non-admin users', async () => {
     mockGetSession.mockResolvedValue({ sub: 'user-2', role: 'AM', username: 'am_user' });
     mockReviewConfigFindMany.mockResolvedValue([]);
+    mockReviewConfigCount.mockResolvedValue(0);
     mockUserFindMany.mockResolvedValue([]);
 
     await GET(makeGetRequest());
@@ -123,9 +195,41 @@ describe('GET /api/reviews', () => {
     );
   });
 
+  it('combines data permission and search filters for non-admin users', async () => {
+    mockGetSession.mockResolvedValue({ sub: 'user-2', role: 'AM', username: 'am_user' });
+    mockUserFindMany.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    mockReviewConfigFindMany.mockResolvedValue([]);
+    mockReviewConfigCount.mockResolvedValue(0);
+
+    await GET(makeGetRequest('http://localhost/api/reviews?search=项目'));
+
+    expect(mockReviewConfigFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          AND: [
+            {
+              project: {
+                OR: [
+                  { createdBy: 'user-2' },
+                  { participants: { has: 'user-2' } },
+                ],
+              },
+            },
+            {
+              OR: [
+                { project: { projectName: { contains: '项目', mode: 'insensitive' } } },
+              ],
+            },
+          ],
+        },
+      })
+    );
+  });
+
   it('does not apply data permission filter for admin users', async () => {
     mockGetSession.mockResolvedValue({ sub: 'user-1', role: 'admin', username: 'admin' });
     mockReviewConfigFindMany.mockResolvedValue([]);
+    mockReviewConfigCount.mockResolvedValue(0);
     mockUserFindMany.mockResolvedValue([]);
 
     await GET(makeGetRequest());
