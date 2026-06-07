@@ -1,11 +1,9 @@
-version: "3.9"
-
 services:
   db:
-    image: postgres:18.3-alpine
+    image: registry.cn-hangzhou.aliyuncs.com/qiluo-images/postgres:16.4
     container_name: ppp-postgres
     ports:
-      - "3010:5432"
+      - "5432:5432"
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: abc.123.ABC
