@@ -31,12 +31,13 @@ echo "Running database migrations..."
 cd /app
 echo "  Checking prisma files..."
 ls -la prisma/schema.prisma prisma.config.ts 2>&1 || echo "  WARNING: Some prisma files missing!"
+set +e
 npx prisma migrate deploy --config prisma.config.ts 2>&1
 MIGRATE_EXIT=$?
+set -e
 if [ $MIGRATE_EXIT -ne 0 ]; then
   echo "WARNING: prisma migrate deploy failed (exit=$MIGRATE_EXIT)."
   echo "Attempting to resolve: marking all migrations as applied (init.sql likely already created tables)..."
-  # Create _prisma_migrations table and mark all migrations as applied
   for dir in prisma/migrations/*/; do
     if [ -d "$dir" ]; then
       migration_name=$(basename "$dir")
