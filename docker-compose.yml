@@ -20,7 +20,6 @@ services:
       - LLM_API_KEY=${LLM_API_KEY:-}
       - LLM_MODEL=${LLM_MODEL:-gpt-5.1}
     volumes:
-      - ./prisma:/app/prisma:ro
       - ./logs:/app/logs
       - ./data/uploads:/app/web/uploads
       - ./data/note-media:/app/web/public/note-media
