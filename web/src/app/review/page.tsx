@@ -77,7 +77,7 @@ export default function ReviewListPage() {
 
       <div className="flex items-start justify-between space-y-0">
 
-          <h1 className="text-2xl tracking-tight text-gray-900">复盘系统</h1>
+          <h1 className="text-2xl tracking-tight text-gray-900">复盘列表</h1>
 
         <Button variant="primary" size="sm" className="shrink-0 gap-1 px-4" asChild>
           <Link href="/review/new">
@@ -130,7 +130,7 @@ export default function ReviewListPage() {
                         {review.projectName}
                       </TableCell>
                       <TableCell className={cn(listTableCellClass, 'whitespace-nowrap')}>
-                        {review.projectId}
+                        {review.id}
                       </TableCell>
                       <TableCell className={cn(listTableCellClass, 'whitespace-nowrap')}>
                         {review.createdByDisplayName || '-'}
