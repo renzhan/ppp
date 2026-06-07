@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Loader2, X, ChevronDown } from 'lucide-react';
 import { PageHeader } from '@/components/layout/page-header';
 import { CascadeSelector, CascadeSelectorValue } from '@/components/form/cascade-selector';
+import { LingxiTaxonomySelector, LingxiTaxonomyValue } from '@/components/form/lingxi-taxonomy-selector';
 import { NoteBasePreview } from '@/components/form/note-base-preview';
 import { ParsedNoteBaseRow } from '@/lib/note-base-parser';
 
@@ -22,6 +23,7 @@ interface ImportedProject {
   category: string;
   brand: string;
   businessLine: string | null;
+  lingxiAccountId: string | null;
 }
 
 interface FormState {
@@ -30,6 +32,7 @@ interface FormState {
   executionStartDate: string;
   endDate: string;
   participants: string[];
+  lingxiTaxonomy: LingxiTaxonomyValue;
 }
 
 type FormErrors = Record<string, string>;
@@ -42,6 +45,7 @@ export default function NewProjectPage() {
     executionStartDate: '',
     endDate: '',
     participants: [],
+    lingxiTaxonomy: { accountId: '', taxonomyCode: '', taxonomyPath: '' },
   });
   const [errors, setErrors] = useState<FormErrors>({});
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -81,12 +85,13 @@ export default function NewProjectPage() {
       const res = await fetch('/api/projects?pageSize=500');
       if (!res.ok) throw new Error('获取项目列表失败');
       const data = await res.json();
-      return (data.items ?? []).map((p: { id: string; projectName: string; category: string; brand: string; businessLine: string | null }) => ({
+      return (data.items ?? []).map((p: { id: string; projectName: string; category: string; brand: string; businessLine: string | null; lingxiAccountId?: string | null }) => ({
         id: p.id,
         projectName: p.projectName,
         category: p.category,
         brand: p.brand,
         businessLine: p.businessLine,
+        lingxiAccountId: p.lingxiAccountId || null,
       }));
     },
   });
@@ -153,6 +158,9 @@ export default function NewProjectPage() {
           endDate: form.endDate || null,
           createdBy: currentUser?.id,
           participants: form.participants,
+          lingxiAccountId: form.lingxiTaxonomy.accountId || null,
+          lingxiTaxonomyCode: form.lingxiTaxonomy.taxonomyCode || null,
+          lingxiTaxonomyPath: form.lingxiTaxonomy.taxonomyPath || null,
         }),
       });
 
@@ -186,6 +194,9 @@ export default function NewProjectPage() {
     if (!form.cascade.category) nextErrors.category = '请选择品类';
     if (!form.cascade.brand) nextErrors.brand = '请选择品牌';
     if (!form.projectName.trim()) nextErrors.projectName = '请输入项目名称';
+    if (form.executionStartDate && form.endDate && form.endDate < form.executionStartDate) {
+      nextErrors.endDate = '项目结束日期不能早于开始执行日期';
+    }
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
   };
@@ -275,7 +286,13 @@ export default function NewProjectPage() {
                       key={project.id}
                       type="button"
                       onClick={() => {
-                        setForm((prev) => ({ ...prev, projectName: project.projectName }));
+                        setForm((prev) => ({
+                          ...prev,
+                          projectName: project.projectName,
+                          lingxiTaxonomy: project.lingxiAccountId
+                            ? { accountId: project.lingxiAccountId, taxonomyCode: '', taxonomyPath: '' }
+                            : prev.lingxiTaxonomy,
+                        }));
                         setShowSuggestions(false);
                       }}
                       className="w-full px-3 py-2 text-left text-sm text-gray-700 transition hover:bg-brand-50 hover:text-brand"
@@ -287,6 +304,16 @@ export default function NewProjectPage() {
               )}
             </div>
             {errors.projectName && <p className="text-xs text-rose-500">{errors.projectName}</p>}
+          </div>
+
+          {/* 灵犀账号ID + 行业选择 */}
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-gray-900">灵犀账号ID</label>
+            <p className="text-xs text-gray-500">输入灵犀账号ID后点击"获取行业"，选择行业分类供灵犀数据爬取使用</p>
+            <LingxiTaxonomySelector
+              value={form.lingxiTaxonomy}
+              onChange={(val) => setForm((prev) => ({ ...prev, lingxiTaxonomy: val }))}
+            />
           </div>
 
           {/* 创建者 - auto-filled, read-only */}
@@ -407,9 +434,13 @@ export default function NewProjectPage() {
             <input
               type="date"
               value={form.endDate}
-              onChange={(e) => setForm((prev) => ({ ...prev, endDate: e.target.value }))}
+              onChange={(e) => {
+                setForm((prev) => ({ ...prev, endDate: e.target.value }));
+                setErrors((prev) => { const n = { ...prev }; delete n.endDate; return n; });
+              }}
               className="h-11 w-full rounded-lg border border-gray-200 px-3 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
             />
+            {errors.endDate && <p className="text-xs text-rose-500">{errors.endDate}</p>}
           </div>
 
           {/* 笔记底表上传 - optional */}

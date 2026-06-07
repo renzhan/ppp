@@ -51,9 +51,28 @@ export function classifyKOLTier(fanCount: number): KOLTier {
 }
 
 /**
- * 爆文判定阈值（固定口径：点赞+收藏+评论 >= 1000）
+ * 爆文判定阈值（默认值：点赞+收藏+评论 >= 1000）
  */
-const VIRAL_THRESHOLD = 1000;
+const DEFAULT_VIRAL_THRESHOLD = 1000;
+
+/**
+ * 达人层级配置（基于粉丝量）
+ */
+export interface FanTierConfig {
+  name: string;
+  fanRangeMin: number; // inclusive
+  fanRangeMax: number; // inclusive
+}
+
+/**
+ * aggregateByKOLTier 可选配置参数
+ */
+export interface AggregateByKOLTierOptions {
+  /** 自定义粉丝层级配置，若不提供则使用 classifyKOLTier 硬编码默认值 */
+  tierConfig?: FanTierConfig[];
+  /** 爆文判定阈值（点赞+收藏+评论），默认1000 */
+  viralThreshold?: number;
+}
 
 /**
  * 按达人层级聚合笔记数据
@@ -71,12 +90,28 @@ const VIRAL_THRESHOLD = 1000;
  * - 水上笔记：kolPrice + serviceFee
  * - 水下笔记：underwaterPrice
  */
-export function aggregateByKOLTier(notes: NoteWithKOL[]): KOLTierAggregation[] {
+export function aggregateByKOLTier(notes: NoteWithKOL[], options?: AggregateByKOLTierOptions): KOLTierAggregation[] {
+  const tierConfig = options?.tierConfig;
+  const viralThreshold = options?.viralThreshold ?? DEFAULT_VIRAL_THRESHOLD;
+
   // Group notes by tier
-  const tierGroups = new Map<KOLTier, NoteWithKOL[]>();
+  const tierGroups = new Map<KOLTier | string, NoteWithKOL[]>();
 
   for (const note of notes) {
-    const tier = classifyKOLTier(note.kolFanNum);
+    let tier: string;
+    if (tierConfig && tierConfig.length > 0) {
+      // Use custom tier config
+      tier = '未分类';
+      for (const t of tierConfig) {
+        if (note.kolFanNum >= t.fanRangeMin && note.kolFanNum <= t.fanRangeMax) {
+          tier = t.name;
+          break;
+        }
+      }
+    } else {
+      // Use default hardcoded tiers
+      tier = classifyKOLTier(note.kolFanNum);
+    }
     const group = tierGroups.get(tier);
     if (group) {
       group.push(note);
@@ -110,8 +145,8 @@ export function aggregateByKOLTier(notes: NoteWithKOL[]): KOLTierAggregation[] {
         totalCost += note.kolPrice + note.serviceFee;
       }
 
-      // Viral detection: fixed threshold (like + fav + cmt >= 1000)
-      if (note.likeNum + note.favNum + note.cmtNum >= VIRAL_THRESHOLD) {
+      // Viral detection: using configured threshold (like + fav + cmt >= threshold)
+      if (note.likeNum + note.favNum + note.cmtNum >= viralThreshold) {
         viralCount++;
       }
     }
@@ -120,7 +155,7 @@ export function aggregateByKOLTier(notes: NoteWithKOL[]): KOLTierAggregation[] {
     const viralRate = noteCount === 0 ? 0 : viralCount / noteCount;
 
     results.push({
-      tier,
+      tier: tier as KOLTier,
       noteCount,
       totalImpressions,
       totalReads,

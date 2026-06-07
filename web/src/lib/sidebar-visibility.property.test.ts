@@ -21,7 +21,7 @@ const navItemArb: fc.Arbitrary<NavItem> = fc.record({
 });
 
 /** Known non-admin roles from the system */
-const knownNonAdminRoles = ['组长', 'AD', 'AM', '投手', '执行'];
+const knownNonAdminRoles = ['VP', 'AD', 'AM', '组长', 'AE'];
 
 /** Generates any non-admin role (known roles + arbitrary strings that are not "admin") */
 const nonAdminRoleArb: fc.Arbitrary<string> = fc.oneof(

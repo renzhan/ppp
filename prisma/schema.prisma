@@ -18,7 +18,10 @@ model User {
   username           String    @unique @db.VarChar(50)
   passwordHash       String    @map("password_hash") @db.VarChar(200)
   displayName        String?   @map("display_name") @db.VarChar(100)
-  role               String    @default("user") @db.VarChar(20) // Valid values: "admin" | "组长" | "AD" | "AM" | "投手" | "执行"
+  realName           String?   @map("real_name") @db.VarChar(100)
+  role               String    @default("AE") @db.VarChar(20) // Valid values: "admin" | "VP" | "AD" | "AM" | "组长" | "AE"
+  permissionLevel    Int       @default(5) @map("permission_level")
+  reportsTo          String?   @map("reports_to") @db.Uuid
   mustChangePassword Boolean   @default(true) @map("must_change_password")
   isActive           Boolean   @default(true) @map("is_active")
   lastLoginAt        DateTime? @map("last_login_at") @db.Timestamptz()
@@ -52,6 +55,11 @@ model Project {
   participants String[] @default([]) @map("participants")
   isImported   Boolean  @default(false) @map("is_imported")
   noteCount    Int      @default(0) @map("note_count")
+
+  // 灵犀关联
+  lingxiAccountId   String?  @map("lingxi_account_id") @db.VarChar(100)
+  lingxiTaxonomyCode String? @map("lingxi_taxonomy_code") @db.VarChar(100)
+  lingxiTaxonomyPath String? @map("lingxi_taxonomy_path") @db.VarChar(500)
 
   // Relations
   comments           Comment[]
@@ -127,6 +135,7 @@ model Note {
   cpcp              Decimal  @default(0) @db.Decimal(12, 2)
   orderId           String?  @map("order_id") @db.VarChar(100)
   effect            String?  @db.VarChar(10)
+  dataSource        String   @default("api") @map("data_source") @db.VarChar(20)  // "api" = 蒲公英爬取, "note_base" = 底表导入(非官方合作)
   createdAt         DateTime? @default(now()) @map("created_at") @db.Timestamptz()
 
   // Relations
@@ -153,6 +162,7 @@ model NoteBase {
   contentCost           Decimal   @default(0) @map("content_cost") @db.Decimal(12, 2)           // 内容实际消耗金额
   contentSettlement     Decimal   @default(0) @map("content_settlement") @db.Decimal(12, 2)     // 内容实际结算金额
   adSpend               Decimal   @default(0) @map("ad_spend") @db.Decimal(12, 2)               // 投流实际消耗
+  adSettlement          Decimal   @default(0) @map("ad_settlement") @db.Decimal(12, 2)          // 投流实际结算金额
   totalCost             Decimal   @default(0) @map("total_cost") @db.Decimal(12, 2)             // 总费用
   metrics               Json?                                                                   // 所有数据指标（曝光量、CPM、投流等额外列，JSON存储）
   createdAt             DateTime? @default(now()) @map("created_at") @db.Timestamptz()
@@ -188,6 +198,7 @@ model JuguangData {
   acp                   Decimal  @default(0) @db.Decimal(12, 2)
   cpm                   Decimal  @default(0) @db.Decimal(12, 2)
   cpi                   Decimal  @default(0) @db.Decimal(12, 2)
+  time                  String?  @map("time") @db.VarChar(10)
   reviewConfigId        String?  @map("review_config_id") @db.Uuid
   createdAt             DateTime? @default(now()) @map("created_at") @db.Timestamptz()
 

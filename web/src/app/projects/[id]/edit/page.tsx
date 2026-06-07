@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Loader2, X, ChevronDown } from 'lucide-react';
 import { PageHeader } from '@/components/layout/page-header';
 import { CascadeSelector, CascadeSelectorValue } from '@/components/form/cascade-selector';
+import { LingxiTaxonomySelector, LingxiTaxonomyValue } from '@/components/form/lingxi-taxonomy-selector';
 import { NoteBaseUploader } from '@/components/form/note-base-uploader';
 import { NoteBaseTable } from '@/components/form/note-base-table';
 
@@ -26,6 +27,9 @@ interface ProjectDetail {
   endDate: string | null;
   participants: string[];
   noteCount: number;
+  lingxiAccountId: string | null;
+  lingxiTaxonomyCode: string | null;
+  lingxiTaxonomyPath: string | null;
 }
 
 interface FormState {
@@ -34,6 +38,7 @@ interface FormState {
   executionStartDate: string;
   endDate: string;
   participants: string[];
+  lingxiTaxonomy: LingxiTaxonomyValue;
 }
 
 type FormErrors = Record<string, string>;
@@ -83,6 +88,11 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
         executionStartDate: project.executionStartDate ? project.executionStartDate.slice(0, 10) : '',
         endDate: project.endDate ? project.endDate.slice(0, 10) : '',
         participants: project.participants || [],
+        lingxiTaxonomy: {
+          accountId: project.lingxiAccountId || '',
+          taxonomyCode: project.lingxiTaxonomyCode || '',
+          taxonomyPath: project.lingxiTaxonomyPath || '',
+        },
       });
     }
   }, [project, form]);
@@ -117,6 +127,9 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
           executionStartDate: form.executionStartDate || null,
           endDate: form.endDate || null,
           participants: form.participants,
+          lingxiAccountId: form.lingxiTaxonomy.accountId || null,
+          lingxiTaxonomyCode: form.lingxiTaxonomy.taxonomyCode || null,
+          lingxiTaxonomyPath: form.lingxiTaxonomy.taxonomyPath || null,
         }),
       });
       const data = await response.json();
@@ -135,6 +148,9 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
     if (!form.cascade.category) nextErrors.category = '请选择品类';
     if (!form.cascade.brand) nextErrors.brand = '请选择品牌';
     if (!form.projectName.trim()) nextErrors.projectName = '请输入项目名称';
+    if (form.executionStartDate && form.endDate && form.endDate < form.executionStartDate) {
+      nextErrors.endDate = '项目结束日期不能早于开始执行日期';
+    }
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
   };
@@ -219,6 +235,16 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
             {errors.projectName && <p className="text-xs text-rose-500">{errors.projectName}</p>}
           </div>
 
+          {/* 灵犀账号ID + 行业选择 */}
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-gray-900">灵犀账号ID</label>
+            <p className="text-xs text-gray-500">输入灵犀账号ID后点击"获取行业"，选择行业分类供灵犀数据爬取使用</p>
+            <LingxiTaxonomySelector
+              value={form.lingxiTaxonomy}
+              onChange={(val) => setForm((prev) => prev ? { ...prev, lingxiTaxonomy: val } : prev)}
+            />
+          </div>
+
           {/* 开始执行日期 */}
           <div className="space-y-2">
             <label className="block text-sm font-medium text-gray-900">开始执行日期</label>
@@ -236,9 +262,13 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
             <input
               type="date"
               value={form.endDate}
-              onChange={(e) => setForm((prev) => prev ? { ...prev, endDate: e.target.value } : prev)}
+              onChange={(e) => {
+                setForm((prev) => prev ? { ...prev, endDate: e.target.value } : prev);
+                setErrors((prev) => { const n = { ...prev }; delete n.endDate; return n; });
+              }}
               className="h-11 w-full rounded-lg border border-gray-200 px-3 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
             />
+            {errors.endDate && <p className="text-xs text-rose-500">{errors.endDate}</p>}
           </div>
 
           {/* 参与者 */}

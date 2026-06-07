@@ -48,9 +48,9 @@ export async function POST(request: NextRequest) {
     };
 
     for (const row of rows) {
-      const username = (row['username'] || row['用户名'] || '').toString().trim();
-      const displayName = (row['displayName'] || row['显示名称'] || row['姓名'] || '').toString().trim();
-      const role = (row['role'] || row['角色'] || 'user').toString().trim();
+      const username = (row['username'] || row['用户名'] || row['花名'] || '').toString().trim();
+      const displayName = (row['displayName'] || row['显示名称'] || row['真名'] || row['姓名'] || '').toString().trim();
+      const role = (row['role'] || row['角色'] || 'AE').toString().trim();
 
       if (!username) {
         results.failed.push({ username: '(空)', reason: '用户名为空' });

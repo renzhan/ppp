@@ -12,10 +12,12 @@ export async function GET() {
 
   // Main sheet with sample data
   const data = [
-    ['用户名', '显示名', '角色'],
-    ['zhangsan', '张三', '执行'],
-    ['lisi', '李四', 'AM'],
-    ['wangwu', '王五', '组长'],
+    ['花名', '真名', '角色'],
+    ['阿玉', '程国玉', 'VP'],
+    ['风犬', '任一枭', 'AD'],
+    ['小鹿', '路宇婷', 'AM'],
+    ['奈奈', '黄慧菲', '组长'],
+    ['小棉', '杨越', 'AE'],
   ];
   
   const ws = XLSX.utils.aoa_to_sheet(data);
@@ -30,7 +32,7 @@ export async function GET() {
   XLSX.utils.book_append_sheet(wb, ws, '用户导入模板');
 
   // Create a hidden "角色选项" sheet with valid role values for reference
-  const validRoles = ['admin', '组长', 'AD', 'AM', '投手', '执行'];
+  const validRoles = ['admin', 'VP', 'AD', 'AM', '组长', 'AE'];
   const rolesData = [['有效角色值（请勿修改此表）'], ...validRoles.map(r => [r])];
   const rolesWs = XLSX.utils.aoa_to_sheet(rolesData);
   rolesWs['!cols'] = [{ wch: 25 }];

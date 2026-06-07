@@ -87,20 +87,22 @@ export class DataIngestionService {
       errors.push(`Failed to fetch pugongying data: ${message}`);
     }
 
-    // 灵犀
+    // 灵犀（仅当项目配置了灵犀账号 ID 时才采集）
     let lingxiData: LingxiData | undefined;
-    try {
-      lingxiData = await this.paichachaClient.fetchLingxiData(
-        ctx.brandName,
-        ctx.execStart,
-        ctx.currentEnd,
-        ctx.taxonomyNames,
-        ctx.preStart,
-        ctx.preEnd,
-      );
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      errors.push(`Failed to fetch lingxi data: ${message}`);
+    if (ctx.lingxiBrandId) {
+      try {
+        lingxiData = await this.paichachaClient.fetchLingxiData(
+          ctx.lingxiBrandId,
+          ctx.execStart,
+          ctx.currentEnd,
+          ctx.taxonomyNames,
+          ctx.preStart,
+          ctx.preEnd,
+        );
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        errors.push(`Failed to fetch lingxi data: ${message}`);
+      }
     }
 
     // 保留已有水下/水下价格
@@ -128,6 +130,19 @@ export class DataIngestionService {
         const message = error instanceof Error ? error.message : String(error);
         errors.push(`Failed to persist pugongying data: ${message}`);
       }
+    }
+
+    // 非官方合作笔记回填：对于蒲公英未返回数据的 noteId，从 note_base 拷贝数据到 notes 表
+    try {
+      const fetchedNoteIds = new Set(pugongyingNotes.map((n) => n.noteId));
+      const missingNoteIds = ctx.noteIds.filter((id) => !fetchedNoteIds.has(id));
+      if (missingNoteIds.length > 0) {
+        await this.persistenceService.fillNotesFromNoteBase(projectId, missingNoteIds);
+        console.log(`[ingestBaseData] 从 note_base 回填 ${missingNoteIds.length} 条非官方合作笔记到 notes 表`);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      errors.push(`Failed to fill notes from note_base: ${message}`);
     }
 
     if (lingxiData) {
@@ -176,6 +191,13 @@ export class DataIngestionService {
     return this.paichachaClient.fetchRawNotes(noteIds);
   }
 
+  /**
+   * 获取品牌行业分类（灵犀接口，原始数据不入库）。
+   */
+  async fetchLingxiBrandTaxonomy(brandId: string) {
+    return this.paichachaClient.fetchLingxiBrandTaxonomy(brandId);
+  }
+
   // ── private helpers ──
 
   /** 解析项目参数 + 计算统一日期，供各采集方法复用 */
@@ -186,8 +208,12 @@ export class DataIngestionService {
     if (!project) throw new Error(`项目不存在: ${projectId}`);
     if (!project.executionStartDate) throw new Error(`项目缺少"开始执行日期"（executionStartDate），请先补充后再拉取数据`);
 
-    const brandName = project.brand;
-    const taxonomyNames = [project.category];
+    const lingxiBrandId = project.lingxiAccountId || undefined;
+
+    // taxonomyNames 需要完整的 name 路径数组，如 ["食品饮料", "饮料冲调", "冲泡茶", "茶叶"]
+    const taxonomyNames = project.lingxiTaxonomyPath
+      ? project.lingxiTaxonomyPath.split(' > ').map(s => s.trim()).filter(Boolean)
+      : undefined;
 
     // T-1（下午 4 点爬取昨天数据）
     const now = new Date();
@@ -205,7 +231,7 @@ export class DataIngestionService {
     const preEnd = new Date(new Date(execStart).getTime() - 86400000).toISOString().slice(0, 10);
     const preStart = new Date(new Date(preEnd).getTime() - periodDays * 86400000 + 86400000).toISOString().slice(0, 10);
 
-    return { noteIds, brandName, taxonomyNames, execStart, execEnd, currentEnd, preStart, preEnd };
+    return { noteIds, lingxiBrandId, taxonomyNames, execStart, execEnd, currentEnd, preStart, preEnd };
   }
 
   /**

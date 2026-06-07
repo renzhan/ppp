@@ -38,6 +38,7 @@ export class ContentAnalysisDataLoader extends BaseChapterDataLoader {
     // ── 0. 加载复盘配置 ──
     let engagementMetric = 'exclude_follow';
     let viralMetric = 'like_comment_share';
+    let viralThreshold = 1000;
     let contentCostCaliber = 'consumption';
     let trafficCostCaliber = 'consumption';
     let influencerTiers: Array<{ name: string; fanRangeMin: number; fanRangeMax: number }> = [
@@ -50,12 +51,15 @@ export class ContentAnalysisDataLoader extends BaseChapterDataLoader {
     try {
       const reviewConfig = await this.prisma.reviewConfig.findFirst({
         where: { projectId },
-        select: { engagementMetric: true, viralMetric: true, influencerTiers: true },
+        select: { engagementMetric: true, viralMetric: true, viralThreshold: true, influencerTiers: true },
         orderBy: { createdAt: 'desc' },
       });
       if (reviewConfig) {
         if (reviewConfig.engagementMetric) engagementMetric = reviewConfig.engagementMetric as string;
         if (reviewConfig.viralMetric) viralMetric = reviewConfig.viralMetric as string;
+        if (reviewConfig.viralThreshold != null && reviewConfig.viralThreshold > 0) {
+          viralThreshold = reviewConfig.viralThreshold;
+        }
         if ((reviewConfig as any).contentCostCaliber) contentCostCaliber = (reviewConfig as any).contentCostCaliber;
         if ((reviewConfig as any).trafficCostCaliber) trafficCostCaliber = (reviewConfig as any).trafficCostCaliber;
         const tiers = reviewConfig.influencerTiers as any[];
@@ -87,6 +91,8 @@ export class ContentAnalysisDataLoader extends BaseChapterDataLoader {
       shareNum: number;
       kolPrice: any;
       serviceFee: any;
+      coverImages: any;
+      noteLink: string | null;
     }
 
     let notes: NoteRow[] = [];
@@ -108,6 +114,8 @@ export class ContentAnalysisDataLoader extends BaseChapterDataLoader {
           shareNum: true,
           kolPrice: true,
           serviceFee: true,
+          coverImages: true,
+          noteLink: true,
         },
       });
     } catch (error) {
@@ -176,6 +184,8 @@ export class ContentAnalysisDataLoader extends BaseChapterDataLoader {
       cpti: number;
       isViral: boolean;
       viralScore: number; // 用于排序
+      coverImage: string | null; // 封面图路径
+      noteLink: string | null;
     }
 
     const enrichedNotes: EnrichedNote[] = [];
@@ -205,11 +215,11 @@ export class ContentAnalysisDataLoader extends BaseChapterDataLoader {
       let isViral: boolean;
       let viralScore: number;
       if (viralMetric === 'like_only') {
-        isViral = note.likeNum >= 1000;
+        isViral = note.likeNum >= viralThreshold;
         viralScore = note.likeNum;
       } else {
         const interactionSum = note.likeNum + note.favNum + note.cmtNum;
-        isViral = interactionSum >= 1000;
+        isViral = interactionSum >= viralThreshold;
         viralScore = interactionSum;
       }
 
@@ -248,6 +258,8 @@ export class ContentAnalysisDataLoader extends BaseChapterDataLoader {
         cpti,
         isViral,
         viralScore,
+        coverImage: Array.isArray(note.coverImages) && note.coverImages.length > 0 ? note.coverImages[0] : null,
+        noteLink: note.noteLink ?? null,
       });
     }
 
@@ -317,15 +329,37 @@ export class ContentAnalysisDataLoader extends BaseChapterDataLoader {
 
     // ── 10. 优质笔记TOP5 ──
     const sortedNotes = [...enrichedNotes].sort((a, b) => b.viralScore - a.viralScore);
-    const top5 = sortedNotes.slice(0, 5).map((n, i) =>
-      `${i + 1}. ${n.kolNickName}（${n.noteType}/${n.contentDirection}）：曝光${n.impNum}, 互动${n.engagement}, CPE=${n.cpe.toFixed(2)}, 赞${n.likeNum}/藏${n.favNum}/评${n.cmtNum}`
-    );
-    variables['top5_notes'] = top5.join('\n');
+    const top5 = sortedNotes.slice(0, 5).map((n, i) => {
+      const coverHtml = n.coverImage
+        ? `[封面图: ${n.coverImage}]`
+        : '[无封面图]';
+      return `${i + 1}. ${n.kolNickName}（${n.noteType}/${n.contentDirection}）：曝光${n.impNum}, 互动${n.engagement}, CPE=${n.cpe.toFixed(2)}, 赞${n.likeNum}/藏${n.favNum}/评${n.cmtNum}\n   标题: ${n.noteTitle || '无标题'}\n   封面: ${coverHtml}\n   链接: ${n.noteLink || '无'}`;
+    });
+    variables['top5_notes'] = top5.join('\n\n');
+
+    // 同时提供结构化的TOP5数据供prompt直接生成img标签
+    const top5Structured = sortedNotes.slice(0, 5).map((n) => ({
+      noteId: n.noteId,
+      kolNickName: n.kolNickName,
+      noteType: n.noteType,
+      contentDirection: n.contentDirection,
+      noteTitle: n.noteTitle,
+      impNum: n.impNum,
+      readNum: n.readNum,
+      engagement: n.engagement,
+      likeNum: n.likeNum,
+      favNum: n.favNum,
+      cmtNum: n.cmtNum,
+      cpe: Number(n.cpe.toFixed(2)),
+      coverImage: n.coverImage,
+      noteLink: n.noteLink,
+    }));
+    variables['top5_notes_json'] = JSON.stringify(top5Structured);
 
     // 统计信息
     variables['total_notes'] = String(enrichedNotes.length);
     variables['total_viral'] = String(enrichedNotes.filter((n) => n.isViral).length);
-    variables['viral_metric'] = viralMetric === 'like_only' ? '千赞（赞≥1000）' : '千互（赞+藏+评≥1000）';
+    variables['viral_metric'] = viralMetric === 'like_only' ? `千赞（赞≥${viralThreshold}）` : `千互（赞+藏+评≥${viralThreshold}）`;
 
     // ── 11. 构建溯源数据 ──
     // 溯源展示原始笔记数据行 + 分组聚合公式
@@ -365,7 +399,7 @@ export class ContentAnalysisDataLoader extends BaseChapterDataLoader {
         { metric: '分组聚合', formula: 'GROUP BY content_direction', inputs: { '分组数': byDirection.size }, result: `${byDirection.size}个内容方向` },
         { metric: 'CPE(每组)', formula: 'SUM(totalCost) / SUM(engagement)', inputs: {}, result: '按组聚合后计算' },
         { metric: 'CPTI(每组)', formula: 'SUM(totalCost) / SUM(tiUserNum)', inputs: {}, result: '按组聚合后计算' },
-        { metric: '爆文率(每组)', formula: 'COUNT(isViral=true) / COUNT(*) * 100', inputs: { '爆文标准': viralMetric === 'like_only' ? '赞≥1000' : '赞+藏+评≥1000' }, result: '按组统计' },
+        { metric: '爆文率(每组)', formula: 'COUNT(isViral=true) / COUNT(*) * 100', inputs: { '爆文标准': viralMetric === 'like_only' ? `赞≥${viralThreshold}` : `赞+藏+评≥${viralThreshold}` }, result: '按组统计' },
       ],
     });
 

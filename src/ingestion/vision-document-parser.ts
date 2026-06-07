@@ -134,13 +134,18 @@ export async function recognizeLingxiScreenshot(
   // as a special format that the Vision API understands
   const userContent = `[IMAGE:${dataUrl}]\n\n请识别这张灵犀平台截图中的数据。`;
 
-  const response = await llmClient.chat(
-    [
-      { role: 'system', content: LINGXI_OCR_SYSTEM_PROMPT },
-      { role: 'user', content: userContent },
-    ],
-    { temperature: 0.1, timeout: VISION_TIMEOUT },
-  );
+  let response: string;
+  try {
+    response = await llmClient.chat(
+      [
+        { role: 'system', content: LINGXI_OCR_SYSTEM_PROMPT },
+        { role: 'user', content: userContent },
+      ],
+      { temperature: 0.1, timeout: VISION_TIMEOUT },
+    );
+  } catch (err) {
+    throw new Error(`OCR识别失败: ${err instanceof Error ? err.message : '请重试'}`);
+  }
 
   return parseOCRResponse(response);
 }
@@ -215,13 +220,19 @@ async function processPlanBatch(
   const estimatedSize = JSON.stringify(content).length;
   console.log(`[策划案解析] 批次${pageRange}, ${pages.length}页, 预估请求体${(estimatedSize / 1024 / 1024).toFixed(1)}MB`);
 
-  const response = await llmClient.chat(
-    [
-      { role: 'system', content: PLAN_DOCUMENT_SYSTEM_PROMPT },
-      { role: 'user', content },
-    ],
-    { temperature: 0.3, timeout: 120000 },
-  );
+  let response: string;
+  try {
+    response = await llmClient.chat(
+      [
+        { role: 'system', content: PLAN_DOCUMENT_SYSTEM_PROMPT },
+        { role: 'user', content },
+      ],
+      { temperature: 0.3, timeout: 120000 },
+    );
+  } catch (err) {
+    console.error(`[策划案解析] 批次${pageRange} LLM调用失败:`, err instanceof Error ? err.message : err);
+    return { confidence: 0, pagesSummary: [] };
+  }
 
   const result = parsePlanResponse(response, pages);
   const status = result.confidence > 0 ? `✓ 置信度${result.confidence}` : `✗ 置信度0`;

@@ -195,6 +195,9 @@ export async function POST(request: Request) {
           executionStartDate,
           createdBy: createdBy || null,
           participants,
+          lingxiAccountId: typeof body.lingxiAccountId === 'string' ? body.lingxiAccountId.trim() || null : null,
+          lingxiTaxonomyCode: typeof body.lingxiTaxonomyCode === 'string' ? body.lingxiTaxonomyCode.trim() || null : null,
+          lingxiTaxonomyPath: typeof body.lingxiTaxonomyPath === 'string' ? body.lingxiTaxonomyPath.trim() || null : null,
         },
       });
 

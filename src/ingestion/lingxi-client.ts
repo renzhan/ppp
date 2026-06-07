@@ -5,7 +5,7 @@
  * Phase 1: keyword_trend（月搜索指数）+ asset_analyse（品牌AIPS/TI）。
  */
 
-import type { BrandData, KeywordData, ScreenshotData, LingxiData } from '../shared/types.js';
+import type { BrandData, LingxiBrandTaxonomyNode, KeywordData, ScreenshotData, LingxiData } from '../shared/types.js';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
@@ -54,15 +54,25 @@ export class LingxiClient {
 
   // ── 统一入口 ──
 
-  async fetchLingxiData(brandName: string, startDate: string, endDate: string, taxonomyNames?: string | string[], preStartDate?: string, preEndDate?: string): Promise<LingxiData> {
-    const brand = await this.fetchBrandData(brandName, startDate, endDate, taxonomyNames, preStartDate, preEndDate);
+  /** 获取品牌行业分类（原始数据，不入库） */
+  async fetchLingxiBrandTaxonomy(brandId: string): Promise<LingxiBrandTaxonomyNode[]> {
+    const url = `${this.config.baseUrl}/api/data/brand-taxonomy?profile_id=default&brand_id=${brandId}`;
+    const res = await fetch(url, { headers: { 'X-API-Key': this.config.apiKey } });
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+    const json = await res.json() as { code: number; data?: LingxiBrandTaxonomyNode[] };
+    if (json.code !== 0) throw new Error(`brand-taxonomy 错误: code=${json.code}`);
+    return json.data ?? [];
+  }
+
+  async fetchLingxiData(brandId: string, startDate: string, endDate: string, taxonomyNames?: string | string[], preStartDate?: string, preEndDate?: string): Promise<LingxiData> {
+    const brand = await this.fetchBrandData(brandId, startDate, endDate, taxonomyNames, preStartDate, preEndDate);
     return { brand };
   }
 
   // ── asset_analyse + move_analyse → 品牌数据 ──
 
-  async fetchBrandData(brandName: string, startDate: string, endDate: string, taxonomyNames?: string | string[], preStartDate?: string, preEndDate?: string): Promise<BrandData> {
-    const res = await this.callTask('asset_analyse', brandName, { endDate });
+  async fetchBrandData(brandId: string, startDate: string, endDate: string, taxonomyNames?: string | string[], preStartDate?: string, preEndDate?: string): Promise<BrandData> {
+    const res = await this.callTask('asset_analyse', brandId, { endDate });
     const captured = res.data?.captured ?? [];
 
     const aips = extractAips(captured);
@@ -72,7 +82,7 @@ export class LingxiClient {
     let brandRank: number | undefined;
     if (taxonomyNames) {
       try {
-        const rankRes = await this.callTask('asset_analyse', brandName, { endDate, taxonomyNames });
+        const rankRes = await this.callTask('asset_analyse', brandId, { endDate, taxonomyNames });
         const rankCaptured = rankRes.data?.captured ?? [];
         brandRank = extractBrandRank(rankCaptured);
       } catch (e) {
@@ -84,7 +94,7 @@ export class LingxiClient {
     let rankData: Partial<BrandData> = {};
     if (taxonomyNames) {
       try {
-        const rankRes = await this.callTask('brand_rank', brandName, {
+        const rankRes = await this.callTask('brand_rank', brandId, {
           startTime: startDate, endTime: endDate, taxonomyNames,
         });
         const rankCaptured = rankRes.data?.captured ?? [];
@@ -96,7 +106,7 @@ export class LingxiClient {
       // 投前搜索量
       if (preStartDate && preEndDate) {
         try {
-          const preRes = await this.callTask('brand_rank', brandName, {
+          const preRes = await this.callTask('brand_rank', brandId, {
             startTime: preStartDate, endTime: preEndDate, taxonomyNames,
           });
           const preCaptured = preRes.data?.captured ?? [];
@@ -112,7 +122,7 @@ export class LingxiClient {
     // 人流流转数据
     let moveData: Partial<BrandData> = {};
     try {
-      const moveRes = await this.callTask('move_analyse', brandName, { startDate, endDate });
+      const moveRes = await this.callTask('move_analyse', brandId, { startDate, endDate });
       const moveCaptured = moveRes.data?.captured ?? [];
       moveData = extractMoveAnalyseData(moveCaptured, startDate, endDate);
     } catch (e) {
@@ -155,7 +165,7 @@ export class LingxiClient {
 
   private async callTask(
     biz: string,
-    brandName: string,
+    brandId: string,
     params: Record<string, unknown>,
   ): Promise<LingxiTaskResponse> {
     return withRetry(async () => {
@@ -173,13 +183,20 @@ export class LingxiClient {
           body: JSON.stringify({
             profile_id: 'default',
             biz,
-            brand_name: brandName,
+            brand_id: brandId,
             params,
           }),
           signal: controller.signal,
         });
 
-        if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+        if (!res.ok) {
+          const err = new Error(`HTTP ${res.status}: ${res.statusText}`);
+          // 4xx 错误是客户端参数问题，重试也不会解决，直接抛出不重试
+          if (res.status >= 400 && res.status < 500) {
+            (err as any).noRetry = true;
+          }
+          throw err;
+        }
 
         const json = await res.json() as LingxiTaskResponse;
 
@@ -302,6 +319,8 @@ function getPeriod(): string {
 async function withRetry<T>(fn: () => Promise<T>, retries = MAX_RETRIES): Promise<T> {
   for (let attempt = 0; attempt <= retries; attempt++) {
     try { return await fn(); } catch (e) {
+      // 不重试标记为 noRetry 的错误（如 4xx 客户端错误）
+      if ((e as any)?.noRetry) throw e;
       if (attempt === retries) throw e;
       await new Promise((r) => setTimeout(r, 3000 * Math.pow(2, attempt)));
     }

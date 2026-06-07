@@ -128,6 +128,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validate benchmark ranges: min ≤ max
+    if (benchmark && typeof benchmark === 'object') {
+      for (const [key, value] of Object.entries(benchmark)) {
+        if (value && typeof value === 'object' && 'min' in value && 'max' in value) {
+          const { min, max } = value as { min: number | null; max: number | null };
+          if (min != null && max != null && min > max) {
+            return NextResponse.json(
+              { error: `大盘数据 ${key} 最小值不能大于最大值`, code: 'VALIDATION_ERROR' },
+              { status: 400 }
+            );
+          }
+          if ((min != null && min < 0) || (max != null && max < 0)) {
+            return NextResponse.json(
+              { error: `大盘数据 ${key} 不能为负数`, code: 'VALIDATION_ERROR' },
+              { status: 400 }
+            );
+          }
+        }
+      }
+    }
+
     // Sanitize advertiserIds: filter to valid numeric strings, limit to 5
     const sanitizedAdvertiserIds: string[] = Array.isArray(advertiserIds)
       ? advertiserIds.filter((id: unknown) => typeof id === 'string' && /^\d+$/.test(id)).slice(0, 5)
@@ -149,17 +170,26 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Trigger juguang data ingestion if advertiserIds is non-empty (fire-and-forget)
+    // Trigger juguang data ingestion if advertiserIds is non-empty (fire-and-forget, no await)
     if (sanitizedAdvertiserIds.length > 0) {
-      try {
-        const ingestionService = new DataIngestionService();
-        // Convert string IDs to numbers as expected by ingestJuguangData
-        const numericAdvertiserIds = sanitizedAdvertiserIds.map((id) => Number(id));
-        await ingestionService.ingestJuguangData(projectId, numericAdvertiserIds, reviewConfig.id);
-      } catch (ingestionError) {
-        // Do not block response on ingestion failure — log error and continue
-        console.error('POST /api/reviews ingestion error (non-blocking):', ingestionError);
-      }
+      const ingestionService = new DataIngestionService();
+      const numericAdvertiserIds = sanitizedAdvertiserIds.map((id) => Number(id));
+      console.log('[POST /api/reviews] 调用 ingestJuguangData (fire-and-forget):', JSON.stringify({
+        projectId,
+        advertiserIds: numericAdvertiserIds,
+        reviewConfigId: reviewConfig.id,
+      }));
+      ingestionService.ingestJuguangData(projectId, numericAdvertiserIds, reviewConfig.id)
+        .then((juguangResult) => {
+          console.log('[POST /api/reviews] ingestJuguangData 完成:', JSON.stringify({
+            juguangNotesCount: juguangResult.juguangNotes.length,
+            errors: juguangResult.errors,
+            sampleNotes: juguangResult.juguangNotes.slice(0, 3),
+          }));
+        })
+        .catch((ingestionError) => {
+          console.error('POST /api/reviews ingestion error (non-blocking):', ingestionError);
+        });
     }
 
     return NextResponse.json(reviewConfig, { status: 201 });

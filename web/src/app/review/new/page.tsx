@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Plus, Trash2, Upload, FileText, AlertCircle, ArrowLeft } from 'lucide-react';
@@ -152,6 +152,14 @@ function NewReviewPageContent() {
   const [advertiserIds, setAdvertiserIds] = useState<string[]>([]);
   const [advertiserIdInput, setAdvertiserIdInput] = useState('');
   const [advertiserIdError, setAdvertiserIdError] = useState<string | null>(null);
+  const [benchmarkErrors, setBenchmarkErrors] = useState<Record<string, string | null>>({});
+  const [tierError, setTierError] = useState<string | null>(null);
+  const [phaseError, setPhaseError] = useState<string | null>(null);
+
+  // ─── Refs for scroll-to-error ────────────────────────────────────────────
+  const benchmarkSectionRef = useRef<HTMLDivElement>(null);
+  const tierSectionRef = useRef<HTMLDivElement>(null);
+  const phaseSectionRef = useRef<HTMLDivElement>(null);
 
   // ─── Data Fetching ───────────────────────────────────────────────────────
   // Fetch project info by projectId (from URL param or edit mode)
@@ -166,11 +174,19 @@ function NewReviewPageContent() {
   });
 
   // Redirect to project list if no projectId provided (and not in edit mode)
-  useEffect(() => {
-    if (!preselectedProjectId && !editFromId) {
-      router.push('/projects?message=请从项目列表选择项目进行复盘');
-    }
-  }, [preselectedProjectId, editFromId, router]);
+  // (No redirect — allow direct access and project selection in form)
+
+  // Fetch all projects for project selector
+  const { data: allProjects } = useQuery<Project[]>({
+    queryKey: ['all-projects-for-review'],
+    queryFn: async () => {
+      const res = await fetch('/api/projects?pageSize=500');
+      if (!res.ok) throw new Error('获取项目列表失败');
+      const data = await res.json();
+      return (data.items ?? []).filter((p: Project) => p.noteCount > 0);
+    },
+    enabled: !preselectedProjectId && !editFromId,
+  });
 
 
 
@@ -303,28 +319,24 @@ function NewReviewPageContent() {
       return res.json();
     },
     onSuccess: async (review) => {
-      // Upload plan file if selected
+      // Upload plan file if selected (non-blocking for navigation)
       if (planFile) {
-        const formData = new FormData();
-        formData.append('file', planFile);
-        await fetch(`/api/reviews/${review.id}/plan-upload`, {
-          method: 'POST',
-          body: formData,
-        });
-      }
-
-      // If advertiserIds were provided, wait for ingestion to complete before redirecting
-      // The POST /api/reviews already triggered ingestion server-side,
-      // but we also trigger pugongying base data fetch here and wait
-      if (advertiserIds.length > 0 || selectedProjectId) {
-        setSubmitError(null);
         try {
-          // Trigger base data ingestion (pugongying notes) and wait
-          await fetch(`/api/upload/api-fetch?projectId=${selectedProjectId}`, {
+          const formData = new FormData();
+          formData.append('file', planFile);
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 30000); // 30s timeout
+          const uploadRes = await fetch(`/api/reviews/${review.id}/plan-upload`, {
             method: 'POST',
+            body: formData,
+            signal: controller.signal,
           });
-        } catch {
-          // Don't block on failure — data may still come from cron
+          clearTimeout(timeout);
+          if (!uploadRes.ok) {
+            console.error('[plan-upload] 上传失败:', await uploadRes.text());
+          }
+        } catch (err) {
+          console.error('[plan-upload] 上传异常:', err);
         }
       }
 
@@ -392,6 +404,90 @@ function NewReviewPageContent() {
     setSubmitError(null);
   };
 
+  // ─── Validation Helpers ─────────────────────────────────────────────────
+  const validateSingleBenchmark = (key: string, min: string, max: string) => {
+    const minVal = min.trim() ? parseFloat(min) : null;
+    const maxVal = max.trim() ? parseFloat(max) : null;
+    let error: string | null = null;
+    if (minVal !== null && minVal < 0) {
+      error = '最小值不能为负数';
+    } else if (maxVal !== null && maxVal < 0) {
+      error = '最大值不能为负数';
+    } else if (minVal !== null && maxVal !== null && minVal > maxVal) {
+      error = '最小值不能大于最大值';
+    }
+    setBenchmarkErrors((prev) => ({ ...prev, [key]: error }));
+  };
+
+  const validateBenchmarks = (): boolean => {
+    const errors: Record<string, string | null> = {};
+    let valid = true;
+    Object.entries(benchmark).forEach(([key, { min, max }]) => {
+      const minVal = min.trim() ? parseFloat(min) : null;
+      const maxVal = max.trim() ? parseFloat(max) : null;
+      if (minVal !== null && minVal < 0) {
+        errors[key] = '最小值不能为负数';
+        valid = false;
+      } else if (maxVal !== null && maxVal < 0) {
+        errors[key] = '最大值不能为负数';
+        valid = false;
+      } else if (minVal !== null && maxVal !== null && minVal > maxVal) {
+        errors[key] = '最小值不能大于最大值';
+        valid = false;
+      } else {
+        errors[key] = null;
+      }
+    });
+    setBenchmarkErrors(errors);
+    return valid;
+  };
+
+  const validateInfluencerTiers = (): boolean => {
+    if (influencerTiers.length <= 1) {
+      setTierError(null);
+      return true;
+    }
+    // Sort tiers by fanRangeMin descending (头部 first, larger fans)
+    const sorted = [...influencerTiers].sort((a, b) => b.fanRangeMin - a.fanRangeMin);
+    for (let i = 0; i < sorted.length - 1; i++) {
+      const currentLower = sorted[i].fanRangeMin;
+      const nextUpper = sorted[i + 1].fanRangeMax;
+      // The current tier's lower bound should equal the next tier's upper bound + 1 (continuous ranges)
+      if (nextUpper + 1 !== currentLower) {
+        setTierError(`层级"${sorted[i].name || `第${i + 1}层`}"下限(${currentLower})与"${sorted[i + 1].name || `第${i + 2}层`}"上限(${nextUpper})不连续，相邻层级应头尾相接`);
+        return false;
+      }
+    }
+    setTierError(null);
+    return true;
+  };
+
+  const validateLaunchPhases = (): boolean => {
+    // Only validate phases that have dates filled
+    const filledPhases = launchPhases.filter((p) => p.startDate && p.endDate);
+    if (filledPhases.length <= 1) {
+      setPhaseError(null);
+      return true;
+    }
+    // Check each phase's own start <= end
+    for (const phase of filledPhases) {
+      if (phase.startDate > phase.endDate) {
+        setPhaseError(`阶段"${phase.name || '未命名'}"的开始日期晚于结束日期`);
+        return false;
+      }
+    }
+    // Sort by startDate for chronological check
+    const sorted = [...filledPhases].sort((a, b) => a.startDate.localeCompare(b.startDate));
+    for (let i = 0; i < sorted.length - 1; i++) {
+      if (sorted[i].endDate > sorted[i + 1].startDate) {
+        setPhaseError(`阶段"${sorted[i].name || `第${i + 1}阶段`}"与"${sorted[i + 1].name || `第${i + 2}阶段`}"时间存在重叠`);
+        return false;
+      }
+    }
+    setPhaseError(null);
+    return true;
+  };
+
   const handleSubmit = () => {
     setSubmitError(null);
 
@@ -403,6 +499,24 @@ function NewReviewPageContent() {
     // Check note count
     if (projectInfo && projectInfo.noteCount === 0) {
       setSubmitError('请先为该项目上传笔记底表，再开始复盘');
+      return;
+    }
+
+    // Validate benchmarks
+    const benchmarkValid = validateBenchmarks();
+    const tiersValid = validateInfluencerTiers();
+    const phasesValid = validateLaunchPhases();
+    if (!benchmarkValid || !tiersValid || !phasesValid) {
+      console.warn('[复盘校验] 校验不通过 —— benchmarkValid:', benchmarkValid, 'tiersValid:', tiersValid, 'phasesValid:', phasesValid, 'benchmark state:', JSON.stringify(benchmark));
+      setSubmitError('请修正表单中的错误后再提交');
+      // Scroll to first error section
+      if (!benchmarkValid && benchmarkSectionRef.current) {
+        benchmarkSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } else if (!tiersValid && tierSectionRef.current) {
+        tierSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } else if (!phasesValid && phaseSectionRef.current) {
+        phaseSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
       return;
     }
 
@@ -457,6 +571,101 @@ function NewReviewPageContent() {
 
       {/* Section: 项目信息 */}
       <FormSection title="项目信息">
+        {/* Project cascade selector (shown when no projectId pre-selected) */}
+        {!preselectedProjectId && !editFromId && (() => {
+          const projects = allProjects ?? [];
+          // Derive cascade options
+          const categories = [...new Set(projects.map(p => p.category))].sort();
+          const selectedCategory = projects.find(p => p.id === selectedProjectId)?.category || '';
+          const brandsForCategory = [...new Set(projects.filter(p => !selectedCategory || p.category === selectedCategory).map(p => p.brand))].sort();
+          const selectedBrand = projects.find(p => p.id === selectedProjectId)?.brand || '';
+          const linesForBrand = [...new Set(projects.filter(p => (!selectedCategory || p.category === selectedCategory) && (!selectedBrand || p.brand === selectedBrand)).map(p => p.businessLine || ''))].filter(Boolean).sort();
+          const selectedLine = projects.find(p => p.id === selectedProjectId)?.businessLine || '';
+          const filteredProjects = projects.filter(p => {
+            if (selectedCategory && p.category !== selectedCategory) return false;
+            if (selectedBrand && p.brand !== selectedBrand) return false;
+            if (selectedLine && (p.businessLine || '') !== selectedLine) return false;
+            return true;
+          });
+
+          return (
+            <div className="space-y-3 mb-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                {/* 品类 */}
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-600">品类</label>
+                  <select
+                    value={selectedCategory}
+                    onChange={(e) => {
+                      // Find the first project matching this category (or clear)
+                      if (!e.target.value) { setSelectedProjectId(''); return; }
+                      const first = projects.find(p => p.category === e.target.value);
+                      if (first) setSelectedProjectId(first.id);
+                    }}
+                    className="h-10 w-full rounded-lg border border-gray-200 px-3 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
+                  >
+                    <option value="">全部品类</option>
+                    {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                {/* 品牌 */}
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-600">品牌</label>
+                  <select
+                    value={selectedBrand}
+                    onChange={(e) => {
+                      if (!e.target.value) { setSelectedProjectId(''); return; }
+                      const first = projects.find(p => p.brand === e.target.value && (!selectedCategory || p.category === selectedCategory));
+                      if (first) setSelectedProjectId(first.id);
+                    }}
+                    className="h-10 w-full rounded-lg border border-gray-200 px-3 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
+                  >
+                    <option value="">全部品牌</option>
+                    {brandsForCategory.map(b => <option key={b} value={b}>{b}</option>)}
+                  </select>
+                </div>
+                {/* 业务线 */}
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-600">业务线</label>
+                  <select
+                    value={selectedLine}
+                    onChange={(e) => {
+                      if (!e.target.value) { return; }
+                      const first = projects.find(p =>
+                        (!selectedCategory || p.category === selectedCategory) &&
+                        (!selectedBrand || p.brand === selectedBrand) &&
+                        (p.businessLine || '') === e.target.value
+                      );
+                      if (first) setSelectedProjectId(first.id);
+                    }}
+                    className="h-10 w-full rounded-lg border border-gray-200 px-3 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
+                  >
+                    <option value="">全部业务线</option>
+                    {linesForBrand.map(l => <option key={l} value={l}>{l}</option>)}
+                  </select>
+                </div>
+              </div>
+              {/* 项目选择 */}
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-600">项目 <span className="text-rose-500">*</span></label>
+                <select
+                  value={selectedProjectId}
+                  onChange={(e) => setSelectedProjectId(e.target.value)}
+                  className="h-10 w-full rounded-lg border border-gray-200 px-3 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
+                >
+                  <option value="">请选择项目</option>
+                  {filteredProjects.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.projectName}（{p.noteCount}篇笔记）
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Project info display */}
         {(isProjectLoading || (editFromId && !selectedProjectId)) ? (
           <div className="flex items-center justify-center py-4">
             <Loading size="sm" />
@@ -481,17 +690,18 @@ function NewReviewPageContent() {
               <span className="text-sm font-medium text-gray-800">{projectInfo.businessLine || '-'}</span>
             </div>
           </div>
-        ) : (
+        ) : selectedProjectId ? (
           <div className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
             <AlertCircle size={16} />
-            <span>未找到项目信息，请从项目列表选择项目进行复盘</span>
+            <span>未找到项目信息</span>
           </div>
-        )}
+        ) : null}
       </FormSection>
 
 
 
       {/* Section: 大盘数据 */}
+      <div ref={benchmarkSectionRef}>
       <FormSection title="大盘数据">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <RangeInput
@@ -500,6 +710,8 @@ function NewReviewPageContent() {
             maxValue={benchmark.ctr.max}
             onMinChange={(v) => setBenchmark({ ...benchmark, ctr: { ...benchmark.ctr, min: v } })}
             onMaxChange={(v) => setBenchmark({ ...benchmark, ctr: { ...benchmark.ctr, max: v } })}
+            onBlur={() => validateSingleBenchmark('ctr', benchmark.ctr.min, benchmark.ctr.max)}
+            error={benchmarkErrors.ctr}
           />
           <RangeInput
             label="CPM"
@@ -507,6 +719,8 @@ function NewReviewPageContent() {
             maxValue={benchmark.cpm.max}
             onMinChange={(v) => setBenchmark({ ...benchmark, cpm: { ...benchmark.cpm, min: v } })}
             onMaxChange={(v) => setBenchmark({ ...benchmark, cpm: { ...benchmark.cpm, max: v } })}
+            onBlur={() => validateSingleBenchmark('cpm', benchmark.cpm.min, benchmark.cpm.max)}
+            error={benchmarkErrors.cpm}
           />
           <RangeInput
             label="CPC"
@@ -514,6 +728,8 @@ function NewReviewPageContent() {
             maxValue={benchmark.cpc.max}
             onMinChange={(v) => setBenchmark({ ...benchmark, cpc: { ...benchmark.cpc, min: v } })}
             onMaxChange={(v) => setBenchmark({ ...benchmark, cpc: { ...benchmark.cpc, max: v } })}
+            onBlur={() => validateSingleBenchmark('cpc', benchmark.cpc.min, benchmark.cpc.max)}
+            error={benchmarkErrors.cpc}
           />
           <RangeInput
             label="CPE"
@@ -521,6 +737,8 @@ function NewReviewPageContent() {
             maxValue={benchmark.cpe.max}
             onMinChange={(v) => setBenchmark({ ...benchmark, cpe: { ...benchmark.cpe, min: v } })}
             onMaxChange={(v) => setBenchmark({ ...benchmark, cpe: { ...benchmark.cpe, max: v } })}
+            onBlur={() => validateSingleBenchmark('cpe', benchmark.cpe.min, benchmark.cpe.max)}
+            error={benchmarkErrors.cpe}
           />
           <RangeInput
             label="互动率 (%)"
@@ -528,11 +746,15 @@ function NewReviewPageContent() {
             maxValue={benchmark.engagementRate.max}
             onMinChange={(v) => setBenchmark({ ...benchmark, engagementRate: { ...benchmark.engagementRate, min: v } })}
             onMaxChange={(v) => setBenchmark({ ...benchmark, engagementRate: { ...benchmark.engagementRate, max: v } })}
+            onBlur={() => validateSingleBenchmark('engagementRate', benchmark.engagementRate.min, benchmark.engagementRate.max)}
+            error={benchmarkErrors.engagementRate}
           />
         </div>
       </FormSection>
+      </div>
 
       {/* Section: 达人层级配置 */}
+      <div ref={tierSectionRef}>
       <FormSection title="达人层级配置">
         <div className="space-y-3">
           {influencerTiers.map((tier) => (
@@ -576,8 +798,10 @@ function NewReviewPageContent() {
             <Plus size={14} />
             添加层级
           </button>
+          {tierError && <p className="mt-2 text-xs text-rose-500">{tierError}</p>}
         </div>
       </FormSection>
+      </div>
 
       {/* Section: KPI目标配置 */}
       <FormSection title="复盘目标（KPI）">
@@ -763,6 +987,7 @@ function NewReviewPageContent() {
 
       {/* Section: 投流周期配置 */}
       {modules.launchAnalysis && (
+        <div ref={phaseSectionRef}>
         <FormSection title="投流周期配置">
           <div className="space-y-3">
             {launchPhases.map((phase) => (
@@ -804,8 +1029,10 @@ function NewReviewPageContent() {
               <Plus size={14} />
               添加阶段
             </button>
+            {phaseError && <p className="mt-2 text-xs text-rose-500">{phaseError}</p>}
           </div>
         </FormSection>
+        </div>
       )}
 
       {/* Section: 投放ID */}
@@ -1016,17 +1243,27 @@ function RangeInput({
   maxValue,
   onMinChange,
   onMaxChange,
+  onBlur,
+  error,
 }: {
   label: string;
   minValue: string;
   maxValue: string;
   onMinChange: (value: string) => void;
   onMaxChange: (value: string) => void;
+  onBlur?: () => void;
+  error?: string | null;
 }) {
   const handleChange = (value: string, onChange: (v: string) => void) => {
-    const result = validateRangeInput(value);
+    // Only allow digits, dots, and minus sign for numeric input
+    const cleaned = value.replace(/[^\d.\-]/g, '');
+    const result = validateRangeInput(cleaned);
     onChange(result.sanitizedValue);
   };
+
+  const inputBaseClass = "block w-full rounded-sm border px-3 h-10 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2";
+  const inputNormalClass = `${inputBaseClass} border-gray-300 focus:border-brand focus:ring-brand/20`;
+  const inputErrorClass = `${inputBaseClass} border-rose-400 bg-rose-50/30 focus:border-rose-500 focus:ring-rose-200`;
 
   return (
     <div>
@@ -1035,27 +1272,30 @@ function RangeInput({
         <div className="flex-1">
           <span className="mb-0.5 block text-xs text-gray-500">最小值</span>
           <input
-            type="number"
-            step="any"
+            type="text"
+            inputMode="decimal"
             value={minValue}
             onChange={(e) => handleChange(e.target.value, onMinChange)}
+            onBlur={onBlur}
             placeholder="--"
-            className="block w-full rounded-sm border border-gray-300 px-3 h-10 text-sm text-gray-900 placeholder:text-gray-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+            className={error ? inputErrorClass : inputNormalClass}
           />
         </div>
         <span className="mt-5 text-gray-400">~</span>
         <div className="flex-1">
           <span className="mb-0.5 block text-xs text-gray-500">最大值</span>
           <input
-            type="number"
-            step="any"
+            type="text"
+            inputMode="decimal"
             value={maxValue}
             onChange={(e) => handleChange(e.target.value, onMaxChange)}
+            onBlur={onBlur}
             placeholder="--"
-            className="block w-full rounded-sm border border-gray-300 px-3 h-10 text-sm text-gray-900 placeholder:text-gray-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+            className={error ? inputErrorClass : inputNormalClass}
           />
         </div>
       </div>
+      {error && <p className="mt-1 text-xs text-rose-500">{error}</p>}
     </div>
   );
 }

@@ -145,8 +145,20 @@ export async function PUT(
     if (body.businessLine !== undefined) {
       updateData.businessLine = body.businessLine || null;
     }
+    if (body.executionStartDate !== undefined) {
+      updateData.executionStartDate = body.executionStartDate ? new Date(body.executionStartDate) : null;
+    }
     if (body.participants !== undefined) {
       updateData.participants = Array.isArray(body.participants) ? body.participants : [];
+    }
+    if (body.lingxiAccountId !== undefined) {
+      updateData.lingxiAccountId = typeof body.lingxiAccountId === 'string' ? body.lingxiAccountId.trim() || null : null;
+    }
+    if (body.lingxiTaxonomyCode !== undefined) {
+      updateData.lingxiTaxonomyCode = typeof body.lingxiTaxonomyCode === 'string' ? body.lingxiTaxonomyCode.trim() || null : null;
+    }
+    if (body.lingxiTaxonomyPath !== undefined) {
+      updateData.lingxiTaxonomyPath = typeof body.lingxiTaxonomyPath === 'string' ? body.lingxiTaxonomyPath.trim() || null : null;
     }
 
     const updated = await prisma.project.update({

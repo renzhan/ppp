@@ -20,8 +20,9 @@ interface ChapterData {
  * - 包含打印友好样式
  */
 export function buildFullExportHtml(chapters: ChapterData[], title: string): string {
+  // Re-number chapters sequentially (1, 2, 3...) regardless of original numbering
   const chaptersHtml = chapters
-    .map((c) => `<section class="chapter" id="chapter-${c.id}"><h2 class="chapter-title">${c.number}. ${c.title}</h2>${c.content}</section>`)
+    .map((c, idx) => `<section class="chapter" id="chapter-${c.id}"><h2 class="chapter-title">${idx + 1}. ${c.title}</h2>${c.content}</section>`)
     .join('\n');
 
   return `<!DOCTYPE html>
@@ -37,7 +38,7 @@ body {
   font-family: -apple-system, "Microsoft YaHei", "PingFang SC", sans-serif;
   color: #1e293b;
   line-height: 1.7;
-  background: #f8fafc;
+  background: #fff;
   padding: 40px 20px;
 }
 .report-container {
@@ -56,21 +57,17 @@ body {
 }
 .report-header h1 { font-size: 28px; color: #0f172a; margin-bottom: 8px; }
 .report-header p { font-size: 14px; color: #64748b; }
-.chapter { margin-bottom: 40px; page-break-inside: avoid; }
-.chapter-title {
-  font-size: 20px;
-  color: #1e40af;
-  border-left: 4px solid #1e40af;
-  padding-left: 12px;
-  margin-bottom: 16px;
-}
-h3 { font-size: 16px; color: #334155; margin: 20px 0 10px; }
+.chapter { margin-bottom: 40px; }
+h3 { font-size: 16px; color: #334155; margin: 20px 0 10px; text-align: left; font-weight: 600; }
+h2 { font-size: 18px; color: #334155; margin: 20px 0 10px; text-align: left; font-weight: 600; }
+h2.chapter-title { font-size: 22px; color: #1e40af; text-align: center; margin-bottom: 20px; padding-bottom: 8px; border-bottom: 2px solid #e2e8f0; }
 p { margin: 8px 0; font-size: 14px; }
 .report-table {
   width: 100%;
   border-collapse: collapse;
   margin: 16px 0;
   font-size: 13px;
+  page-break-inside: avoid;
 }
 .report-table th, .report-table td {
   border: 1px solid #e2e8f0;
@@ -84,17 +81,26 @@ p { margin: 8px 0; font-size: 14px; }
 }
 .report-table tr:nth-child(even) { background: #f8fafc; }
 .report-table td:last-child { text-align: right; }
-.highlight { color: #1e40af; font-weight: 600; }
+.highlight { color: #F5A623; font-weight: 600; }
 .text-green { color: #16a34a; font-weight: 600; }
 .text-red { color: #dc2626; font-weight: 600; }
 ul, ol { margin: 8px 0 8px 24px; font-size: 14px; }
 li { margin: 4px 0; }
-.chart-container { width: 100%; height: 360px; margin: 16px 0; }
+.chart-container { width: 100%; height: 360px; margin: 16px 0; break-inside: avoid; page-break-inside: avoid; }
 .chart-placeholder { display: none; }
+.report-table { break-inside: avoid; page-break-inside: avoid; }
+table { break-inside: avoid; page-break-inside: avoid; }
+h3, h2 { break-after: avoid; page-break-after: avoid; }
+@page { margin: 15mm 10mm; }
 @media print {
-  body { background: #fff; padding: 0; }
-  .report-container { box-shadow: none; padding: 20px; }
-  .chart-container { page-break-inside: avoid; }
+  body { background: #fff !important; padding: 0; margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .report-container { box-shadow: none; padding: 0; max-width: 100%; }
+  .chapter { page-break-inside: auto; }
+  .report-table, table { page-break-inside: avoid; break-inside: avoid; }
+  .chart-container { page-break-inside: avoid; break-inside: avoid; }
+  h2, h3, .chapter-title { page-break-after: avoid; break-after: avoid; }
+  p { orphans: 3; widows: 3; }
+  ul, ol { page-break-inside: avoid; break-inside: avoid; }
 }
 </style>
 </head>

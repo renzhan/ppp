@@ -14,7 +14,10 @@ CREATE TABLE IF NOT EXISTS "users" (
   "username"             VARCHAR(50) NOT NULL UNIQUE,
   "password_hash"        VARCHAR(200) NOT NULL,
   "display_name"         VARCHAR(100),
-  "role"                 VARCHAR(20) NOT NULL DEFAULT 'user',
+  "real_name"            VARCHAR(100),
+  "role"                 VARCHAR(20) NOT NULL DEFAULT 'AE',
+  "permission_level"     INTEGER NOT NULL DEFAULT 5,
+  "reports_to"           UUID,
   "must_change_password" BOOLEAN NOT NULL DEFAULT true,
   "is_active"            BOOLEAN NOT NULL DEFAULT true,
   "last_login_at"        TIMESTAMPTZ,
@@ -22,9 +25,9 @@ CREATE TABLE IF NOT EXISTS "users" (
   "updated_at"           TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- 默认管理员 admin / admin123
-INSERT INTO "users" ("username", "password_hash", "role", "must_change_password", "display_name")
-VALUES ('admin', '$2b$10$8EDP6o5pmKjm2sGbfTW00umtZEXI3HrUzYghnL0/7YHqY48dd8OsC', 'admin', false, '管理员')
+-- 默认管理员 admin / ppp666
+INSERT INTO "users" ("username", "password_hash", "role", "permission_level", "must_change_password", "display_name")
+VALUES ('admin', '$2b$10$8EDP6o5pmKjm2sGbfTW00umtZEXI3HrUzYghnL0/7YHqY48dd8OsC', 'admin', 0, false, '管理员')
 ON CONFLICT ("username") DO NOTHING;
 
 -- 确保 uuid 扩展可用

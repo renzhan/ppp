@@ -168,3 +168,7 @@ web/uploads/
 
 *.tar
 .idea/
+
+# Downloaded note media
+web/web/
+web/public/note-media/

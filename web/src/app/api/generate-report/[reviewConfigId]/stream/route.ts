@@ -6,6 +6,7 @@ import { createChapterDataLoaderRegistry } from '@/pipeline/loaders/index';
 import { PromptTemplateLoader } from '@/pipeline/template-loader';
 import type { ChatMessage } from '@/shared/types';
 import path from 'path';
+import fs from 'fs';
 
 export const maxDuration = 300; // 5 minutes
 
@@ -107,6 +108,8 @@ async function runBackgroundGeneration(reviewConfigId: string, projectId: string
     // Process a single chapter
     const processChapter = async (index: number) => {
       const chapterDef = CHAPTER_DEFS[index];
+      const chapterStartTime = Date.now();
+      console.log(`[ReportGen] 开始生成 ch${chapterDef.number}_${chapterDef.id} (${reviewConfigId})`);
       try {
         const template = templateLoader.loadTemplate(chapterDef.number);
         const title = template.metadata.chapter_name;
@@ -129,8 +132,31 @@ async function runBackgroundGeneration(reviewConfigId: string, projectId: string
             { role: 'user', content: userPrompt },
           ];
 
+          const totalPromptChars = systemPrompt.length + userPrompt.length;
+          const estimatedTokens = Math.ceil(totalPromptChars / 1.5); // 中文约1.5字符/token
+          console.log(`[ReportGen] ch${chapterDef.number}_${chapterDef.id} prompt大小: ${totalPromptChars}字符, 约${estimatedTokens} tokens (system=${systemPrompt.length}, user=${userPrompt.length})`);
+
+          // Log prompts to file for debugging
+          try {
+            const logDir = path.resolve(process.cwd(), '..', 'logs', 'prompts', reviewConfigId);
+            fs.mkdirSync(logDir, { recursive: true });
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            const logFile = path.join(logDir, `ch${chapterDef.number}_${chapterDef.id}_${timestamp}.txt`);
+            const logContent = `=== Chapter ${chapterDef.number}: ${chapterDef.id} ===\n` +
+              `=== Timestamp: ${new Date().toISOString()} ===\n` +
+              `=== ReviewConfig: ${reviewConfigId} ===\n` +
+              `=== Prompt Size: ${totalPromptChars} chars, ~${estimatedTokens} tokens ===\n\n` +
+              `--- SYSTEM PROMPT ---\n${systemPrompt}\n\n` +
+              `--- USER PROMPT ---\n${userPrompt}\n`;
+            fs.writeFileSync(logFile, logContent, 'utf-8');
+          } catch { /* ignore logging errors */ }
+
+          // 动态超时：基础60s + 每1000 tokens加30s，上限300s
+          const dynamicTimeout = Math.min(300000, 60000 + Math.ceil(estimatedTokens / 1000) * 30000);
+          console.log(`[ReportGen] ch${chapterDef.number}_${chapterDef.id} timeout=${dynamicTimeout / 1000}s`);
+
           const rawResponse = await llmClient.chat(messages, {
-            timeout: 60000,
+            timeout: dynamicTimeout,
             temperature: 0.3,
           });
 
@@ -154,11 +180,19 @@ async function runBackgroundGeneration(reviewConfigId: string, projectId: string
           traceIds: (dataContext.traceItems || []).map((t) => ({ traceId: t.traceId, label: t.label })),
         };
 
+        const elapsed = ((Date.now() - chapterStartTime) / 1000).toFixed(1);
+        console.log(`[ReportGen] ✅ ch${chapterDef.number}_${chapterDef.id} 完成 (${elapsed}s, ${content.length}字符)`);
+
         if (dataContext.traceItems && dataContext.traceItems.length > 0) {
           allTraceItems.push(...dataContext.traceItems);
         }
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : '生成失败';
+        const elapsed = ((Date.now() - chapterStartTime) / 1000).toFixed(1);
+        console.error(`[ReportGen] ❌ ch${chapterDef.number}_${chapterDef.id} 失败 (${elapsed}s): ${errorMsg}`);
+        if (err instanceof Error && err.stack) {
+          console.error(`[ReportGen]    Stack: ${err.stack.split('\n').slice(0, 3).join(' | ')}`);
+        }
         const template = templateLoader.loadTemplate(chapterDef.number);
         chapterResults[index] = {
           id: chapterDef.id,
@@ -297,7 +331,7 @@ export async function GET(
 
       send({ type: 'start', totalChapters: CHAPTER_DEFS.length });
 
-      let lastSentCount = 0;
+      let sentChapterIds = new Set<string>();
       const POLL_INTERVAL = 1500; // 1.5s
       const MAX_POLLS = 200; // 5 minutes max
 
@@ -318,22 +352,23 @@ export async function GET(
         const content = current.reportContent as { type?: string; chapters?: Array<{ id: string; title: string; number: number; content: string; traceIds?: unknown }> } | null;
         const chapters = content?.chapters || [];
 
-        // Emit progress events for chapters being generated
-        // Any chapter beyond lastSentCount but not yet sent is "generating"
-        if (chapters.length > lastSentCount) {
-          for (let i = lastSentCount; i < chapters.length; i++) {
-            const ch = chapters[i];
-            // Emit progress (approximate token usage from content length)
+        // Emit chapter events for newly completed chapters (order-independent)
+        for (const ch of chapters) {
+          if (!sentChapterIds.has(ch.id)) {
             const tokensUsed = Math.ceil((ch.content?.length || 0) / 2);
             send({ type: 'progress', chapterId: ch.id, tokensUsed });
             send({ type: 'chapter', chapter: ch });
+            sentChapterIds.add(ch.id);
           }
-          lastSentCount = chapters.length;
-        } else if (current.status === 'generating' && chapters.length < CHAPTER_DEFS.length) {
-          // Emit progress event for the next chapter being generated (tokensUsed: 0)
-          const nextChapterId = CHAPTER_DEFS[chapters.length]?.id;
-          if (nextChapterId) {
-            send({ type: 'progress', chapterId: nextChapterId, tokensUsed: 0 });
+        }
+
+        // Emit progress event for chapters still being generated
+        if (current.status === 'generating' && chapters.length < CHAPTER_DEFS.length) {
+          for (const def of CHAPTER_DEFS) {
+            if (!sentChapterIds.has(def.id) && !chapters.find(c => c.id === def.id)) {
+              send({ type: 'progress', chapterId: def.id, tokensUsed: 0 });
+              break; // Only show one as "generating" at a time
+            }
           }
         }
 

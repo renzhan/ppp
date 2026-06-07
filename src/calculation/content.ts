@@ -1,9 +1,17 @@
 import type { AnnotatedNote, DimensionAggregation } from '../shared/types';
 
 /**
- * 爆文判定阈值（固定口径：点赞+收藏+评论 >= 1000）
+ * 默认爆文判定阈值（点赞+收藏+评论 >= 1000）
  */
-const VIRAL_THRESHOLD = 1000;
+const DEFAULT_VIRAL_THRESHOLD = 1000;
+
+/**
+ * aggregateByDimension 可选配置参数
+ */
+export interface AggregateByDimensionOptions {
+  /** 爆文判定阈值（点赞+收藏+评论），默认1000 */
+  viralThreshold?: number;
+}
 
 /**
  * 有效的维度字段名
@@ -26,7 +34,7 @@ type DimensionField = 'noteType' | 'contentDirection' | 'accountType' | 'kolType
  * - totalReads: 总阅读（sum of readNum）
  * - totalEngagement: 总互动（默认口径：like+fav+cmt+share+follow）
  * - cpe: 总费用 / 总互动（互动为0时返回'N/A'）
- * - viralCount: 爆文数（like+fav+cmt >= 1000）
+ * - viralCount: 爆文数（like+fav+cmt >= threshold）
  * - viralRate: 爆文率（viralCount / noteCount）
  *
  * 费用计算：
@@ -37,13 +45,15 @@ type DimensionField = 'noteType' | 'contentDirection' | 'accountType' | 'kolType
  */
 export function aggregateByDimension(
   notes: AnnotatedNote[],
-  dimension: string
+  dimension: string,
+  options?: AggregateByDimensionOptions
 ): DimensionAggregation[] {
   if (notes.length === 0) {
     return [];
   }
 
   const dimField = dimension as DimensionField;
+  const viralThreshold = options?.viralThreshold ?? DEFAULT_VIRAL_THRESHOLD;
 
   // Group notes by dimension value
   const groups = new Map<string, AnnotatedNote[]>();
@@ -83,8 +93,8 @@ export function aggregateByDimension(
         totalCost += note.kolPrice + note.serviceFee;
       }
 
-      // Viral detection: fixed threshold (like + fav + cmt >= 1000)
-      if (note.likeNum + note.favNum + note.cmtNum >= VIRAL_THRESHOLD) {
+      // Viral detection: using configured threshold (like + fav + cmt >= threshold)
+      if (note.likeNum + note.favNum + note.cmtNum >= viralThreshold) {
         viralCount++;
       }
     }

@@ -21,7 +21,7 @@ export interface LLMClient {
   chat(messages: ChatMessage[], options?: LLMOptions): Promise<string>;
 }
 
-const DEFAULT_TIMEOUT = 60000; // 60 seconds (increased for Qwen models)
+const DEFAULT_TIMEOUT = 120000; // 120 seconds default (Qwen models need more time for complex outputs)
 const FALLBACK_MESSAGE = 'AI生成失败，请稍后重试';
 
 /**
@@ -99,15 +99,18 @@ export class OpenAILLMClient implements LLMClient {
     const timeout = options?.timeout ?? DEFAULT_TIMEOUT;
 
     // First attempt
+    let lastError: Error | undefined;
     try {
       return await this.callLLM(messages, options, timeout);
-    } catch {
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
       // Retry once on failure
       try {
         return await this.callLLM(messages, options, timeout);
-      } catch {
-        // Both attempts failed, return fallback
-        return FALLBACK_MESSAGE;
+      } catch (retryErr) {
+        lastError = retryErr instanceof Error ? retryErr : new Error(String(retryErr));
+        // Both attempts failed - throw with details instead of returning silent fallback
+        throw new Error(`LLM调用失败(重试后仍失败): ${lastError.message}`);
       }
     }
   }

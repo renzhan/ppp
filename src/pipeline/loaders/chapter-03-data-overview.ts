@@ -50,6 +50,7 @@ export class DataOverviewDataLoader extends BaseChapterDataLoader {
     // ── 0. 加载复盘配置（需要先读取口径设置） ──
     let engagementMetric = 'exclude_follow'; // 默认不含关注
     let viralMetric = 'like_comment_share';  // 默认千互（赞+藏+评）
+    let viralThreshold = 1000;               // 默认爆文阈值
     let contentCostCaliber = 'consumption';  // 默认消耗口径
     let trafficCostCaliber = 'consumption';  // 默认消耗口径
     let kpi: Record<string, number> = {};
@@ -63,6 +64,7 @@ export class DataOverviewDataLoader extends BaseChapterDataLoader {
           benchmark: true,
           engagementMetric: true,
           viralMetric: true,
+          viralThreshold: true,
           modules: true,
         },
         orderBy: { createdAt: 'desc' },
@@ -74,6 +76,9 @@ export class DataOverviewDataLoader extends BaseChapterDataLoader {
         }
         if (reviewConfig.viralMetric) {
           viralMetric = reviewConfig.viralMetric as string;
+        }
+        if (reviewConfig.viralThreshold != null && reviewConfig.viralThreshold > 0) {
+          viralThreshold = reviewConfig.viralThreshold;
         }
         // contentCostCaliber / trafficCostCaliber stored in modules JSON
         const modules = reviewConfig.modules as Record<string, unknown> | null;
@@ -96,6 +101,7 @@ export class DataOverviewDataLoader extends BaseChapterDataLoader {
 
     variables['engagement_metric'] = engagementMetric;
     variables['viral_metric'] = viralMetric;
+    variables['viral_threshold'] = String(viralThreshold);
     variables['content_cost_caliber'] = contentCostCaliber;
     variables['traffic_cost_caliber'] = trafficCostCaliber;
 
@@ -103,12 +109,13 @@ export class DataOverviewDataLoader extends BaseChapterDataLoader {
     try {
       const project = await this.prisma.project.findUnique({
         where: { id: projectId },
-        select: { projectName: true, brand: true, startDate: true, endDate: true },
+        select: { projectName: true, brand: true, startDate: true, endDate: true, executionStartDate: true },
       });
       if (project) {
         if (project.projectName) variables['project_name'] = project.projectName;
         if (project.brand) variables['brand'] = project.brand;
-        if (project.startDate) variables['start_date'] = project.startDate.toISOString().split('T')[0];
+        if (project.executionStartDate) variables['start_date'] = project.executionStartDate.toISOString().split('T')[0];
+        else if (project.startDate) variables['start_date'] = project.startDate.toISOString().split('T')[0];
         if (project.endDate) variables['end_date'] = project.endDate.toISOString().split('T')[0];
       }
     } catch (error) {
@@ -212,11 +219,11 @@ export class DataOverviewDataLoader extends BaseChapterDataLoader {
 
         // 爆文判断
         if (viralMetric === 'like_only') {
-          // 千赞：like >= 1000
-          if (n.likeNum >= 1000) viralCount++;
+          // 千赞：like >= viralThreshold
+          if (n.likeNum >= viralThreshold) viralCount++;
         } else {
-          // 千互（默认）：like + fav + cmt >= 1000
-          if (n.likeNum + n.favNum + n.cmtNum >= 1000) viralCount++;
+          // 千互（默认）：like + fav + cmt >= viralThreshold
+          if (n.likeNum + n.favNum + n.cmtNum >= viralThreshold) viralCount++;
         }
       }
     } catch (error) {
@@ -333,7 +340,7 @@ export class DataOverviewDataLoader extends BaseChapterDataLoader {
       totalImpression: { varKey: 'impression', actual: totalImpressions, isCost: false },
       totalRead: { varKey: 'read', actual: totalReads, isCost: false },
       totalEngagement: { varKey: 'engagement', actual: totalEngagement, isCost: false },
-      viralPosts1k: { varKey: 'viral_rate', actual: viralRate, isCost: false },
+      viralPosts1k: { varKey: 'viral_count', actual: viralCount, isCost: false },
       cpm: { varKey: 'cpm', actual: cpm, isCost: true },
       cpc: { varKey: 'cpc', actual: cpc, isCost: true },
       cpe: { varKey: 'cpe', actual: cpe, isCost: true },
@@ -451,7 +458,7 @@ export class DataOverviewDataLoader extends BaseChapterDataLoader {
           { metric: '总曝光(实际)', formula: 'SUM(imp_num)', inputs: { '行数': rawNoteRows.length }, result: totalImpressions },
           { metric: '总阅读(实际)', formula: 'SUM(read_num)', inputs: { '行数': rawNoteRows.length }, result: totalReads },
           { metric: '总互动(实际)', formula: engagementMetric === 'include_follow' ? 'SUM(engage_num)' : 'SUM(like_num + fav_num + cmt_num + share_num)', inputs: engagementMetric === 'include_follow' ? { 'SUM(engage_num)': totalEngagement } : { 'SUM(like)': totalLikes, 'SUM(fav)': totalFavs, 'SUM(cmt)': totalComments, 'SUM(share)': totalShares }, result: totalEngagement },
-          { metric: '爆文率', formula: `COUNT(${viralMetric === 'like_only' ? 'like_num>=1000' : 'like+fav+cmt>=1000'}) / note_base.COUNT(*) * 100`, inputs: { '爆文数': viralCount, '总篇数(note_base)': noteCount }, result: Number(viralRate.toFixed(1)) },
+          { metric: '爆文率', formula: `COUNT(${viralMetric === 'like_only' ? `like_num>=${viralThreshold}` : `like+fav+cmt>=${viralThreshold}`}) / note_base.COUNT(*) * 100`, inputs: { '爆文数': viralCount, '总篇数(note_base)': noteCount, '爆文阈值': viralThreshold }, result: Number(viralRate.toFixed(1)) },
           { metric: 'CPM', formula: '总费用 / SUM(imp_num) * 1000', inputs: { '总费用': totalCost, 'SUM(imp_num)': totalImpressions }, result: Number(cpm.toFixed(2)) },
           { metric: 'CPC', formula: '总费用 / SUM(read_num)', inputs: { '总费用': totalCost, 'SUM(read_num)': totalReads }, result: Number(cpc.toFixed(2)) },
           { metric: 'CPE', formula: '总费用 / SUM(互动)', inputs: { '总费用': totalCost, 'SUM(互动)': totalEngagement }, result: Number(cpe.toFixed(2)) },

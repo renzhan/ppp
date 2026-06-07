@@ -1,0 +1,31 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:18.3-alpine
+    container_name: ppp-postgres
+    ports:
+      - "3010:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: abc.123.ABC
+      POSTGRES_DB: ppp
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./prisma/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - ppp-network
+
+volumes:
+  pgdata:
+
+networks:
+  ppp-network:
+    name: ppp-network
+    driver: bridge

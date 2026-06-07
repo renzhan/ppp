@@ -16,6 +16,7 @@ export interface ParsedNoteBaseRow {
   contentCost: number;
   contentSettlement: number;
   adSpend: number;
+  adSettlement: number;
   totalCost: number;
   /** All extra metrics/data columns from Excel, stored in note_base.metrics JSON */
   displayMetrics?: Record<string, number | string>;
@@ -53,14 +54,20 @@ export const NOTE_BASE_COLUMN_MAP: Record<string, string> = {
   '是否报备': 'isRegistered',
   '内容方向': 'contentDirection',
   '达人类型': 'kolType',
+  '笔记类型': 'kolType',         // 别名
   '对应SPU': 'spuName',
 
   // ─── 费用字段（note_base 独有）───
   '内容实际消耗金额': 'contentCost',
-  '达人金额': 'contentCost',           // 别名
+  '内容消耗金额': 'contentCost',       // 新表头别名
+  '达人金额': 'contentCost',           // 旧别名
   '内容实际结算金额': 'contentSettlement',
+  '内容结算金额': 'contentSettlement', // 新表头别名
   '投流实际消耗': 'adSpend',
-  '投流金额': 'adSpend',               // 别名
+  '投流消耗金额': 'adSpend',           // 新表头别名
+  '投流金额': 'adSpend',               // 旧别名
+  '投流结算金额': 'adSettlement',      // 新字段
+  '投流实际结算金额': 'adSettlement',  // 可能的别名
   '总费用': 'totalCost',
   '总消耗': 'totalCost',               // 别名
 };
@@ -72,15 +79,28 @@ export const NOTE_BASE_COLUMN_MAP: Record<string, string> = {
 export const DISPLAY_ONLY_COLUMN_MAP: Record<string, string> = {
   // 基础数据指标
   '曝光量': 'impNum',
+  '曝光': 'impNum',             // 短别名
   '阅读量': 'readNum',
+  '阅读': 'readNum',             // 短别名
   '互动量': 'engageNum',
+  '互动': 'engageNum',           // 短别名
   '点赞量': 'likeNum',
+  '点赞': 'likeNum',             // 短别名
   '收藏量': 'favNum',
+  '收藏': 'favNum',              // 短别名
   '评论量': 'cmtNum',
+  '评论': 'cmtNum',              // 短别名
   '分享量': 'shareNum',
+  '转发': 'shareNum',            // 短别名（转发=分享）
   '关注量': 'followNum',
+  // 爆文标记
+  '是否千互': 'isViral1kEngage',
+  '是否千赞': 'isViral1kLike',
   // 效率指标
   'CTR': 'ctr',
+  'CPM': 'cpm',
+  'CPC': 'cpc',
+  'CPE': 'cpe',
   '总CPM': 'totalCpm',
   '总CPE': 'totalCpe',
   '总CPC': 'totalCpc',
@@ -278,6 +298,7 @@ export function parseNoteBaseExcel(buffer: Buffer): ParseResult {
       contentCost: parseNumber(mapped.contentCost),
       contentSettlement: parseNumber(mapped.contentSettlement),
       adSpend: parseNumber(mapped.adSpend),
+      adSettlement: parseNumber(mapped.adSettlement),
       totalCost: parseNumber(mapped.totalCost),
     };
 

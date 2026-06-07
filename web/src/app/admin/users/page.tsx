@@ -60,11 +60,11 @@ interface User {
 }
 
 const ROLE_OPTIONS = [
-  { value: '组长', label: '组长' },
+  { value: 'VP', label: 'VP' },
   { value: 'AD', label: 'AD' },
   { value: 'AM', label: 'AM' },
-  { value: '投手', label: '投手' },
-  { value: '执行', label: '执行' },
+  { value: '组长', label: '组长' },
+  { value: 'AE', label: 'AE' },
   { value: 'admin', label: '管理员' },
 ] as const;
 
@@ -181,8 +181,8 @@ export default function AdminUsersPage() {
               <Table className="text-sm">
                 <TableHeader>
                   <TableRow className={listTableHeaderRowClass}>
-                    <TableHead className={listTableHeadClass}>用户名</TableHead>
-                    <TableHead className={listTableHeadClass}>显示名称</TableHead>
+                    <TableHead className={listTableHeadClass}>花名</TableHead>
+                    <TableHead className={listTableHeadClass}>真名</TableHead>
                     <TableHead className={listTableHeadClass}>角色</TableHead>
                     <TableHead className={listTableHeadClass}>状态</TableHead>
                     <TableHead className={listTableHeadClass}>最后登录</TableHead>
@@ -419,7 +419,7 @@ function AddUserModal({
   const [form, setForm] = useState({
     username: '',
     displayName: '',
-    role: '执行',
+    role: 'AE',
     password: '',
   });
   const [error, setError] = useState('');
@@ -454,7 +454,7 @@ function AddUserModal({
     <ModalWrapper title="添加用户" icon={User} onClose={onClose}>
       <ModalError error={error} />
       <form onSubmit={handleSubmit} className="space-y-4">
-        <FormField label="用户名 *" htmlFor="add-username">
+        <FormField label="花名 *" htmlFor="add-username">
           <Input
             id="add-username"
             variant="form"
@@ -463,7 +463,7 @@ function AddUserModal({
             required
           />
         </FormField>
-        <FormField label="显示名称" htmlFor="add-displayName">
+        <FormField label="真名" htmlFor="add-displayName">
           <Input
             id="add-displayName"
             variant="form"
@@ -542,7 +542,7 @@ function EditUserModal({
     <ModalWrapper title='编辑用户' icon={User} onClose={onClose}>
       <ModalError error={error} />
       <form onSubmit={handleSubmit} className="space-y-4">
-      <FormField label="用户名" htmlFor="edit-displayName">
+      <FormField label="花名" htmlFor="edit-displayName">
           <Input
             id="displayName"
             variant="form"
@@ -550,7 +550,7 @@ function EditUserModal({
             value={user.username}
           />
         </FormField>
-        <FormField label="显示名称" htmlFor="edit-displayName">
+        <FormField label="真名" htmlFor="edit-displayName">
           <Input
             id="edit-displayName"
             variant="form"

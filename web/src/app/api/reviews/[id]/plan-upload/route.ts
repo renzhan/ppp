@@ -5,6 +5,10 @@ import path from 'path';
 import fs from 'fs/promises';
 import crypto from 'crypto';
 
+// Allow larger file uploads (default is 4MB, increase to 50MB for plan documents)
+export const runtime = 'nodejs';
+export const maxDuration = 60; // 60 seconds timeout
+
 /**
  * Allowed file extensions for plan uploads.
  */
@@ -29,6 +33,7 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  console.log('[plan-upload] 收到上传请求');
   try {
     const session = await getSession(request);
     if (!session) {
@@ -39,6 +44,7 @@ export async function POST(
     }
 
     const { id } = await params;
+    console.log(`[plan-upload] reviewId=${id}, user=${session.sub}`);
 
     // Check if review exists
     const review = await prisma.reviewConfig.findUnique({
@@ -73,6 +79,7 @@ export async function POST(
     }
 
     // Parse multipart form data
+    console.log('[plan-upload] 开始解析 formData...');
     const formData = await request.formData();
     const file = formData.get('file');
 
@@ -82,6 +89,8 @@ export async function POST(
         { status: 400 }
       );
     }
+
+    console.log(`[plan-upload] 文件: ${file.name}, 大小: ${(file.size / 1024 / 1024).toFixed(2)}MB`);
 
     // Validate file format
     if (!isValidPlanFile(file.name)) {
