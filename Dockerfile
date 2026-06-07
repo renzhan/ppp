@@ -17,6 +17,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
+# Use China npm mirror for faster/reliable installs in CI
+RUN npm config set registry https://registry.npmmirror.com
+
 COPY package.json package-lock.json ./
 RUN npm ci
 
