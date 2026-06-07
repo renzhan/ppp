@@ -13,18 +13,24 @@ done > /app/.env
 echo "Waiting for database to be ready..."
 MAX_RETRIES=30
 RETRY=0
-until echo "SELECT 1" | npx prisma db execute --stdin --config prisma.config.ts > /dev/null 2>&1; do
+DB_HOST=$(echo "$DATABASE_URL" | sed -n 's|.*@\([^:]*\):.*|\1|p')
+DB_PORT=$(echo "$DATABASE_URL" | sed -n 's|.*:\([0-9]*\)/.*|\1|p')
+DB_HOST=${DB_HOST:-localhost}
+DB_PORT=${DB_PORT:-5432}
+until node -e "const net=require('net');const s=net.connect({host:'${DB_HOST}',port:${DB_PORT}},()=>{s.end();process.exit(0)});s.on('error',()=>process.exit(1))" 2>/dev/null; do
   RETRY=$((RETRY + 1))
   if [ $RETRY -ge $MAX_RETRIES ]; then
-    echo "ERROR: Database not reachable after ${MAX_RETRIES}s. Continuing anyway..."
+    echo "ERROR: Database not reachable at ${DB_HOST}:${DB_PORT} after ${MAX_RETRIES}s. Continuing anyway..."
     break
   fi
-  echo "  Database not ready, retrying in 1s... ($RETRY/$MAX_RETRIES)"
+  echo "  Database not ready at ${DB_HOST}:${DB_PORT}, retrying in 1s... ($RETRY/$MAX_RETRIES)"
   sleep 1
 done
 
 echo "Running database migrations..."
 cd /app
+echo "  Checking prisma files..."
+ls -la prisma/schema.prisma prisma.config.ts 2>&1 || echo "  WARNING: Some prisma files missing!"
 npx prisma migrate deploy --config prisma.config.ts 2>&1
 MIGRATE_EXIT=$?
 if [ $MIGRATE_EXIT -ne 0 ]; then
