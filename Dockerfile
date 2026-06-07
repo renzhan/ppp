@@ -102,6 +102,9 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma ./prisma
 COPY package.json tsconfig.json prisma.config.ts ./
 
+# Verify prisma files are present
+RUN ls -la prisma/schema.prisma && echo "✓ prisma/schema.prisma exists"
+
 # --- Next.js artifacts ---
 COPY --from=web-builder /app/web/node_modules ./web/node_modules
 COPY --from=web-builder /app/web/.next ./web/.next
