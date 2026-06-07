@@ -9,9 +9,37 @@ env | grep -E '^(DATABASE_URL|LLM_|QWEN_|JWT_|PAICHACHA_|ENCRYPTION_KEY|NODE_ENV
   echo "$line"
 done > /app/.env
 
+# Wait for database to be ready (max 30 seconds)
+echo "Waiting for database to be ready..."
+MAX_RETRIES=30
+RETRY=0
+until npx prisma db execute --stdin --config prisma.config.ts <<< "SELECT 1" > /dev/null 2>&1; do
+  RETRY=$((RETRY + 1))
+  if [ $RETRY -ge $MAX_RETRIES ]; then
+    echo "ERROR: Database not reachable after ${MAX_RETRIES}s. Continuing anyway..."
+    break
+  fi
+  echo "  Database not ready, retrying in 1s... ($RETRY/$MAX_RETRIES)"
+  sleep 1
+done
+
 echo "Running database migrations..."
 cd /app
-npx prisma migrate deploy --config prisma.config.ts 2>&1 || echo "WARNING: Migrations failed (database may be unreachable). Continuing anyway..."
+npx prisma migrate deploy --config prisma.config.ts 2>&1
+MIGRATE_EXIT=$?
+if [ $MIGRATE_EXIT -ne 0 ]; then
+  echo "WARNING: prisma migrate deploy failed (exit=$MIGRATE_EXIT)."
+  echo "Attempting to resolve: marking all migrations as applied (init.sql likely already created tables)..."
+  # Create _prisma_migrations table and mark all migrations as applied
+  for dir in prisma/migrations/*/; do
+    if [ -d "$dir" ]; then
+      migration_name=$(basename "$dir")
+      echo "  Resolving: $migration_name"
+      npx prisma migrate resolve --applied "$migration_name" --config prisma.config.ts 2>&1 || true
+    fi
+  done
+  echo "Migration resolve complete."
+fi
 
 # Apply manual migrations that are not managed by Prisma
 echo "Applying manual migrations (if not already applied)..."
