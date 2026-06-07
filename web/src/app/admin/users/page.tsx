@@ -192,7 +192,7 @@ export default function AdminUsersPage() {
                 <TableBody>
                   {users.map((user, index) => (
                     <TableRow key={user.id} className={listTableRowClass(index)}>
-                      <TableCell className={cn(listTableCellClass, 'font-medium')}>
+                      <TableCell className={cn(listTableCellClass)}>
                         {user.username}
                       </TableCell>
                       <TableCell className={cn(listTableCellClass, 'text-gray-600')}>
@@ -615,7 +615,7 @@ function ResetPasswordModal({
       <ModalError error={error} />
       <form onSubmit={handleSubmit} className="space-y-4">
         <p className="text-sm text-gray-500">重置后用户下次登录需要重新设置密码。</p>
-        <FormField label="用户名" htmlFor="edit-displayName">
+        <FormField label="花名" htmlFor="edit-displayName">
           <Input
             id="displayName"
             variant="form"
