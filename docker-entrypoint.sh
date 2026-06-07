@@ -32,20 +32,14 @@ cd /app
 echo "  Checking prisma files..."
 ls -la prisma/schema.prisma prisma.config.ts 2>&1 || echo "  WARNING: Some prisma files missing!"
 set +e
-npx prisma migrate deploy --config prisma.config.ts 2>&1
-MIGRATE_EXIT=$?
+npx prisma db push --config prisma.config.ts --accept-data-loss 2>&1
+PUSH_EXIT=$?
 set -e
-if [ $MIGRATE_EXIT -ne 0 ]; then
-  echo "WARNING: prisma migrate deploy failed (exit=$MIGRATE_EXIT)."
-  echo "Attempting to resolve: marking all migrations as applied (init.sql likely already created tables)..."
-  for dir in prisma/migrations/*/; do
-    if [ -d "$dir" ]; then
-      migration_name=$(basename "$dir")
-      echo "  Resolving: $migration_name"
-      npx prisma migrate resolve --applied "$migration_name" --config prisma.config.ts 2>&1 || true
-    fi
-  done
-  echo "Migration resolve complete."
+if [ $PUSH_EXIT -ne 0 ]; then
+  echo "WARNING: prisma db push failed (exit=$PUSH_EXIT). Attempting migrate deploy..."
+  set +e
+  npx prisma migrate deploy --config prisma.config.ts 2>&1
+  set -e
 fi
 
 # Apply manual migrations that are not managed by Prisma
