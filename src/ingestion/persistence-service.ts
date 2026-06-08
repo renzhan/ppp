@@ -199,35 +199,38 @@ export class PrismaDataPersistenceService implements DataPersistenceService {
   async saveJuguangData(projectId: string, data: JuguangNote[], reviewConfigId?: string): Promise<void> {
     if (data.length === 0) return;
 
-    await prisma.$transaction(async (tx) => {
-      await tx.juguangData.createMany({
-        data: data.map((record) => ({
-          projectId,
-          reviewConfigId,
-          time: record.time ?? null,
-          advertiserId: record.advertiserId ?? null,
-          noteId: record.noteId ?? null,
-          placement: record.placement ?? null,
-          targetsDetail: record.targetsDetail ?? null,
-          keyword: record.keyword ?? null,
-          fee: record.fee,
-          impression: record.impression,
-          click: record.click,
-          interaction: record.interaction,
-          iUserNum: record.iUserNum,
-          tiUserNum: record.tiUserNum,
-          iUserPrice: record.iUserPrice,
-          tiUserPrice: record.tiUserPrice,
-          searchCmtClick: record.searchCmtClick,
-          searchCmtAfterRead: record.searchCmtAfterRead,
-          searchCmtAfterReadAvg: record.searchCmtAfterReadAvg,
-          searchCmtClickCvr: record.searchCmtClickCvr,
-          acp: record.acp,
-          cpm: record.cpm,
-          cpi: record.cpi,
-        })),
-      });
-    });
+    // 分批插入，每批 200 条，避免事务超时
+    const BATCH_SIZE = 200;
+    const records = data.map((record) => ({
+      projectId,
+      reviewConfigId,
+      time: record.time ?? null,
+      advertiserId: record.advertiserId ?? null,
+      noteId: record.noteId ?? null,
+      placement: record.placement ?? null,
+      targetsDetail: record.targetsDetail ?? null,
+      keyword: record.keyword ?? null,
+      fee: record.fee,
+      impression: record.impression,
+      click: record.click,
+      interaction: record.interaction,
+      iUserNum: record.iUserNum,
+      tiUserNum: record.tiUserNum,
+      iUserPrice: record.iUserPrice,
+      tiUserPrice: record.tiUserPrice,
+      searchCmtClick: record.searchCmtClick,
+      searchCmtAfterRead: record.searchCmtAfterRead,
+      searchCmtAfterReadAvg: record.searchCmtAfterReadAvg,
+      searchCmtClickCvr: record.searchCmtClickCvr,
+      acp: record.acp,
+      cpm: record.cpm,
+      cpi: record.cpi,
+    }));
+
+    for (let i = 0; i < records.length; i += BATCH_SIZE) {
+      const batch = records.slice(i, i + BATCH_SIZE);
+      await prisma.juguangData.createMany({ data: batch });
+    }
   }
 
   /**
@@ -329,36 +332,34 @@ export class PrismaDataPersistenceService implements DataPersistenceService {
     const noteIds = [...new Set(data.map((d) => d.noteId))];
     const incomingIds = new Set(data.map((d) => d.commentId));
 
-    await prisma.$transaction(async (tx) => {
-      // Upsert incoming comments
-      for (const d of data) {
-        await tx.comment.upsert({
-          where: { commentId: d.commentId },
-          create: {
-            projectId,
-            noteId: d.noteId,
-            commentId: d.commentId,
-            parentCommentId: d.parentCommentId ?? null,
-            nickname: d.nickname ?? null,
-            content: d.content ?? null,
-            likes: d.likes,
-            commentTime: d.commentTime ?? null,
-            isActive: true,
-          },
-          update: {
-            likes: d.likes,
-            content: d.content ?? null,
-            commentTime: d.commentTime ?? null,
-            isActive: true,
-          },
-        });
-      }
-
-      // Mark comments not in the new batch as inactive (deleted on platform)
-      await tx.comment.updateMany({
-        where: { projectId, noteId: { in: noteIds }, commentId: { notIn: [...incomingIds] }, isActive: true },
-        data: { isActive: false },
+    // 逐条 upsert，不使用事务避免超时问题
+    for (const d of data) {
+      await prisma.comment.upsert({
+        where: { commentId: d.commentId },
+        create: {
+          projectId,
+          noteId: d.noteId,
+          commentId: d.commentId,
+          parentCommentId: d.parentCommentId ?? null,
+          nickname: d.nickname ?? null,
+          content: d.content ?? null,
+          likes: d.likes,
+          commentTime: d.commentTime ?? null,
+          isActive: true,
+        },
+        update: {
+          likes: d.likes,
+          content: d.content ?? null,
+          commentTime: d.commentTime ?? null,
+          isActive: true,
+        },
       });
+    }
+
+    // Mark comments not in the new batch as inactive (deleted on platform)
+    await prisma.comment.updateMany({
+      where: { projectId, noteId: { in: noteIds }, commentId: { notIn: [...incomingIds] }, isActive: true },
+      data: { isActive: false },
     });
   }
 

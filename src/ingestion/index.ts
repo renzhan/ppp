@@ -243,18 +243,28 @@ export class DataIngestionService {
     const errors: string[] = [];
     let commentData: CommentData[] = [];
 
+    console.log(`[ingestComments] 开始采集评论: projectId=${projectId}, noteIds=${noteIds.length}篇, 日期范围=${ctx.execStart}~${ctx.currentEnd}`);
+
+    const fetchStart = Date.now();
     try {
       commentData = await this.paichachaClient.fetchCommentData(noteIds, ctx.execStart, ctx.execStart);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       errors.push(`Failed to fetch comment data: ${message}`);
     }
+    const fetchElapsed = ((Date.now() - fetchStart) / 1000).toFixed(1);
+    console.log(`[ingestComments] 评论采集完成: ${commentData.length}条评论, 耗时${fetchElapsed}s`);
 
     if (commentData.length > 0) {
+      const saveStart = Date.now();
       try {
         await this.persistenceService.saveComments(projectId, commentData);
+        const saveElapsed = ((Date.now() - saveStart) / 1000).toFixed(1);
+        console.log(`[ingestComments] 评论入库完成: ${commentData.length}条, 耗时${saveElapsed}s`);
       } catch (error) {
+        const saveElapsed = ((Date.now() - saveStart) / 1000).toFixed(1);
         const message = error instanceof Error ? error.message : String(error);
+        console.error(`[ingestComments] 评论入库失败: 耗时${saveElapsed}s, 错误: ${message}`);
         errors.push(`Failed to persist comment data: ${message}`);
       }
     }

@@ -13,7 +13,12 @@ let prismaInstance: InstanceType<typeof PrismaClient> | null = null;
  */
 export function getPrismaClient(): InstanceType<typeof PrismaClient> {
   if (!prismaInstance) {
-    prismaInstance = new PrismaClient();
+    prismaInstance = new PrismaClient({
+      transactionOptions: {
+        maxWait: 10000,  // 最大等待获取事务的时间 10s
+        timeout: 10000,  // 事务执行超时 10s (默认5s)
+      },
+    });
   }
   return prismaInstance;
 }
