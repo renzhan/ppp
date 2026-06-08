@@ -199,6 +199,7 @@ model JuguangData {
   cpm                   Decimal  @default(0) @db.Decimal(12, 2)
   cpi                   Decimal  @default(0) @db.Decimal(12, 2)
   time                  String?  @map("time") @db.VarChar(10)
+  advertiserId          Int?     @map("advertiser_id")
   reviewConfigId        String?  @map("review_config_id") @db.Uuid
   createdAt             DateTime? @default(now()) @map("created_at") @db.Timestamptz()
 

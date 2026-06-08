@@ -205,6 +205,7 @@ export class PrismaDataPersistenceService implements DataPersistenceService {
           projectId,
           reviewConfigId,
           time: record.time ?? null,
+          advertiserId: record.advertiserId ?? null,
           noteId: record.noteId ?? null,
           placement: record.placement ?? null,
           targetsDetail: record.targetsDetail ?? null,

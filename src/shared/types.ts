@@ -169,6 +169,7 @@ export interface NoteBaseRecord {
  */
 export interface JuguangNote {
   time?: string;                  // 数据日期 yyyy-MM-dd
+  advertiserId?: number;          // 广告主 ID
   noteId?: string;                // 笔记id
   placement?: string;             // 广告类型/投放位置：1-信息流、2-搜索、4-全站智投、7-视频流
   targetsDetail?: string;         // 精准定向/人群定向名称

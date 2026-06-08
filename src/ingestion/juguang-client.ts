@@ -24,6 +24,7 @@ const MAX_RETRIES = 3;
 /** 聚光笔记报表 API 返回的原始记录（值均为 string） */
 interface RawJuguangNote {
   time?: string;                 // 客户端填充：数据所属日期
+  advertiserId?: number;         // 客户端填充：广告主 ID
   note_id?: string;
   placement?: string;             // 广告类型：1-信息流、2-搜索、4-全站智投、7-视频流
   targets_detail?: string;        // 精准定向名称
@@ -85,7 +86,7 @@ export class JuguangClient {
                 console.error(`[juguang] advertiserId=${advertiserId} date=${date} split=${v.splitColumns?.join(',') || 'none'} 失败:`, (e as Error).message);
                 return [] as RawJuguangNote[];
               });
-            for (const r of rows) r.time = date;
+            for (const r of rows) { r.time = date; r.advertiserId = advertiserId; }
             return rows;
           })
         )
@@ -165,6 +166,7 @@ function parseNum(val?: string): number {
 function mapToJuguangNote(raw: RawJuguangNote): JuguangNote {
   return {
     time: raw.time,
+    advertiserId: raw.advertiserId,
     noteId: raw.note_id || undefined,
     placement: raw.placement || undefined,
     targetsDetail: raw.targets_detail || undefined,
