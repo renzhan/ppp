@@ -244,7 +244,7 @@ export class DataIngestionService {
     let commentData: CommentData[] = [];
 
     try {
-      commentData = await this.paichachaClient.fetchCommentData(noteIds, ctx.execStart, ctx.currentEnd);
+      commentData = await this.paichachaClient.fetchCommentData(noteIds, ctx.execStart, ctx.execStart);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       errors.push(`Failed to fetch comment data: ${message}`);
