@@ -301,6 +301,9 @@ export class PugongyingClient {
   // ── Comments ──
 
   async fetchComments(noteIds: string[], startDate: string, endDate: string): Promise<CommentData[]> {
+    // startDate 距今天超过 90 天需先触发实时采集
+    const needPreFetch = dateDiff(startDate, today()) >= 90;
+
     const allComments: CommentData[] = [];
     const CONCURRENCY = 5;
     const pending = [...noteIds];
@@ -308,6 +311,21 @@ export class PugongyingClient {
       while (pending.length > 0) {
         const noteId = pending.shift()!;
         try {
+          // 预采集：触发实时爬取
+          if (needPreFetch) {
+            await withRetry(async () => {
+              const url = `${this.config.commentBaseUrl}/api/comments/collect`;
+              const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-API-Key': this.config.apiKey },
+                body: JSON.stringify({ note_id: noteId }),
+              });
+              if (!res.ok) throw new Error(`collect HTTP ${res.status}`);
+              const json = await res.json() as { code: number; msg?: string };
+              if (json.code !== 0) throw new Error(`collect 失败: ${json.msg}`);
+            });
+          }
+
           const raw = await withRetry(async () => {
             const url = `${this.config.commentBaseUrl}/api/comments/full_tree/?note_id=${encodeURIComponent(noteId)}`;
             const res = await fetch(url, { headers: { 'X-API-Key': this.config.apiKey } });
@@ -503,6 +521,16 @@ function buildComponents(raw: RawPugongyingNote): PugongyingNote['components'] {
 }
 
 // ── Utilities ──
+
+function today(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function dateDiff(start: string, end: string): number {
+  const s = new Date(start);
+  const e = new Date(end);
+  return Math.ceil((e.getTime() - s.getTime()) / 86400000);
+}
 
 function chunkArray<T>(arr: T[], size: number): T[][] {
   const chunks: T[][] = [];
