@@ -222,24 +222,34 @@ export async function POST(request: NextRequest) {
 
     // Trigger juguang data ingestion if advertiserIds is non-empty (fire-and-forget, no await)
     if (sanitizedAdvertiserIds.length > 0) {
-      const ingestionService = new DataIngestionService();
-      const numericAdvertiserIds = sanitizedAdvertiserIds.map((id) => Number(id));
-      console.log('[POST /api/reviews] 调用 ingestJuguangData (fire-and-forget):', JSON.stringify({
-        projectId,
-        advertiserIds: numericAdvertiserIds,
-        reviewConfigId: reviewConfig.id,
-      }));
-      ingestionService.ingestJuguangData(projectId, numericAdvertiserIds, reviewConfig.id)
-        .then((juguangResult) => {
-          console.log('[POST /api/reviews] ingestJuguangData 完成:', JSON.stringify({
-            juguangNotesCount: juguangResult.juguangNotes.length,
-            errors: juguangResult.errors,
-            sampleNotes: juguangResult.juguangNotes.slice(0, 3),
-          }));
-        })
-        .catch((ingestionError) => {
-          console.error('POST /api/reviews ingestion error (non-blocking):', ingestionError);
-        });
+      // 从投流周期计算最小/最大日期
+      const phases = Array.isArray(launchPhases) ? launchPhases as Array<{ startDate?: string; endDate?: string }> : [];
+      const allDates = phases.flatMap((p) => [p.startDate, p.endDate]).filter((d): d is string => !!d).sort();
+      const startDate = allDates[0] || '';
+      const endDate = allDates[allDates.length - 1] || '';
+
+      if (startDate && endDate) {
+        const ingestionService = new DataIngestionService();
+        const numericAdvertiserIds = sanitizedAdvertiserIds.map((id) => Number(id));
+        console.log('[POST /api/reviews] 调用 ingestJuguangData (fire-and-forget):', JSON.stringify({
+          projectId,
+          advertiserIds: numericAdvertiserIds,
+          startDate,
+          endDate,
+          reviewConfigId: reviewConfig.id,
+        }));
+        ingestionService.ingestJuguangData(projectId, numericAdvertiserIds, startDate, endDate, reviewConfig.id)
+          .then((juguangResult) => {
+            console.log('[POST /api/reviews] ingestJuguangData 完成:', JSON.stringify({
+              juguangNotesCount: juguangResult.juguangNotes.length,
+              errors: juguangResult.errors,
+              sampleNotes: juguangResult.juguangNotes.slice(0, 3),
+            }));
+          })
+          .catch((ingestionError) => {
+            console.error('POST /api/reviews ingestion error (non-blocking):', ingestionError);
+          });
+      }
     }
 
     return NextResponse.json(reviewConfig, { status: 201 });

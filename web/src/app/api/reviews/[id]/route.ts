@@ -164,9 +164,17 @@ export async function PUT(
 
       if (advertiserIdsChanged) {
         try {
-          const ingestionService = new DataIngestionService();
-          const numericAdvertiserIds = sanitizedAdvertiserIds.map((aid) => Number(aid));
-          await ingestionService.ingestJuguangData(existing.projectId, numericAdvertiserIds, updated.id);
+          // 从更新后的 reviewConfig 获取投流周期，计算最小/最大日期
+          const phases = Array.isArray(updated.launchPhases) ? updated.launchPhases as Array<{ startDate?: string; endDate?: string }> : [];
+          const allDates = phases.flatMap((p) => [p.startDate, p.endDate]).filter((d): d is string => !!d).sort();
+          const startDate = allDates[0] || '';
+          const endDate = allDates[allDates.length - 1] || '';
+
+          if (startDate && endDate) {
+            const ingestionService = new DataIngestionService();
+            const numericAdvertiserIds = sanitizedAdvertiserIds.map((aid) => Number(aid));
+            await ingestionService.ingestJuguangData(existing.projectId, numericAdvertiserIds, startDate, endDate, updated.id);
+          }
         } catch (ingestionError) {
           // Do not block response on ingestion failure — log error and continue
           console.error('PUT /api/reviews/[id] ingestion error (non-blocking):', ingestionError);
