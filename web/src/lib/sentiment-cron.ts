@@ -114,8 +114,11 @@ async function runSentimentJob(): Promise<void> {
 
         totalComments += count;
 
-        // 执行情感分析
-        await analyzeSentiment(project.id);
+        // 异步后台执行情感分析，不阻塞爬取任务
+        analyzeSentiment(project.id).catch((sentimentErr) => {
+          const sentimentMsg = sentimentErr instanceof Error ? sentimentErr.message : String(sentimentErr);
+          console.error(`  [${project.projectName}] 情感分析失败: ${sentimentMsg}`);
+        });
 
         successCount++;
         console.log(`  ✓ [${project.projectName}] ${noteIds.length} 篇笔记, ${count} 条评论`);
