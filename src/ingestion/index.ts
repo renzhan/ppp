@@ -160,13 +160,13 @@ export class DataIngestionService {
   /**
    * 采集聚光投流数据（需广告主 ID + 复盘 ID，由用户手动触发）。
    */
-  async ingestJuguangData(projectId: string, advertiserIds: number[], reviewConfigId: string): Promise<JuguangDataResult> {
+  async ingestJuguangData(projectId: string, advertiserIds: number[], startDate: string, endDate: string, reviewConfigId: string): Promise<JuguangDataResult> {
     const ctx = await this.resolveProjectContext(projectId);
     const errors: string[] = [];
     let juguangNotes: JuguangNote[] = [];
 
     try {
-      juguangNotes = await this.paichachaClient.fetchJuguangData(advertiserIds, ctx.currentEnd, ctx.currentEnd);
+      juguangNotes = await this.paichachaClient.fetchJuguangData(advertiserIds, startDate, endDate);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       errors.push(`Failed to fetch juguang data: ${message}`);
