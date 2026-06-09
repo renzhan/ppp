@@ -99,14 +99,6 @@ export function NoteBaseTable({ projectId }: NoteBaseTableProps) {
 
   return (
     <div className="mt-4 space-y-3">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="text-sm text-gray-600">
-          <span className="font-medium">笔记底表</span>
-          <span className="ml-4 text-gray-500">共计 {total} 条记录</span>
-        </div>
-      </div>
-
       {/* Table with horizontal scroll */}
       <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
         <table className="w-full text-sm border-collapse">

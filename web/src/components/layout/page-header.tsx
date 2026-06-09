@@ -9,12 +9,13 @@ interface BreadcrumbItem {
 interface PageHeaderProps {
   title: string;
   description?: string;
+  titleClassName?: string;
   actions?: React.ReactNode;
   backHref?: string;
   breadcrumbs?: BreadcrumbItem[];
 }
 
-export function PageHeader({ title, description, actions, backHref, breadcrumbs }: PageHeaderProps) {
+export function PageHeader({ title, description, titleClassName, actions, backHref, breadcrumbs }: PageHeaderProps) {
   return (
     <div className="space-y-2">
       {/* Breadcrumb navigation */}
@@ -50,7 +51,7 @@ export function PageHeader({ title, description, actions, backHref, breadcrumbs 
             </Link>
           )}
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-gray-900">
+            <h1 className={`text-2xl tracking-tight text-gray-900 ${titleClassName ?? 'font-bold'}`}>
               {title}
             </h1>
             {description && (

@@ -9,6 +9,11 @@ import { CascadeSelector, CascadeSelectorValue } from '@/components/form/cascade
 import { LingxiTaxonomySelector, LingxiTaxonomyValue } from '@/components/form/lingxi-taxonomy-selector';
 import { NoteBaseUploader } from '@/components/form/note-base-uploader';
 import { NoteBaseTable } from '@/components/form/note-base-table';
+import { Card, CardContent, CardFooter } from '@/components/ui/card';
+import { FormField } from '@/components/ui/form-field';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
 
 interface User {
   id: string;
@@ -27,6 +32,7 @@ interface ProjectDetail {
   endDate: string | null;
   participants: string[];
   noteCount: number;
+  createdBy: string | null;
   lingxiAccountId: string | null;
   lingxiTaxonomyCode: string | null;
   lingxiTaxonomyPath: string | null;
@@ -189,6 +195,10 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
     return user?.displayName || user?.username || userId;
   };
 
+  const creatorDisplayName = project?.createdBy
+    ? getDisplayName(project.createdBy)
+    : '-';
+
   if (projectLoading || !form) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -199,210 +209,217 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      <PageHeader
-        title="编辑项目"
-        description={project?.projectName || ''}
-        backHref="/"
-      />
+      <PageHeader title="编辑项目" backHref="/" titleClassName="font-normal" />
 
-      <div className="rounded-lg border bg-white px-8 py-10 shadow-sm">
-        <div className="mx-auto max-w-3xl space-y-8">
-          {/* 品类/品牌/业务线 */}
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-900">
-              品类 / 品牌 / 业务线 <span className="text-rose-500">*</span>
-            </label>
+      <Card>
+        <CardContent className="p-8">
+          <div className="mx-auto space-y-6">
+            {/* 品类/品牌/业务线 */}
             <CascadeSelector value={form.cascade} onChange={handleCascadeChange} />
             {(errors.category || errors.brand) && (
               <p className="text-xs text-rose-500">{errors.category || errors.brand}</p>
             )}
-          </div>
 
-          {/* 项目名称 */}
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-900">
-              项目名称 <span className="text-rose-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={form.projectName}
-              onChange={(e) => {
-                setForm((prev) => prev ? { ...prev, projectName: e.target.value } : prev);
-                setErrors((prev) => { const n = { ...prev }; delete n.projectName; return n; });
-              }}
-              className="h-11 w-full rounded-lg border border-gray-200 px-3 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
-            />
-            {errors.projectName && <p className="text-xs text-rose-500">{errors.projectName}</p>}
-          </div>
+            {/* 项目名称 */}
+            <FormField
+              label={<>项目名称 <span className="text-rose-500">*</span></>}
+              htmlFor="projectName"
+            >
+              <Input
+                id="projectName"
+                type="text"
+                variant="form"
+                value={form.projectName}
+                onChange={(e) => {
+                  setForm((prev) => prev ? { ...prev, projectName: e.target.value } : prev);
+                  setErrors((prev) => { const n = { ...prev }; delete n.projectName; return n; });
+                }}
+                placeholder="请输入项目名称（不能与其它项目重名）"
+              />
+              {errors.projectName && <p className="text-xs text-rose-500">{errors.projectName}</p>}
+            </FormField>
 
-          {/* 灵犀账号ID + 行业选择 */}
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-900">灵犀账号ID</label>
-            <p className="text-xs text-gray-500">输入灵犀账号ID后点击"获取行业"，选择行业分类供灵犀数据爬取使用</p>
-            <LingxiTaxonomySelector
-              value={form.lingxiTaxonomy}
-              onChange={(val) => setForm((prev) => prev ? { ...prev, lingxiTaxonomy: val } : prev)}
-            />
-          </div>
+            {/* 创建者 */}
+            <FormField label="创建者" htmlFor="creator">
+              <Input
+                id="creator"
+                type="text"
+                variant="form"
+                value={creatorDisplayName}
+                readOnly
+                disabled
+                className="bg-gray-50 text-gray-500"
+              />
+            </FormField>
 
-          {/* 开始执行日期 */}
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-900">开始执行日期</label>
-            <input
-              type="date"
-              value={form.executionStartDate}
-              onChange={(e) => setForm((prev) => prev ? { ...prev, executionStartDate: e.target.value } : prev)}
-              className="h-11 w-full rounded-lg border border-gray-200 px-3 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
-            />
-          </div>
-
-          {/* 项目结束日期 */}
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-900">项目结束日期</label>
-            <input
-              type="date"
-              value={form.endDate}
-              onChange={(e) => {
-                setForm((prev) => prev ? { ...prev, endDate: e.target.value } : prev);
-                setErrors((prev) => { const n = { ...prev }; delete n.endDate; return n; });
-              }}
-              className="h-11 w-full rounded-lg border border-gray-200 px-3 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
-            />
-            {errors.endDate && <p className="text-xs text-rose-500">{errors.endDate}</p>}
-          </div>
-
-          {/* 参与者 */}
-          <div className="space-y-2" ref={participantRef}>
-            <label className="block text-sm font-medium text-gray-900">参与者</label>
-            <div className="relative">
-              <div
-                onClick={() => setShowParticipantDropdown(!showParticipantDropdown)}
-                className="flex min-h-[44px] w-full cursor-pointer flex-wrap items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-sm transition hover:border-gray-300"
-              >
-                {form.participants.length === 0 && (
-                  <span className="text-gray-400">点击选择参与者</span>
-                )}
-                {form.participants.map((userId) => (
-                  <span
-                    key={userId}
-                    className="inline-flex items-center gap-1 rounded-md bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand"
-                  >
-                    {getDisplayName(userId)}
-                    <button
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); removeParticipant(userId); }}
-                      className="ml-0.5 rounded-full p-0.5 transition hover:bg-brand-100"
-                    >
-                      <X size={12} />
-                    </button>
-                  </span>
-                ))}
-                <ChevronDown size={16} className="ml-auto text-gray-400" />
-              </div>
-              {showParticipantDropdown && (
-                <div className="absolute z-10 mt-1 max-h-60 w-full overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg">
-                  <div className="border-b px-3 py-2">
-                    <input
-                      type="text"
-                      value={participantSearch}
-                      onChange={(e) => setParticipantSearch(e.target.value)}
-                      placeholder="搜索姓名..."
-                      className="h-8 w-full rounded border border-gray-200 px-2 text-sm outline-none focus:border-brand focus:ring-1 focus:ring-brand/20"
-                      autoFocus
-                    />
-                  </div>
-                  <div className="max-h-48 overflow-y-auto">
-                  {availableParticipants.filter((u) => {
-                    if (!participantSearch.trim()) return true;
-                    const q = participantSearch.toLowerCase();
-                    return (u.displayName || '').toLowerCase().includes(q) || u.username.toLowerCase().includes(q);
-                  }).length === 0 ? (
-                    <div className="px-3 py-2 text-sm text-gray-400">无匹配用户</div>
-                  ) : (
-                    availableParticipants.filter((u) => {
-                      if (!participantSearch.trim()) return true;
-                      const q = participantSearch.toLowerCase();
-                      return (u.displayName || '').toLowerCase().includes(q) || u.username.toLowerCase().includes(q);
-                    }).map((user) => {
-                      const isSelected = form.participants.includes(user.id);
-                      return (
-                        <button
-                          key={user.id}
-                          type="button"
-                          onClick={() => toggleParticipant(user.id)}
-                          className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition ${
-                            isSelected ? 'bg-brand-50 text-brand' : 'text-gray-700 hover:bg-gray-50'
-                          }`}
-                        >
-                          <span className={`flex h-4 w-4 items-center justify-center rounded border ${
-                            isSelected ? 'border-brand bg-brand' : 'border-gray-300'
-                          }`}>
-                            {isSelected && (
-                              <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                              </svg>
-                            )}
-                          </span>
-                          <span>{user.displayName || user.username}</span>
-                          {user.role && user.role !== 'admin' && (
-                            <span className="ml-auto text-xs text-gray-400">{user.role}</span>
-                          )}
-                        </button>
-                      );
-                    })
+            {/* 参与者 */}
+            <FormField label="参与者">
+              <div className="relative" ref={participantRef}>
+                <div
+                  onClick={() => setShowParticipantDropdown(!showParticipantDropdown)}
+                  className="flex min-h-[40px] w-full cursor-pointer flex-wrap items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-2 text-sm transition hover:border-gray-400"
+                >
+                  {form.participants.length === 0 && (
+                    <span className="text-gray-400">点击选择参与者</span>
                   )}
-                  </div>
+                  {form.participants.map((userId) => (
+                    <span
+                      key={userId}
+                      className="inline-flex items-center gap-1 rounded-md bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand"
+                    >
+                      {getDisplayName(userId)}
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); removeParticipant(userId); }}
+                        className="ml-0.5 rounded-full p-0.5 transition hover:bg-brand-100"
+                      >
+                        <X size={12} />
+                      </button>
+                    </span>
+                  ))}
+                  <ChevronDown size={16} className="ml-auto text-gray-400" />
                 </div>
-              )}
+                {showParticipantDropdown && (
+                  <div className="absolute z-10 mt-1 max-h-60 w-full overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg">
+                    <div className="border-b px-3 py-2">
+                      <Input
+                        type="text"
+                        variant="form"
+                        value={participantSearch}
+                        onChange={(e) => setParticipantSearch(e.target.value)}
+                        placeholder="搜索姓名..."
+                        className="h-8"
+                        autoFocus
+                      />
+                    </div>
+                    <div className="max-h-48 overflow-y-auto">
+                      {availableParticipants.filter((u) => {
+                        if (!participantSearch.trim()) return true;
+                        const q = participantSearch.toLowerCase();
+                        return (u.displayName || '').toLowerCase().includes(q) || u.username.toLowerCase().includes(q);
+                      }).length === 0 ? (
+                        <div className="px-3 py-2 text-sm text-gray-400">无匹配用户</div>
+                      ) : (
+                        availableParticipants.filter((u) => {
+                          if (!participantSearch.trim()) return true;
+                          const q = participantSearch.toLowerCase();
+                          return (u.displayName || '').toLowerCase().includes(q) || u.username.toLowerCase().includes(q);
+                        }).map((user) => {
+                          const isSelected = form.participants.includes(user.id);
+                          return (
+                            <button
+                              key={user.id}
+                              type="button"
+                              onClick={() => toggleParticipant(user.id)}
+                              className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition ${
+                                isSelected ? 'bg-brand-50 text-brand' : 'text-gray-700 hover:bg-gray-50'
+                              }`}
+                            >
+                              <span className={`flex h-4 w-4 items-center justify-center rounded border ${
+                                isSelected ? 'border-brand bg-brand' : 'border-gray-300'
+                              }`}>
+                                {isSelected && (
+                                  <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                  </svg>
+                                )}
+                              </span>
+                              <span>{user.displayName || user.username}</span>
+                              {user.role && user.role !== 'admin' && (
+                                <span className="ml-auto text-xs text-gray-400">{user.role}</span>
+                              )}
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </FormField>
+
+            {/* 开始执行日期 & 项目结束日期 */}
+            <div className="grid grid-cols-2 gap-4">
+              <FormField label="开始执行日期" htmlFor="executionStartDate">
+                <Input
+                  id="executionStartDate"
+                  type="date"
+                  variant="form"
+                  className="flex-1"
+                  value={form.executionStartDate}
+                  onChange={(e) => setForm((prev) => prev ? { ...prev, executionStartDate: e.target.value } : prev)}
+                />
+              </FormField>
+              <FormField label="项目结束日期" htmlFor="endDate">
+                <Input
+                  id="endDate"
+                  type="date"
+                  variant="form"
+                  className="flex-1"
+                  value={form.endDate}
+                  onChange={(e) => {
+                    setForm((prev) => prev ? { ...prev, endDate: e.target.value } : prev);
+                    setErrors((prev) => { const n = { ...prev }; delete n.endDate; return n; });
+                  }}
+                />
+                {errors.endDate && <p className="text-xs text-rose-500">{errors.endDate}</p>}
+              </FormField>
             </div>
-          </div>
 
-          {/* 笔记底表上传 */}
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-900">笔记底表</label>
-            <p className="text-xs text-gray-500">
-              {project?.noteCount ? `当前已有 ${project.noteCount} 条笔记数据。重新上传将覆盖现有数据。` : '尚未上传笔记底表，上传后可用于复盘分析。'}
-            </p>
-            <NoteBaseUploader
-              projectId={projectId}
-              onUploadSuccess={() => {
-                queryClient.invalidateQueries({ queryKey: ['project', projectId] });
-                queryClient.invalidateQueries({ queryKey: ['projects'] });
-                queryClient.invalidateQueries({ queryKey: ['project-note-base', projectId] });
-              }}
-              onUploadError={() => {}}
-            />
-            {/* 笔记记录表格 */}
-            <NoteBaseTable projectId={projectId} />
-          </div>
+            {/* 灵犀数据获取 */}
+            <FormField label="灵犀数据获取">
+              <LingxiTaxonomySelector
+                value={form.lingxiTaxonomy}
+                onChange={(val) => setForm((prev) => prev ? { ...prev, lingxiTaxonomy: val } : prev)}
+              />
+            </FormField>
 
-          {/* Submit */}
-          <div className="flex items-center justify-end gap-3 pt-4">
-            <button
-              type="button"
-              onClick={() => router.push('/')}
-              className="inline-flex h-10 items-center rounded-lg border border-gray-200 px-5 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
-            >
-              取消
-            </button>
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={updateProjectMutation.isPending}
-              className="inline-flex h-10 items-center gap-2 rounded-lg bg-brand px-6 text-sm font-medium text-white transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {updateProjectMutation.isPending && <Loader2 size={16} className="animate-spin" />}
-              保存修改
-            </button>
-          </div>
-
-          {updateProjectMutation.isError && (
-            <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-600">
-              {(updateProjectMutation.error as Error).message || '更新项目失败'}
+            {/* 业务底表 */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <Label className="font-normal text-gray-500">业务底表</Label>
+                <a
+                  href="/down/projects-template.xlsx"
+                  download
+                  className="text-sm text-brand hover:underline"
+                >
+                  业务底表模版下载
+                </a>
+              </div>
+              <NoteBaseUploader
+                projectId={projectId}
+                onUploadSuccess={() => {
+                  queryClient.invalidateQueries({ queryKey: ['project', projectId] });
+                  queryClient.invalidateQueries({ queryKey: ['projects'] });
+                  queryClient.invalidateQueries({ queryKey: ['project-note-base', projectId] });
+                }}
+                onUploadError={() => {}}
+              />
+              <NoteBaseTable projectId={projectId} />
             </div>
-          )}
-        </div>
-      </div>
+
+            {updateProjectMutation.isError && (
+              <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-600">
+                {(updateProjectMutation.error as Error).message || '更新项目失败'}
+              </div>
+            )}
+          </div>
+        </CardContent>
+        <CardFooter className="justify-end gap-3 px-8 pb-8">
+          <Button type="button" variant="outline" onClick={() => router.push('/')}>
+            取消
+          </Button>
+          <Button
+            type="button"
+            variant="submit"
+            onClick={handleSubmit}
+            disabled={updateProjectMutation.isPending}
+          >
+            {updateProjectMutation.isPending && <Loader2 size={16} className="animate-spin" />}
+            保存修改
+          </Button>
+        </CardFooter>
+      </Card>
     </div>
   );
 }
