@@ -3,12 +3,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
-import { Loader2, X, ChevronDown } from 'lucide-react';
+import { Loader2, X, ChevronDown, Upload } from 'lucide-react';
 import { PageHeader } from '@/components/layout/page-header';
 import { CascadeSelector, CascadeSelectorValue } from '@/components/form/cascade-selector';
 import { LingxiTaxonomySelector, LingxiTaxonomyValue } from '@/components/form/lingxi-taxonomy-selector';
 import { NoteBasePreview } from '@/components/form/note-base-preview';
 import { ParsedNoteBaseRow } from '@/lib/note-base-parser';
+import { Card, CardContent, CardFooter } from '@/components/ui/card';
+import { FormField } from '@/components/ui/form-field';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
 
 interface User {
   id: string;
@@ -239,230 +244,221 @@ export default function NewProjectPage() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      <PageHeader
-        title="新建项目"
-        description="填写项目基础信息，笔记底表可在创建后通过编辑上传。"
-        backHref="/"
-      />
+      <PageHeader title="新建项目" backHref="/" titleClassName="font-normal" />
 
-      <div className="rounded-lg border bg-white px-8 py-10 shadow-sm">
-        <div className="mx-auto max-w-3xl space-y-8">
-          {/* 品类/品牌/业务线 - CascadeSelector */}
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-900">
-              品类 / 品牌 / 业务线 <span className="text-rose-500">*</span>
-            </label>
-            <CascadeSelector
-              value={form.cascade}
-              onChange={handleCascadeChange}
-            />
+      <Card>
+        <CardContent className="p-8">
+          <div className="mx-auto  space-y-6">
+            {/* 品类/品牌/业务线 */}
+            <CascadeSelector value={form.cascade} onChange={handleCascadeChange} />
             {(errors.category || errors.brand) && (
               <p className="text-xs text-rose-500">{errors.category || errors.brand}</p>
             )}
-          </div>
 
-          {/* 项目名称 - with suggestions */}
-          <div className="space-y-2" ref={suggestionsRef}>
-            <label className="block text-sm font-medium text-gray-900">
-              项目名称 <span className="text-rose-500">*</span>
-            </label>
-            <div className="relative">
-              <input
-                type="text"
-                value={form.projectName}
-                onChange={(e) => {
-                  setForm((prev) => ({ ...prev, projectName: e.target.value }));
-                  setErrors((prev) => { const n = { ...prev }; delete n.projectName; return n; });
-                  setShowSuggestions(true);
-                }}
-                onFocus={() => setShowSuggestions(true)}
-                placeholder="输入项目名称或从已导入项目中选择"
-                className="h-11 w-full rounded-lg border border-gray-200 px-3 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
-              />
-              {showSuggestions && filteredSuggestions.length > 0 && (
-                <div className="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
-                  {filteredSuggestions.map((project) => (
-                    <button
-                      key={project.id}
-                      type="button"
-                      onClick={() => {
-                        setForm((prev) => ({
-                          ...prev,
-                          projectName: project.projectName,
-                          lingxiTaxonomy: project.lingxiAccountId
-                            ? { accountId: project.lingxiAccountId, taxonomyCode: '', taxonomyPath: '' }
-                            : prev.lingxiTaxonomy,
-                        }));
-                        setShowSuggestions(false);
-                      }}
-                      className="w-full px-3 py-2 text-left text-sm text-gray-700 transition hover:bg-brand-50 hover:text-brand"
-                    >
-                      {project.projectName}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-            {errors.projectName && <p className="text-xs text-rose-500">{errors.projectName}</p>}
-          </div>
-
-          {/* 灵犀账号ID + 行业选择 */}
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-900">灵犀账号ID</label>
-            <p className="text-xs text-gray-500">输入灵犀账号ID后点击"获取行业"，选择行业分类供灵犀数据爬取使用</p>
-            <LingxiTaxonomySelector
-              value={form.lingxiTaxonomy}
-              onChange={(val) => setForm((prev) => ({ ...prev, lingxiTaxonomy: val }))}
-            />
-          </div>
-
-          {/* 创建者 - auto-filled, read-only */}
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-900">创建者</label>
-            <input
-              type="text"
-              value={currentUser ? (currentUser.displayName || currentUser.username) : '加载中...'}
-              readOnly
-              disabled
-              className="h-11 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 text-sm text-gray-500 outline-none"
-            />
-          </div>
-
-          {/* 参与者 - multi-select */}
-          <div className="space-y-2" ref={participantRef}>
-            <label className="block text-sm font-medium text-gray-900">参与者</label>
-            <div className="relative">
-              <div
-                onClick={() => setShowParticipantDropdown(!showParticipantDropdown)}
-                className="flex min-h-[44px] w-full cursor-pointer flex-wrap items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-sm transition hover:border-gray-300 focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/20"
-              >
-                {form.participants.length === 0 && (
-                  <span className="text-gray-400">点击选择参与者</span>
+            {/* 项目名称 */}
+            <FormField
+              label={<>项目名称 <span className="text-rose-500">*</span></>}
+              htmlFor="projectName"
+            >
+              <div className="relative" ref={suggestionsRef}>
+                <Input
+                  id="projectName"
+                  type="text"
+                  variant="form"
+                  value={form.projectName}
+                  onChange={(e) => {
+                    setForm((prev) => ({ ...prev, projectName: e.target.value }));
+                    setErrors((prev) => { const n = { ...prev }; delete n.projectName; return n; });
+                    setShowSuggestions(true);
+                  }}
+                  onFocus={() => setShowSuggestions(true)}
+                  placeholder="请输入项目名称（不能与其它项目重名）"
+                />
+                {showSuggestions && filteredSuggestions.length > 0 && (
+                  <div className="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+                    {filteredSuggestions.map((project) => (
+                      <button
+                        key={project.id}
+                        type="button"
+                        onClick={() => {
+                          setForm((prev) => ({
+                            ...prev,
+                            projectName: project.projectName,
+                            lingxiTaxonomy: project.lingxiAccountId
+                              ? { accountId: project.lingxiAccountId, taxonomyCode: '', taxonomyPath: '' }
+                              : prev.lingxiTaxonomy,
+                          }));
+                          setShowSuggestions(false);
+                        }}
+                        className="w-full px-3 py-2 text-left text-sm text-gray-700 transition hover:bg-brand-50 hover:text-brand"
+                      >
+                        {project.projectName}
+                      </button>
+                    ))}
+                  </div>
                 )}
-                {form.participants.map((userId) => (
-                  <span
-                    key={userId}
-                    className="inline-flex items-center gap-1 rounded-md bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand"
-                  >
-                    {getDisplayName(userId)}
-                    <button
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); removeParticipant(userId); }}
-                      className="ml-0.5 rounded-full p-0.5 transition hover:bg-brand-100"
-                    >
-                      <X size={12} />
-                    </button>
-                  </span>
-                ))}
-                <ChevronDown size={16} className="ml-auto text-gray-400" />
               </div>
+              {errors.projectName && <p className="text-xs text-rose-500">{errors.projectName}</p>}
+            </FormField>
 
-              {showParticipantDropdown && (
-                <div className="absolute z-10 mt-1 max-h-60 w-full overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg">
-                  <div className="border-b px-3 py-2">
-                    <input
-                      type="text"
-                      value={participantSearch}
-                      onChange={(e) => setParticipantSearch(e.target.value)}
-                      placeholder="搜索姓名..."
-                      className="h-8 w-full rounded border border-gray-200 px-2 text-sm outline-none focus:border-brand focus:ring-1 focus:ring-brand/20"
-                      autoFocus
-                    />
-                  </div>
-                  <div className="max-h-48 overflow-y-auto">
-                  {availableParticipants.filter((u) => {
-                    if (!participantSearch.trim()) return true;
-                    const q = participantSearch.toLowerCase();
-                    return (u.displayName || '').toLowerCase().includes(q) || u.username.toLowerCase().includes(q);
-                  }).length === 0 ? (
-                    <div className="px-3 py-2 text-sm text-gray-400">无匹配用户</div>
-                  ) : (
-                    availableParticipants.filter((u) => {
-                      if (!participantSearch.trim()) return true;
-                      const q = participantSearch.toLowerCase();
-                      return (u.displayName || '').toLowerCase().includes(q) || u.username.toLowerCase().includes(q);
-                    }).map((user) => {
-                      const isSelected = form.participants.includes(user.id);
-                      return (
-                        <button
-                          key={user.id}
-                          type="button"
-                          onClick={() => toggleParticipant(user.id)}
-                          className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition ${
-                            isSelected
-                              ? 'bg-brand-50 text-brand'
-                              : 'text-gray-700 hover:bg-gray-50'
-                          }`}
-                        >
-                          <span className={`flex h-4 w-4 items-center justify-center rounded border ${
-                            isSelected ? 'border-brand bg-brand' : 'border-gray-300'
-                          }`}>
-                            {isSelected && (
-                              <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                              </svg>
-                            )}
-                          </span>
-                          <span>{user.displayName || user.username}</span>
-                          {user.role && user.role !== 'admin' && (
-                            <span className="ml-auto text-xs text-gray-400">{user.role}</span>
-                          )}
-                        </button>
-                      );
-                    })
+            {/* 创建者 */}
+            <FormField label="创建者" htmlFor="creator">
+              <Input
+                id="creator"
+                type="text"
+                variant="form"
+                value={currentUser ? (currentUser.displayName || currentUser.username) : '加载中...'}
+                readOnly
+                disabled
+                className="bg-gray-50 text-gray-500"
+              />
+            </FormField>
+
+            {/* 参与者 */}
+            <FormField label="参与者">
+              <div className="relative" ref={participantRef}>
+                <div
+                  onClick={() => setShowParticipantDropdown(!showParticipantDropdown)}
+                  className="flex min-h-[40px] w-full cursor-pointer flex-wrap items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-2 text-sm transition hover:border-gray-400 focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/20"
+                >
+                  {form.participants.length === 0 && (
+                    <span className="text-gray-400">点击选择参与者</span>
                   )}
-                  </div>
+                  {form.participants.map((userId) => (
+                    <span
+                      key={userId}
+                      className="inline-flex items-center gap-1 rounded-md bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand"
+                    >
+                      {getDisplayName(userId)}
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); removeParticipant(userId); }}
+                        className="ml-0.5 rounded-full p-0.5 transition hover:bg-brand-100"
+                      >
+                        <X size={12} />
+                      </button>
+                    </span>
+                  ))}
+                  <ChevronDown size={16} className="ml-auto text-gray-400" />
                 </div>
-              )}
+
+                {showParticipantDropdown && (
+                  <div className="absolute z-10 mt-1 max-h-60 w-full overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg">
+                    <div className="border-b px-3 py-2">
+                      <Input
+                        type="text"
+                        variant="form"
+                        value={participantSearch}
+                        onChange={(e) => setParticipantSearch(e.target.value)}
+                        placeholder="搜索姓名..."
+                        className="h-8"
+                        autoFocus
+                      />
+                    </div>
+                    <div className="max-h-48 overflow-y-auto">
+                      {availableParticipants.filter((u) => {
+                        if (!participantSearch.trim()) return true;
+                        const q = participantSearch.toLowerCase();
+                        return (u.displayName || '').toLowerCase().includes(q) || u.username.toLowerCase().includes(q);
+                      }).length === 0 ? (
+                        <div className="px-3 py-2 text-sm text-gray-400">无匹配用户</div>
+                      ) : (
+                        availableParticipants.filter((u) => {
+                          if (!participantSearch.trim()) return true;
+                          const q = participantSearch.toLowerCase();
+                          return (u.displayName || '').toLowerCase().includes(q) || u.username.toLowerCase().includes(q);
+                        }).map((user) => {
+                          const isSelected = form.participants.includes(user.id);
+                          return (
+                            <button
+                              key={user.id}
+                              type="button"
+                              onClick={() => toggleParticipant(user.id)}
+                              className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition ${
+                                isSelected
+                                  ? 'bg-brand-50 text-brand'
+                                  : 'text-gray-700 hover:bg-gray-50'
+                              }`}
+                            >
+                              <span className={`flex h-4 w-4 items-center justify-center rounded border ${
+                                isSelected ? 'border-brand bg-brand' : 'border-gray-300'
+                              }`}>
+                                {isSelected && (
+                                  <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                  </svg>
+                                )}
+                              </span>
+                              <span>{user.displayName || user.username}</span>
+                              {user.role && user.role !== 'admin' && (
+                                <span className="ml-auto text-xs text-gray-400">{user.role}</span>
+                              )}
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </FormField>
+
+            {/* 开始执行日期 & 项目结束日期 */}
+            <div className="grid grid-cols-2 gap-4">
+              <FormField label="开始执行日期" htmlFor="executionStartDate">
+                <Input
+                  id="executionStartDate"
+                  type="date"
+                  variant="form"
+                  className="flex-1"
+                  value={form.executionStartDate}
+                  onChange={(e) => setForm((prev) => ({ ...prev, executionStartDate: e.target.value }))}
+                />
+              </FormField>
+              <FormField label="项目结束日期" htmlFor="endDate">
+                <Input
+                  id="endDate"
+                  type="date"
+                  variant="form"
+                  className="flex-1"
+                  value={form.endDate}
+                  onChange={(e) => {
+                    setForm((prev) => ({ ...prev, endDate: e.target.value }));
+                    setErrors((prev) => { const n = { ...prev }; delete n.endDate; return n; });
+                  }}
+                />
+                {errors.endDate && <p className="text-xs text-rose-500">{errors.endDate}</p>}
+              </FormField>
             </div>
-          </div>
 
-          {/* 开始执行日期 */}
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-900">开始执行日期</label>
-            <input
-              type="date"
-              value={form.executionStartDate}
-              onChange={(e) => setForm((prev) => ({ ...prev, executionStartDate: e.target.value }))}
-              className="h-11 w-full rounded-lg border border-gray-200 px-3 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
-            />
-          </div>
+            {/* 灵犀数据获取 */}
+            <FormField label="灵犀数据获取">
+              <LingxiTaxonomySelector
+                value={form.lingxiTaxonomy}
+                onChange={(val) => setForm((prev) => ({ ...prev, lingxiTaxonomy: val }))}
+              />
+            </FormField>
 
-          {/* 项目结束日期 */}
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-900">项目结束日期</label>
-            <input
-              type="date"
-              value={form.endDate}
-              onChange={(e) => {
-                setForm((prev) => ({ ...prev, endDate: e.target.value }));
-                setErrors((prev) => { const n = { ...prev }; delete n.endDate; return n; });
-              }}
-              className="h-11 w-full rounded-lg border border-gray-200 px-3 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
-            />
-            {errors.endDate && <p className="text-xs text-rose-500">{errors.endDate}</p>}
-          </div>
-
-          {/* 笔记底表上传 - optional */}
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-900">笔记底表（可选）</label>
-            <p className="text-xs text-gray-500">
-              可选上传，创建项目时将自动保存到数据库。也可后续通过编辑项目上传。
-            </p>
-            <div>
-              <label className="flex cursor-pointer flex-col items-center justify-center rounded-md border-2 border-dashed border-gray-300 bg-white px-4 py-6 transition-colors hover:border-gray-400 hover:bg-gray-50">
-                <svg className="mb-2 h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                </svg>
+            {/* 业务底表 */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <Label className="font-normal text-gray-500">业务底表</Label>
+                <a
+                  href="/down/projects-template.xlsx"
+                  download
+                  className="text-sm text-brand hover:underline"
+                >
+                  业务底表模版下载
+                </a>
+              </div>
+              <label className="flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-white px-4 py-6 transition-colors hover:border-gray-400 hover:bg-gray-50">
+                <Upload className="mb-2 h-8 w-8 text-gray-400" />
                 {pendingNoteFile ? (
-                  <p className="text-sm text-emerald-600 font-medium">已选择: {pendingNoteFile.name}</p>
+                  <p className="text-sm font-medium text-emerald-600">已选择: {pendingNoteFile.name}</p>
                 ) : (
-                  <>
-                    <p className="text-sm text-gray-600">
-                      点击选择 <span className="font-medium text-brand">.xlsx</span> 笔记底表文件
-                    </p>
-                    <p className="mt-1 text-xs text-gray-400">创建项目时将自动保存</p>
-                  </>
+                  <p className="text-sm text-gray-600">
+                    请上传<span className="font-medium text-brand">.xlsx</span>格式业务底表
+                  </p>
                 )}
                 <input
                   type="file"
@@ -476,7 +472,6 @@ export default function NewProjectPage() {
                         return;
                       }
                       setPendingNoteFile(file);
-                      // 立即调用解析端点预览数据
                       setIsParsing(true);
                       setParsedPreviewRecords([]);
                       setParseWarnings([]);
@@ -511,53 +506,46 @@ export default function NewProjectPage() {
                     setParsedPreviewRecords([]);
                     setParseWarnings([]);
                   }}
-                  className="mt-2 text-xs text-gray-500 hover:text-rose-500"
+                  className="text-xs text-gray-500 hover:text-rose-500"
                 >
                   取消选择
                 </button>
               )}
-              {/* 解析中提示 */}
               {isParsing && (
-                <div className="mt-2 flex items-center gap-2 text-xs text-brand">
+                <div className="flex items-center gap-2 text-xs text-brand">
                   <Loader2 size={12} className="animate-spin" />
                   正在解析预览...
                 </div>
               )}
-              {/* 解析预览 */}
               {!isParsing && parsedPreviewRecords.length > 0 && (
                 <NoteBasePreview records={parsedPreviewRecords} warnings={parseWarnings} />
               )}
-              {/* 解析失败提示（无记录时） */}
               {!isParsing && parsedPreviewRecords.length === 0 && parseWarnings.length > 0 && (
-                <div className="mt-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                <div className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-700">
                   {parseWarnings.map((w, i) => <p key={i}>{w}</p>)}
                 </div>
               )}
             </div>
-          </div>
 
-          {/* Submit */}
-          <div className="flex items-center justify-end pt-4">
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={createProjectMutation.isPending}
-              className="inline-flex h-12 items-center gap-2 rounded-lg bg-brand px-6 text-sm font-medium text-white transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {createProjectMutation.isPending ? (
-                <Loader2 size={16} className="animate-spin" />
-              ) : null}
-              <span>创建项目</span>
-            </button>
+            {createProjectMutation.isError && (
+              <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-600">
+                {(createProjectMutation.error as Error).message || '创建项目失败'}
+              </div>
+            )}
           </div>
-
-          {createProjectMutation.isError && (
-            <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-600">
-              {(createProjectMutation.error as Error).message || '创建项目失败'}
-            </div>
-          )}
-        </div>
-      </div>
+        </CardContent>
+        <CardFooter className="justify-end px-8 pb-8">
+          <Button
+            type="button"
+            variant="submit"
+            onClick={handleSubmit}
+            disabled={createProjectMutation.isPending}
+          >
+            {createProjectMutation.isPending && <Loader2 size={16} className="animate-spin" />}
+            创建项目
+          </Button>
+        </CardFooter>
+      </Card>
     </div>
   );
 }

@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { getBrandsForCategory, getBusinessLinesForBrand } from '@/lib/cascade-filter';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
 
 export interface TreeNode {
   id: string;
@@ -22,14 +24,12 @@ export interface CascadeSelectorProps {
   disabled?: boolean;
 }
 
+function RequiredMark() {
+  return <span className="text-rose-500">*</span>;
+}
+
 /**
  * Three-level cascade selector: 品类 → 品牌 → 业务线
- *
- * Behavior:
- * 1. If treeData is not provided, fetches from /api/tree-structure on mount
- * 2. Renders 3 select dropdowns: 品类, 品牌, 业务线
- * 3. When category changes: filters brands, clears brand and businessLine
- * 4. When brand changes: filters businessLines, clears businessLine
  */
 export function CascadeSelector({ treeData, value, onChange, disabled }: CascadeSelectorProps) {
   const [tree, setTree] = useState<TreeNode[]>(treeData ?? []);
@@ -82,14 +82,11 @@ export function CascadeSelector({ treeData, value, onChange, disabled }: Cascade
     onChange({ ...value, businessLine });
   };
 
-  const selectClass =
-    'block w-full rounded-sm border border-gray-300 bg-white px-3 h-10 text-sm text-gray-900 placeholder:text-gray-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20 disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-gray-50';
-
   if (loading) {
     return (
       <div className="grid grid-cols-3 gap-3">
         {[1, 2, 3].map((i) => (
-          <div key={i} className="h-10 animate-pulse rounded-sm bg-gray-200" />
+          <div key={i} className="h-10 animate-pulse rounded-md bg-gray-200" />
         ))}
       </div>
     );
@@ -97,67 +94,72 @@ export function CascadeSelector({ treeData, value, onChange, disabled }: Cascade
 
   return (
     <div className="grid grid-cols-3 gap-3">
-      {/* 品类 */}
-      <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">品类</label>
-        <select
-          className={selectClass}
-          value={value.category}
-          onChange={(e) => handleCategoryChange(e.target.value)}
-          disabled={disabled}
-        >
-          <option value="">请选择品类</option>
-          {tree.map((node) => (
-            <option key={node.id} value={node.id}>
-              {node.label}
-            </option>
-          ))}
-        </select>
+      <div className="space-y-1.5">
+        <Label className="font-normal text-gray-500">
+          品类 <RequiredMark />
+        </Label>
+        <Select value={value.category} onValueChange={handleCategoryChange} disabled={disabled}>
+          <SelectTrigger className="h-10 rounded-lg border-gray-300" />
+          <SelectContent>
+            <SelectItem value="">请选择品类</SelectItem>
+            {tree.map((node) => (
+              <SelectItem key={node.id} value={node.id}>
+                {node.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
-      {/* 品牌 */}
-      <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">品牌</label>
-        <select
-          className={selectClass}
+      <div className="space-y-1.5">
+        <Label className="font-normal text-gray-500">
+          品牌 <RequiredMark />
+        </Label>
+        <Select
           value={value.brand}
-          onChange={(e) => handleBrandChange(e.target.value)}
+          onValueChange={handleBrandChange}
           disabled={disabled || !value.category}
         >
-          <option value="">请选择品牌</option>
-          {brandOptions.map((brandId) => {
-            const categoryNode = tree.find((n) => n.id === value.category);
-            const brandNode = categoryNode?.children?.find((n) => n.id === brandId);
-            return (
-              <option key={brandId} value={brandId}>
-                {brandNode?.label ?? brandId}
-              </option>
-            );
-          })}
-        </select>
+          <SelectTrigger className="h-10 rounded-lg border-gray-300" />
+          <SelectContent>
+            <SelectItem value="">请选择品牌</SelectItem>
+            {brandOptions.map((brandId) => {
+              const categoryNode = tree.find((n) => n.id === value.category);
+              const brandNode = categoryNode?.children?.find((n) => n.id === brandId);
+              return (
+                <SelectItem key={brandId} value={brandId}>
+                  {brandNode?.label ?? brandId}
+                </SelectItem>
+              );
+            })}
+          </SelectContent>
+        </Select>
       </div>
 
-      {/* 业务线 */}
-      <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">业务线</label>
-        <select
-          className={selectClass}
+      <div className="space-y-1.5">
+        <Label className="font-normal text-gray-500">
+          业务线 <RequiredMark />
+        </Label>
+        <Select
           value={value.businessLine}
-          onChange={(e) => handleBusinessLineChange(e.target.value)}
+          onValueChange={handleBusinessLineChange}
           disabled={disabled || !value.brand}
         >
-          <option value="">请选择业务线</option>
-          {businessLineOptions.map((blId) => {
-            const categoryNode = tree.find((n) => n.id === value.category);
-            const brandNode = categoryNode?.children?.find((n) => n.id === value.brand);
-            const blNode = brandNode?.children?.find((n) => n.id === blId);
-            return (
-              <option key={blId} value={blId}>
-                {blNode?.label ?? blId}
-              </option>
-            );
-          })}
-        </select>
+          <SelectTrigger className="h-10 rounded-lg border-gray-300" />
+          <SelectContent>
+            <SelectItem value="">请选择业务线</SelectItem>
+            {businessLineOptions.map((blId) => {
+              const categoryNode = tree.find((n) => n.id === value.category);
+              const brandNode = categoryNode?.children?.find((n) => n.id === value.brand);
+              const blNode = brandNode?.children?.find((n) => n.id === blId);
+              return (
+                <SelectItem key={blId} value={blId}>
+                  {blNode?.label ?? blId}
+                </SelectItem>
+              );
+            })}
+          </SelectContent>
+        </Select>
       </div>
     </div>
   );

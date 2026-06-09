@@ -16,7 +16,7 @@ export const listTableActionHeadClass = cn(listTableHeadClass, 'text-center');
 export const listTableCellClass = 'py-3 text-center';
 
 /** 操作列单元格 */
-export const listTableActionCellClass = 'py-3 text-right';
+export const listTableActionCellClass = 'py-3 text-center';
 
 /** 筛选区与数据列表之间的间距 */
 export const listFilterToDataGapClass = 'mt-10';

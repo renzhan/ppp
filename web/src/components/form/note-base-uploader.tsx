@@ -153,9 +153,8 @@ export function NoteBaseUploader({ projectId, onUploadSuccess, onUploadError }: 
               />
             </svg>
             <p className="text-sm text-gray-600">
-              拖拽文件到此处，或 <span className="font-medium text-brand">点击选择文件</span>
+              请上传<span className="font-medium text-brand">.xlsx</span>格式业务底表
             </p>
-            <p className="mt-1 text-xs text-gray-400">仅支持 .xlsx 格式</p>
           </>
         )}
       </div>
