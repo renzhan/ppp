@@ -23,19 +23,24 @@ export default function LoginPage() {
     setError('');
     setPhoneError('');
 
-    // Client-side phone format validation
-    if (!isValidPhone(phone)) {
-      setPhoneError('请输入正确的11位手机号');
+    if (!phone.trim()) {
+      setPhoneError('请输入手机号或用户名');
       return;
     }
 
     setLoading(true);
 
+    // Determine if input is a phone number or username
+    const isPhone = isValidPhone(phone);
+    const body = isPhone
+      ? { phone, password, rememberMe }
+      : { username: phone, password, rememberMe };
+
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone, password, rememberMe }),
+        body: JSON.stringify(body),
       });
 
       const data = await res.json();
@@ -83,18 +88,18 @@ export default function LoginPage() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
-            <FormField label="手机号" htmlFor="phone">
+            <FormField label="手机号 / 用户名" htmlFor="phone">
               <Input
                 id="phone"
                 variant="login"
-                type="tel"
+                type="text"
                 value={phone}
                 onChange={(e) => {
                   setPhone(e.target.value);
                   if (phoneError) setPhoneError('');
                 }}
-                placeholder="请输入11位手机号"
-                autoComplete="tel"
+                placeholder="请输入手机号或用户名"
+                autoComplete="username"
                 required
               />
               {phoneError && (
