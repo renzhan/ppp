@@ -73,6 +73,7 @@ export class JuguangClient {
       {},
       { splitColumns: ['placement'] },
       { splitColumns: ['keyword'] },
+      { splitColumns: ['targetDetail'] },
     ];
 
     const dates = dateRange(startDate, endDate);
