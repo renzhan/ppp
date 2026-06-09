@@ -6,11 +6,11 @@ import * as XLSX from 'xlsx';
  * Download an Excel template for batch user import.
  */
 export async function GET() {
-  const headers = ['username', 'displayName', 'role'];
+  const headers = ['username', 'displayName', 'phone', 'role'];
   const sampleData = [
-    ['zhangsan', '张三', 'user'],
-    ['lisi', '李四', 'user'],
-    ['wangwu', '王五', 'admin'],
+    ['zhangsan', '张三', '13800138001', 'user'],
+    ['lisi', '李四', '13800138002', 'user'],
+    ['wangwu', '王五', '13800138003', 'admin'],
   ];
 
   const ws = XLSX.utils.aoa_to_sheet([headers, ...sampleData]);
@@ -19,6 +19,7 @@ export async function GET() {
   ws['!cols'] = [
     { wch: 20 }, // username
     { wch: 20 }, // displayName
+    { wch: 15 }, // phone
     { wch: 10 }, // role
   ];
 

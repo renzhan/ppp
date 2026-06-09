@@ -4,22 +4,38 @@ import { verifyPassword, createToken, getCookieName } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
   try {
-    const { username, password, rememberMe } = await request.json();
+    const { phone, username, password, rememberMe } = await request.json();
 
-    if (!username || !password) {
+    // Validate: at least phone or username must be provided
+    if (!phone && !username) {
       return NextResponse.json(
-        { error: '请输入用户名和密码' },
+        { error: '请输入手机号和密码' },
         { status: 400 }
       );
     }
 
-    const user = await prisma.user.findUnique({
-      where: { username },
-    });
+    if (!password) {
+      return NextResponse.json(
+        { error: '请输入手机号和密码' },
+        { status: 400 }
+      );
+    }
+
+    // Primary lookup by phone; fallback to username for backward compatibility
+    let user;
+    if (phone) {
+      user = await prisma.user.findUnique({
+        where: { phone },
+      });
+    } else {
+      user = await prisma.user.findUnique({
+        where: { username },
+      });
+    }
 
     if (!user || !user.isActive) {
       return NextResponse.json(
-        { error: '用户名或密码错误' },
+        { error: '手机号或密码错误' },
         { status: 401 }
       );
     }
@@ -27,7 +43,7 @@ export async function POST(request: NextRequest) {
     const valid = await verifyPassword(password, user.passwordHash);
     if (!valid) {
       return NextResponse.json(
-        { error: '用户名或密码错误' },
+        { error: '手机号或密码错误' },
         { status: 401 }
       );
     }
@@ -42,6 +58,7 @@ export async function POST(request: NextRequest) {
       {
         id: user.id,
         username: user.username,
+        phone: user.phone,
         role: user.role,
         mustChangePassword: user.mustChangePassword,
       },

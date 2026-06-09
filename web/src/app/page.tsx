@@ -8,7 +8,7 @@ import { Loading } from '@/components/ui/loading';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { FilterField } from '@/components/ui/filter-field';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { CardFooter } from '@/components/ui/card';
 import {
   listEmptyClass,
   listErrorClass,
@@ -35,7 +35,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { formatDate } from '@/lib/project-meta';
 import { generatePageNumbers } from '@/lib/pagination';
 import { cn } from '@/lib/utils';
 
@@ -56,8 +55,6 @@ interface Project {
   createdAt: string;
   createdBy: string | null;
   createdByDisplayName: string | null;
-  noteCount: number;
-  participants: string[];
 }
 
 interface ProjectsResponse {
@@ -300,22 +297,19 @@ export default function ProjectListPage() {
               <Table className="min-w-[960px] text-sm">
                 <TableHeader>
                   <TableRow className={listTableHeaderRowClass}>
-                    <TableHead className={listTableHeadClass}>品类</TableHead>
-                    <TableHead className={listTableHeadClass}>品牌</TableHead>
-                    <TableHead className={listTableHeadClass}>业务线</TableHead>
                     <TableHead className={cn(listTableHeadClass, 'min-w-[220px]')}>项目名称</TableHead>
+                    <TableHead className={listTableHeadClass}>品牌名称</TableHead>
+                    <TableHead className={listTableHeadClass}>品牌业务线</TableHead>
+                    <TableHead className={listTableHeadClass}>品牌行业类目</TableHead>
                     <TableHead className={listTableHeadClass}>创建者</TableHead>
-                    <TableHead className={listTableHeadClass}>笔记数量</TableHead>
-                    <TableHead className={listTableHeadClass}>项目结束日期</TableHead>
-                    <TableHead className={listTableHeadClass}>参与者</TableHead>
                     <TableHead className={listTableActionHeadClass}>操作</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {data.items.map((project, index) => (
                     <TableRow key={project.id} className={listTableRowClass(index)}>
-                      <TableCell className={cn(listTableCellClass, 'whitespace-nowrap')}>
-                        {project.category || '-'}
+                      <TableCell title={project.projectName} className={cn(listTableCellClass, 'max-w-[280px] truncate')}>
+                        {project.projectName}
                       </TableCell>
                       <TableCell className={cn(listTableCellClass, 'whitespace-nowrap')}>
                         {project.brand || '-'}
@@ -323,22 +317,11 @@ export default function ProjectListPage() {
                       <TableCell className={cn(listTableCellClass, 'whitespace-nowrap')}>
                         {project.businessLine || '-'}
                       </TableCell>
-                      <TableCell title={project.projectName} className={cn(listTableCellClass, 'max-w-[280px] truncate')}>
-                        {project.projectName}
+                      <TableCell className={cn(listTableCellClass, 'whitespace-nowrap')}>
+                        {project.category || '-'}
                       </TableCell>
                       <TableCell className={cn(listTableCellClass, 'whitespace-nowrap')}>
                         {project.createdByDisplayName || '-'}
-                      </TableCell>
-                      <TableCell className={cn(listTableCellClass, 'whitespace-nowrap')}>
-                        {project.noteCount ?? 0}
-                      </TableCell>
-                      <TableCell className={cn(listTableCellClass, 'whitespace-nowrap')}>
-                        {project.endDate ? formatDate(project.endDate) : '-'}
-                      </TableCell>
-                      <TableCell className={cn(listTableCellClass, 'whitespace-nowrap')}>
-                        {project.participants?.length > 0
-                          ? `${project.participants.length}人`
-                          : '-'}
                       </TableCell>
                       <TableCell className={cn(listTableActionCellClass, 'whitespace-nowrap')}>
                         <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1">

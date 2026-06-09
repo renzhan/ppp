@@ -5,8 +5,8 @@ import { BaseChapterDataLoader, ChapterDataContext, TraceItem } from './types';
  * Chapter 6 (内容分析) Data Loader
  *
  * 按多个维度分组聚合笔记数据，生成标准表格：
- * - 内容方向分析（按 note_base.content_direction 分组）
- * - 达人类型分析（按 note_base.kol_type 分组）
+ * - 内容方向分析（按 notes.contentDirection 分组）
+ * - 达人类型分析（按 notes.noteType 分组）
  * - 达人层级分析（按 notes.kol_fan_num + review_configs.influencerTiers 分类）
  * - 内容形式分析（按 notes.note_type 图文/视频 分组）
  * - 优质笔记TOP5（按爆文口径排序取前5）
@@ -14,15 +14,14 @@ import { BaseChapterDataLoader, ChapterDataContext, TraceItem } from './types';
  * 表格标准列：维度 | 篇数 | 曝光量 | 阅读量 | 互动量 | TI人群 | CPTI | CPE | 爆文篇数 | 爆文率
  *
  * 数据来源：
- * - notes: imp_num, read_num, like_num, fav_num, cmt_num, share_num, engage_num, kol_fan_num, note_type, kol_nick_name
- * - note_base: content_direction, kol_type, content_cost
+ * - notes: imp_num, read_num, like_num, fav_num, cmt_num, share_num, engage_num, kol_fan_num, note_type, kol_nick_name, contentDirection, kolPrice
  * - juguang_data: fee, ti_user_num（按note_id关联）
  * - review_configs: influencerTiers, engagementMetric, viralMetric, contentCostCaliber, trafficCostCaliber
  */
 export class ContentAnalysisDataLoader extends BaseChapterDataLoader {
   chapterNumber = 6;
   chapterName = '内容分析';
-  requiredDataSources = ['notes', 'note_base', 'juguang_data', 'review_configs'];
+  requiredDataSources = ['notes', 'juguang_data', 'review_configs'];
   requiredFields = [
     'by_content_direction', 'by_kol_type', 'by_kol_tier', 'by_content_form',
     'top5_notes',
@@ -93,6 +92,7 @@ export class ContentAnalysisDataLoader extends BaseChapterDataLoader {
       serviceFee: any;
       coverImages: any;
       noteLink: string | null;
+      contentDirection: string | null;
     }
 
     let notes: NoteRow[] = [];
@@ -116,29 +116,14 @@ export class ContentAnalysisDataLoader extends BaseChapterDataLoader {
           serviceFee: true,
           coverImages: true,
           noteLink: true,
+          contentDirection: true,
         },
       });
     } catch (error) {
       console.warn(`[ContentAnalysisDataLoader] Failed to load notes: ${error}`);
     }
 
-    // ── 2. 加载笔记底表（content_direction, kol_type, content_cost） ──
-    const noteBaseMap = new Map<string, { contentDirection: string; kolType: string; contentCost: number }>();
-    try {
-      const noteBaseResult = await this.prisma.$queryRaw<Array<{ note_id: string; content_direction: string | null; kol_type: string | null; content_cost: number }>>`
-        SELECT note_id, content_direction, kol_type, content_cost::float
-        FROM note_base WHERE project_id = ${projectId}::uuid
-      `;
-      for (const row of noteBaseResult) {
-        noteBaseMap.set(row.note_id, {
-          contentDirection: row.content_direction || '未分类',
-          kolType: row.kol_type || '未分类',
-          contentCost: row.content_cost ?? 0,
-        });
-      }
-    } catch (error) {
-      console.warn(`[ContentAnalysisDataLoader] Failed to load note_base: ${error}`);
-    }
+    // ── 2. (Removed: note_base query no longer needed — contentDirection and kolPrice now read from notes table) ──
 
     // ── 3. 加载聚光数据（fee, ti_user_num 按note_id） ──
     const juguangMap = new Map<string, { fee: number; tiUserNum: number }>();
@@ -191,7 +176,6 @@ export class ContentAnalysisDataLoader extends BaseChapterDataLoader {
     const enrichedNotes: EnrichedNote[] = [];
 
     for (const note of notes) {
-      const noteBase = noteBaseMap.get(note.noteId);
       const juguang = juguangMap.get(note.noteId);
 
       // 互动量（按口径）
@@ -199,8 +183,8 @@ export class ContentAnalysisDataLoader extends BaseChapterDataLoader {
         ? note.engageNum
         : note.likeNum + note.favNum + note.cmtNum + note.shareNum;
 
-      // 费用
-      const contentCost = noteBase?.contentCost ?? (Number(note.kolPrice) + Number(note.serviceFee));
+      // 费用 — contentCost now read from notes.kolPrice (资源含税成本价)
+      const contentCost = Number(note.kolPrice) + Number(note.serviceFee);
       const juguangFee = juguang?.fee ?? 0;
       const totalCost = contentCost + juguangFee;
 
@@ -236,14 +220,18 @@ export class ContentAnalysisDataLoader extends BaseChapterDataLoader {
       // 内容形式
       const noteTypeLabel = (note.noteType === '1' || note.noteType === 'image') ? '图文' : '视频';
 
+      // contentDirection and kolType read directly from notes table (null → "未分类")
+      const contentDirection = note.contentDirection || '未分类';
+      const kolType = note.noteType || '未分类';
+
       enrichedNotes.push({
         noteId: note.noteId,
         kolNickName: note.kolNickName ?? '',
         kolFanNum: fanNum,
         noteType: noteTypeLabel,
         noteTitle: note.noteTitle ?? '',
-        contentDirection: noteBase?.contentDirection ?? '未分类',
-        kolType: noteBase?.kolType ?? '未分类',
+        contentDirection,
+        kolType,
         kolTier,
         impNum: note.impNum,
         readNum: note.readNum,
@@ -381,8 +369,8 @@ export class ContentAnalysisDataLoader extends BaseChapterDataLoader {
       traceId: 'ch6_by_direction',
       chapterNumber: 6,
       label: '内容方向分析(原始笔记数据)',
-      sourceTable: 'notes + note_base + juguang_data',
-      sourceQuery: `SELECT n.note_id, n.imp_num, n.read_num, n.like_num, n.fav_num, n.cmt_num, n.share_num, nb.content_direction, nb.content_cost, j.fee, j.ti_user_num\nFROM notes n\nLEFT JOIN note_base nb ON n.note_id = nb.note_id AND nb.project_id = '${projectId}'\nLEFT JOIN (SELECT note_id, SUM(fee) fee, SUM(ti_user_num) ti_user_num FROM juguang_data WHERE project_id = '${projectId}' GROUP BY note_id) j ON n.note_id = j.note_id\nWHERE n.project_id = '${projectId}';`,
+      sourceTable: 'notes + juguang_data',
+      sourceQuery: `SELECT n.note_id, n.imp_num, n.read_num, n.like_num, n.fav_num, n.cmt_num, n.share_num, n.content_direction, n.kol_price, j.fee, j.ti_user_num\nFROM notes n\nLEFT JOIN (SELECT note_id, SUM(fee) fee, SUM(ti_user_num) ti_user_num FROM juguang_data WHERE project_id = '${projectId}' GROUP BY note_id) j ON n.note_id = j.note_id\nWHERE n.project_id = '${projectId}';`,
       totalRows: enrichedNotes.length,
       columns: [
         { key: 'kolNickName', label: '达人', type: 'string' },

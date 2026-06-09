@@ -12,6 +12,7 @@ const COOKIE_NAME = 'ppp_token';
 export interface JWTPayload {
   sub: string; // user id
   username: string;
+  phone?: string; // phone number
   role: string;
   mustChangePassword: boolean;
 }
@@ -25,17 +26,23 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
 }
 
 export async function createToken(
-  user: { id: string; username: string; role: string; mustChangePassword: boolean },
+  user: { id: string; username: string; phone?: string | null; role: string; mustChangePassword: boolean },
   rememberMe: boolean = false
 ): Promise<string> {
   const expiresIn = rememberMe ? '7d' : '24h';
 
-  return new SignJWT({
+  const payload: Record<string, unknown> = {
     sub: user.id,
     username: user.username,
     role: user.role,
     mustChangePassword: user.mustChangePassword,
-  })
+  };
+
+  if (user.phone) {
+    payload.phone = user.phone;
+  }
+
+  return new SignJWT(payload)
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime(expiresIn)

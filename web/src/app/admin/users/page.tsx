@@ -12,6 +12,7 @@ import { FilterField } from '@/components/ui/filter-field';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import { Loading } from '@/components/ui/loading';
+import { isValidPhone } from '@/lib/phone-validator';
 import {
   listEmptyClass,
   listErrorClass,
@@ -45,6 +46,7 @@ import { cn } from '@/lib/utils';
 interface User {
   id: string;
   username: string;
+  phone: string | null;
   displayName: string | null;
   role: string;
   isActive: boolean;
@@ -223,6 +225,7 @@ export default function AdminUsersPage() {
                   <TableRow className={listTableHeaderRowClass}>
                     <TableHead className={listTableHeadClass}>真名</TableHead>
                     <TableHead className={listTableHeadClass}>花名</TableHead>
+                    <TableHead className={listTableHeadClass}>手机号</TableHead>
                     <TableHead className={listTableHeadClass}>角色</TableHead>
                     <TableHead className={listTableHeadClass}>状态</TableHead>
                     <TableHead className={listTableHeadClass}>最后登录</TableHead>
@@ -236,6 +239,7 @@ export default function AdminUsersPage() {
                         {user.displayName || '-'}
                       </TableCell>
                       <TableCell className={listTableCellClass}>{user.username}</TableCell>
+                      <TableCell className={cn(listTableCellClass, 'text-gray-500')}>{user.phone || '-'}</TableCell>
                       <TableCell className={listTableCellClass}>{formatRole(user.role)}</TableCell>
                       <TableCell className={listTableCellClass}>
                         <span
@@ -531,15 +535,36 @@ function AddUserModal({
   const [form, setForm] = useState({
     username: '',
     displayName: '',
+    phone: '',
     role: 'AE',
     password: '',
   });
   const [error, setError] = useState('');
+  const [phoneError, setPhoneError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const handlePhoneChange = (value: string) => {
+    setForm({ ...form, phone: value });
+    if (value && !isValidPhone(value)) {
+      setPhoneError('手机号格式不正确（需为11位，以1开头）');
+    } else {
+      setPhoneError('');
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    if (!form.phone) {
+      setPhoneError('手机号为必填项');
+      return;
+    }
+    if (!isValidPhone(form.phone)) {
+      setPhoneError('手机号格式不正确（需为11位，以1开头）');
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -551,7 +576,11 @@ function AddUserModal({
 
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error || '创建失败');
+        if (data.error?.includes('手机号')) {
+          setPhoneError(data.error);
+        } else {
+          setError(data.error || '创建失败');
+        }
         return;
       }
       onSuccess();
@@ -582,6 +611,20 @@ function AddUserModal({
             value={form.displayName}
             onChange={(e) => setForm({ ...form, displayName: e.target.value })}
           />
+        </FormField>
+        <FormField label="手机号 *" htmlFor="add-phone">
+          <Input
+            id="add-phone"
+            variant="form"
+            value={form.phone}
+            onChange={(e) => handlePhoneChange(e.target.value)}
+            placeholder="11位手机号"
+            required
+            maxLength={11}
+          />
+          {phoneError && (
+            <p className="text-xs text-red-500 mt-1">{phoneError}</p>
+          )}
         </FormField>
         <FormField label="角色">
           <RoleSelect value={form.role} onValueChange={(role) => setForm({ ...form, role })} />
@@ -620,14 +663,32 @@ function EditUserModal({
 }) {
   const [form, setForm] = useState({
     displayName: user.displayName || '',
+    phone: user.phone || '',
     role: user.role,
   });
   const [error, setError] = useState('');
+  const [phoneError, setPhoneError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const handlePhoneChange = (value: string) => {
+    setForm({ ...form, phone: value });
+    if (value && !isValidPhone(value)) {
+      setPhoneError('手机号格式不正确（需为11位，以1开头）');
+    } else {
+      setPhoneError('');
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setPhoneError('');
+
+    if (form.phone && !isValidPhone(form.phone)) {
+      setPhoneError('手机号格式不正确（需为11位，以1开头）');
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -639,7 +700,11 @@ function EditUserModal({
 
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error || '更新失败');
+        if (data.error?.includes('手机号')) {
+          setPhoneError(data.error);
+        } else {
+          setError(data.error || '更新失败');
+        }
         return;
       }
       onSuccess();
@@ -669,6 +734,19 @@ function EditUserModal({
             value={form.displayName}
             onChange={(e) => setForm({ ...form, displayName: e.target.value })}
           />
+        </FormField>
+        <FormField label="手机号" htmlFor="edit-phone">
+          <Input
+            id="edit-phone"
+            variant="form"
+            value={form.phone}
+            onChange={(e) => handlePhoneChange(e.target.value)}
+            placeholder="11位手机号"
+            maxLength={11}
+          />
+          {phoneError && (
+            <p className="text-xs text-red-500 mt-1">{phoneError}</p>
+          )}
         </FormField>
         <FormField label="角色">
           <RoleSelect value={form.role} onValueChange={(role) => setForm({ ...form, role })} />
@@ -861,6 +939,10 @@ function ImportModal({
       }`;
 
       if (!data.errors || data.errors.length === 0) {
+        onSuccess(msg);
+      } else if (data.imported > 0) {
+        // Some rows imported successfully but others had errors.
+        // Show errors in the modal but still notify parent to refresh the list.
         onSuccess(msg);
       }
     } catch {

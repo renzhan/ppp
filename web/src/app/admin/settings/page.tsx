@@ -56,7 +56,13 @@ function ProjectBaseImportSection() {
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.error || '导入失败，请稍后重试');
+        const detailErrors: string[] = data.errors ?? [];
+        const mainError = data.error || '导入失败，请稍后重试';
+        if (detailErrors.length > 0) {
+          setError(`${mainError}\n${detailErrors.slice(0, 10).join('\n')}`);
+        } else {
+          setError(mainError);
+        }
       } else {
         setResult({
           imported: data.imported ?? 0,
@@ -162,7 +168,11 @@ function ProjectBaseImportSection() {
 
         {error && (
           <div className={listErrorClass} role="alert">
-            {error}
+            {error.split('\n').map((line, idx) => (
+              <p key={idx} className={idx === 0 ? 'font-medium' : 'mt-1 text-xs'}>
+                {line}
+              </p>
+            ))}
           </div>
         )}
       </CardContent>

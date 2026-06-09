@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession, hashPassword } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { isValidPhone } from '@/lib/phone-validator';
 import * as XLSX from 'xlsx';
 
 /**
@@ -9,9 +10,14 @@ import * as XLSX from 'xlsx';
 const COLUMN_MAP: Record<string, string> = {
   '花名': 'username',
   '用户名': 'username',
+  '姓名': 'realName',
   '真名': 'realName',
+  '真实姓名': 'realName',
   '显示名': 'displayName',
   '角色': 'role',
+  '岗位简称': 'role',
+  '手机号': 'phone',
+  'phone': 'phone',
 };
 
 /**
@@ -90,8 +96,11 @@ export async function POST(request: NextRequest) {
       const rowNum = i + 2; // Excel row number (1-indexed header + 1-indexed data)
 
       // Map Chinese headers to field names
+      // Only set the mapped value when the column key actually exists in the raw row
+      // (XLSX.utils.sheet_to_json only includes keys for columns present in the header)
       const mapped: Record<string, string | null> = {};
       for (const [chineseHeader, fieldName] of Object.entries(COLUMN_MAP)) {
+        if (!(chineseHeader in raw)) continue;
         const value = raw[chineseHeader];
         mapped[fieldName] = value != null && String(value).trim() !== '' ? String(value).trim() : null;
       }
@@ -122,6 +131,13 @@ export async function POST(request: NextRequest) {
 
       const displayName = mapped.displayName || mapped.username || null;
       const realName = mapped.realName || null;
+      const phone = mapped.phone || null;
+
+      // Validate phone format if provided
+      if (phone && !isValidPhone(phone)) {
+        errors.push(`第${rowNum}行: 手机号格式不正确`);
+        continue;
+      }
 
       // Check if username already exists
       try {
@@ -129,6 +145,15 @@ export async function POST(request: NextRequest) {
         if (existing) {
           errors.push(`第${rowNum}行: 用户名"${username}"已存在`);
           continue;
+        }
+
+        // Check if phone already exists
+        if (phone) {
+          const existingPhone = await prisma.user.findUnique({ where: { phone } });
+          if (existingPhone) {
+            errors.push(`第${rowNum}行: 手机号已存在`);
+            continue;
+          }
         }
 
         // Use default password and hash it
@@ -144,6 +169,7 @@ export async function POST(request: NextRequest) {
             passwordHash,
             displayName,
             realName,
+            phone,
             role,
             permissionLevel,
             mustChangePassword: true,

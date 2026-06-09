@@ -12,12 +12,12 @@ export async function GET() {
 
   // Main sheet with sample data
   const data = [
-    ['花名', '真名', '角色'],
-    ['阿玉', '程国玉', 'VP'],
-    ['风犬', '任一枭', 'AD'],
-    ['小鹿', '路宇婷', 'AM'],
-    ['奈奈', '黄慧菲', '组长'],
-    ['小棉', '杨越', 'AE'],
+    ['花名', '真名', '手机号', '角色'],
+    ['阿玉', '程国玉', '13800138001', 'VP'],
+    ['风犬', '任一枭', '13800138002', 'AD'],
+    ['小鹿', '路宇婷', '13800138003', 'AM'],
+    ['奈奈', '黄慧菲', '13800138004', '组长'],
+    ['小棉', '杨越', '13800138005', 'AE'],
   ];
   
   const ws = XLSX.utils.aoa_to_sheet(data);
@@ -26,6 +26,7 @@ export async function GET() {
   ws['!cols'] = [
     { wch: 20 },
     { wch: 20 },
+    { wch: 15 },
     { wch: 15 },
   ];
 
@@ -43,7 +44,7 @@ export async function GET() {
   // so we also add the roles as a reference sheet
   if (!ws['!dataValidation']) ws['!dataValidation'] = [];
   (ws['!dataValidation'] as unknown[]).push({
-    sqref: 'C2:C200',
+    sqref: 'D2:D200',
     type: 'list',
     formula1: `"${validRoles.join(',')}"`,
   });

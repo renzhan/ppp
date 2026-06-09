@@ -15,6 +15,7 @@ const COLUMN_MAP: Record<string, string> = {
   // 品牌 (brand)
   '品牌简称': 'brand',
   '品牌简称（必填）': 'brand',
+  '品牌名称': 'brand',
   '品牌': 'brand',
   // 业务线 (businessLine)
   '品牌业务线': 'businessLine',
@@ -33,12 +34,12 @@ const COLUMN_MAP: Record<string, string> = {
   '灵犀ID': 'lingxiAccountId',
 };
 
-const REQUIRED_FIELDS = ['category', 'brand', 'businessLine', 'projectName'];
+const REQUIRED_FIELDS = ['category', 'brand', 'projectName'];
 
 interface ParsedRow {
   category: string;
   brand: string;
-  businessLine: string;
+  businessLine: string | null;
   projectName: string;
   startDate: string | null;
   createdBy: string | null;
@@ -117,7 +118,32 @@ export async function POST(request: Request) {
         const retryHasKnownHeader = retryKeys.some((key) => knownHeaders.includes(key));
         if (retryHasKnownHeader) {
           rawRows = rawRowsRetry;
+        } else {
+          // Neither row 1 nor row 2 contains known headers — this is likely the wrong file type
+          const allFoundHeaders = [...new Set([...firstRowKeys, ...retryKeys])];
+          const requiredFieldNames = REQUIRED_FIELDS.map(f => {
+            const names = Object.entries(COLUMN_MAP).filter(([, v]) => v === f).map(([k]) => k);
+            return `${f}(${names.join('/')})`;
+          });
+          const diagnostic = `文件列名无法识别，请确认上传的是项目底表文件。需要的列: ${requiredFieldNames.join(', ')}。文件中找到的列名: [${allFoundHeaders.join(', ')}]`;
+          console.error(`[project-base import] ${diagnostic}`);
+          return NextResponse.json(
+            { error: '文件列名无法识别，请确认上传的是项目底表', code: 'COLUMN_MISMATCH', errors: [diagnostic] },
+            { status: 400 }
+          );
         }
+      } else {
+        // No data in retry either — wrong file type
+        const requiredFieldNames = REQUIRED_FIELDS.map(f => {
+          const names = Object.entries(COLUMN_MAP).filter(([, v]) => v === f).map(([k]) => k);
+          return `${f}(${names.join('/')})`;
+        });
+        const diagnostic = `文件列名无法识别，请确认上传的是项目底表文件。需要的列: ${requiredFieldNames.join(', ')}。文件中找到的列名: [${firstRowKeys.join(', ')}]`;
+        console.error(`[project-base import] ${diagnostic}`);
+        return NextResponse.json(
+          { error: '文件列名无法识别，请确认上传的是项目底表', code: 'COLUMN_MISMATCH', errors: [diagnostic] },
+          { status: 400 }
+        );
       }
     }
 
@@ -151,7 +177,7 @@ export async function POST(request: Request) {
       parsedRows.push({
         category: mapped.category!,
         brand: mapped.brand!,
-        businessLine: mapped.businessLine!,
+        businessLine: mapped.businessLine ?? null,
         projectName: mapped.projectName!,
         startDate: mapped.startDate || null,
         createdBy: mapped.createdBy || null,
@@ -160,6 +186,32 @@ export async function POST(request: Request) {
     }
 
     if (parsedRows.length === 0) {
+      // Build diagnostic info: show which columns were found vs expected
+      const foundHeaders = Object.keys(rawRows[0] || {});
+      const mappedFields = new Set<string>();
+      for (const header of foundHeaders) {
+        if (COLUMN_MAP[header]) {
+          mappedFields.add(COLUMN_MAP[header]);
+        }
+      }
+      const unmappedRequired = REQUIRED_FIELDS.filter(f => !mappedFields.has(f));
+      const fieldToChineseNames: Record<string, string[]> = {};
+      for (const [cn, field] of Object.entries(COLUMN_MAP)) {
+        if (!fieldToChineseNames[field]) fieldToChineseNames[field] = [];
+        fieldToChineseNames[field].push(cn);
+      }
+
+      if (unmappedRequired.length > 0) {
+        const details = unmappedRequired.map(f => {
+          const acceptedNames = fieldToChineseNames[f]?.join('、') || f;
+          return `"${f}"(可接受列名: ${acceptedNames})`;
+        });
+        const diagnostic = `文件缺少必填列映射: ${details.join('; ')}。文件中的列名: [${foundHeaders.join(', ')}]`;
+        errors.unshift(diagnostic);
+        console.error(`[project-base import] ${diagnostic}`);
+      }
+
+      console.error(`[project-base import] 没有有效的数据行。共${rawRows.length}行数据，全部校验失败。前5条错误:`, errors.slice(0, 5));
       return NextResponse.json(
         { error: '没有有效的数据行', code: 'PARSE_FAILED', errors },
         { status: 400 }
@@ -179,26 +231,38 @@ export async function POST(request: Request) {
           startDate = new Date();
         }
 
+        // Resolve createdBy realName to UUID
+        let resolvedCreatedBy: string | null = null;
+        if (row.createdBy) {
+          const resolution = await resolveCreatedBy(row.createdBy);
+          resolvedCreatedBy = resolution.userId;
+          if (resolution.warning) {
+            errors.push(`项目"${row.projectName}": ${resolution.warning}`);
+          }
+        }
+
         await prisma.project.upsert({
           where: {
-            // Use a composite approach: find by projectName + brand + category
-            // Since there's no unique constraint on these, we use a workaround
-            id: await findProjectId(row.category, row.brand, row.projectName),
+            // Use a composite approach: find by category + brand + businessLine + projectName
+            // Since PostgreSQL treats NULL != NULL in unique constraints, we use findFirst workaround
+            id: await findProjectId(row.category, row.brand, row.businessLine, row.projectName),
           },
           update: {
-            businessLine: row.businessLine,
+            businessLine: row.businessLine ?? undefined,
             isImported: true,
             lingxiAccountId: row.lingxiAccountId || undefined,
+            createdBy: resolvedCreatedBy,
           },
           create: {
             category: row.category,
             brand: row.brand,
-            businessLine: row.businessLine,
+            businessLine: row.businessLine ?? null,
             projectName: row.projectName,
             startDate: startDate,
             endDate: startDate, // Default endDate same as startDate for imported projects
             isImported: true,
             lingxiAccountId: row.lingxiAccountId || null,
+            createdBy: resolvedCreatedBy,
           },
         });
         importedCount++;
@@ -209,9 +273,9 @@ export async function POST(request: Request) {
     }
 
     // Deduplicate and upsert project_tree_nodes
-    const uniqueTuples = new Map<string, { category: string; brand: string; businessLine: string }>();
+    const uniqueTuples = new Map<string, { category: string; brand: string; businessLine: string | null }>();
     for (const row of parsedRows) {
-      const key = `${row.category}|${row.brand}|${row.businessLine}`;
+      const key = `${row.category}|${row.brand}|${row.businessLine ?? ''}`;
       if (!uniqueTuples.has(key)) {
         uniqueTuples.set(key, {
           category: row.category,
@@ -224,25 +288,45 @@ export async function POST(request: Request) {
     let treeNodesCreated = 0;
     for (const tuple of uniqueTuples.values()) {
       try {
-        await prisma.projectTreeNode.upsert({
-          where: {
-            category_brand_businessLine: {
+        // Skip tree node upsert if businessLine is null (unique constraint requires non-null)
+        if (tuple.businessLine === null) {
+          // Create tree node at brand level only (no businessLine)
+          await prisma.projectTreeNode.upsert({
+            where: {
+              category_brand_businessLine: {
+                category: tuple.category,
+                brand: tuple.brand,
+                businessLine: '',
+              },
+            },
+            update: {},
+            create: {
+              category: tuple.category,
+              brand: tuple.brand,
+              businessLine: '',
+            },
+          });
+        } else {
+          await prisma.projectTreeNode.upsert({
+            where: {
+              category_brand_businessLine: {
+                category: tuple.category,
+                brand: tuple.brand,
+                businessLine: tuple.businessLine,
+              },
+            },
+            update: {},
+            create: {
               category: tuple.category,
               brand: tuple.brand,
               businessLine: tuple.businessLine,
             },
-          },
-          update: {}, // No update needed, just ensure it exists
-          create: {
-            category: tuple.category,
-            brand: tuple.brand,
-            businessLine: tuple.businessLine,
-          },
-        });
+          });
+        }
         treeNodesCreated++;
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Unknown error';
-        errors.push(`创建树节点"${tuple.category}/${tuple.brand}/${tuple.businessLine}"失败: ${message}`);
+        errors.push(`创建树节点"${tuple.category}/${tuple.brand}/${tuple.businessLine ?? ''}"失败: ${message}`);
       }
     }
 
@@ -261,17 +345,45 @@ export async function POST(request: Request) {
 }
 
 /**
- * Helper: Find existing project ID by category + brand + projectName.
+ * Helper: Find existing project ID by the full composite unique key
+ * (category, brand, businessLine, projectName).
+ *
+ * Handles PostgreSQL NULL semantics: NULL != NULL in unique constraints,
+ * so we use findFirst with explicit `businessLine: null` when businessLine is null.
+ * This ensures correct upsert behavior for the @@unique([category, brand, businessLine, projectName]) constraint.
+ *
  * If not found, returns a non-existent UUID to trigger create in upsert.
  */
-async function findProjectId(category: string, brand: string, projectName: string): Promise<string> {
+async function findProjectId(
+  category: string,
+  brand: string,
+  businessLine: string | null,
+  projectName: string
+): Promise<string> {
   const existing = await prisma.project.findFirst({
     where: {
       category,
       brand,
+      businessLine: businessLine ?? null,
       projectName,
     },
     select: { id: true },
   });
   return existing?.id ?? '00000000-0000-0000-0000-000000000000';
+}
+
+/**
+ * Helper: Resolve a real name (创建者) to a user UUID.
+ * - If exactly 1 user matches the realName → return their UUID
+ * - If 0 matches → return null + warning "未找到用户"
+ * - If >1 matches → return null + warning "姓名重复，请手动指定创建者"
+ */
+async function resolveCreatedBy(realName: string): Promise<{ userId: string | null; warning?: string }> {
+  const users = await prisma.user.findMany({
+    where: { realName },
+    select: { id: true },
+  });
+  if (users.length === 1) return { userId: users[0].id };
+  if (users.length > 1) return { userId: null, warning: `姓名"${realName}"重复，请手动指定创建者` };
+  return { userId: null, warning: `未找到用户"${realName}"` };
 }

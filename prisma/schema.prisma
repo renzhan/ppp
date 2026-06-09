@@ -16,6 +16,7 @@ datasource db {
 model User {
   id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   username           String    @unique @db.VarChar(50)
+  phone              String?   @unique @db.VarChar(20)
   passwordHash       String    @map("password_hash") @db.VarChar(200)
   displayName        String?   @map("display_name") @db.VarChar(100)
   realName           String?   @map("real_name") @db.VarChar(100)
@@ -136,6 +137,9 @@ model Note {
   orderId           String?  @map("order_id") @db.VarChar(100)
   effect            String?  @db.VarChar(10)
   dataSource        String   @default("api") @map("data_source") @db.VarChar(20)  // "api" = 蒲公英爬取, "note_base" = 底表导入(非官方合作)
+  contentDirection  String?   @map("content_direction") @db.VarChar(100)
+  cooperationForm   String?   @map("cooperation_form") @db.VarChar(100)
+  totalCost         Decimal?  @map("total_cost") @db.Decimal(12, 2)
   createdAt         DateTime? @default(now()) @map("created_at") @db.Timestamptz()
 
   // Relations

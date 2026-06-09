@@ -61,9 +61,14 @@ export async function POST(
 
     // Check for valid records
     if (parseResult.records.length === 0) {
+      const diagnosticInfo = [
+        ...(parseResult.warnings || []),
+        parseResult.skippedRows > 0 ? `跳过了${parseResult.skippedRows}行（发布链接为空）` : null,
+      ].filter(Boolean);
+      console.error(`[note-base upload] 没有有效的数据行。skippedRows=${parseResult.skippedRows}, warnings:`, parseResult.warnings);
       return NextResponse.json(
         {
-          error: '没有有效的数据行',
+          error: diagnosticInfo.length > 0 ? diagnosticInfo.join('；') : '没有有效的数据行',
           code: 'PARSE_FAILED',
           skippedRows: parseResult.skippedRows,
           warnings: parseResult.warnings,

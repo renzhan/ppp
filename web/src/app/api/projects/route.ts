@@ -117,16 +117,16 @@ export async function GET(request: NextRequest) {
       prisma.project.count({ where }),
     ]);
 
-    // Resolve createdBy user IDs to display names
+    // Resolve createdBy user IDs to display names (realName per Requirement 6.5)
     const createdByIds = items.map(item => item.createdBy).filter((id): id is string => id != null);
     const uniqueCreatedByIds = Array.from(new Set(createdByIds));
     const users = uniqueCreatedByIds.length > 0
       ? await prisma.user.findMany({
           where: { id: { in: uniqueCreatedByIds } },
-          select: { id: true, displayName: true, username: true },
+          select: { id: true, realName: true, displayName: true, username: true },
         })
       : [];
-    const userMap = new Map(users.map((u: { id: string; displayName: string | null; username: string }) => [u.id, u.displayName || u.username]));
+    const userMap = new Map(users.map((u: { id: string; realName: string | null; displayName: string | null; username: string }) => [u.id, u.realName || u.displayName || u.username]));
 
     const enrichedItems = items.map((item) => ({
       ...item,

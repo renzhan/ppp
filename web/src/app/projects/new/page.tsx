@@ -492,7 +492,11 @@ export default function NewProjectPage() {
                           setParsedPreviewRecords(data.records);
                           setParseWarnings(data.warnings || []);
                         } else {
-                          setParseWarnings([data.error || '解析失败']);
+                          const allWarnings = [
+                            data.error || '解析失败',
+                            ...(data.warnings || []),
+                          ];
+                          setParseWarnings(allWarnings);
                         }
                       } catch {
                         setParseWarnings(['解析请求失败，请稍后重试']);

@@ -132,13 +132,14 @@ export class DataIngestionService {
       }
     }
 
-    // 非官方合作笔记回填：对于蒲公英未返回数据的 noteId，从 note_base 拷贝数据到 notes 表
+    // 笔记回填：Step 1 对所有笔记拷贝必带字段，Step 2 仅对蒲公英未返回的非官方合作笔记拷贝 metrics
     try {
+      const allNoteIds = ctx.noteIds;
       const fetchedNoteIds = new Set(pugongyingNotes.map((n) => n.noteId));
-      const missingNoteIds = ctx.noteIds.filter((id) => !fetchedNoteIds.has(id));
-      if (missingNoteIds.length > 0) {
-        await this.persistenceService.fillNotesFromNoteBase(projectId, missingNoteIds);
-        console.log(`[ingestBaseData] 从 note_base 回填 ${missingNoteIds.length} 条非官方合作笔记到 notes 表`);
+      const missingNoteIds = allNoteIds.filter((id) => !fetchedNoteIds.has(id));
+      if (allNoteIds.length > 0) {
+        await this.persistenceService.fillNotesFromNoteBase(projectId, allNoteIds, missingNoteIds);
+        console.log(`[ingestBaseData] note_base 回填完成: Step1=${allNoteIds.length}篇(必带字段), Step2=${missingNoteIds.length}篇(非官方合作+metrics)`);
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

@@ -47,6 +47,7 @@ export const NOTE_BASE_COLUMN_MAP: Record<string, string> = {
   // ─── 笔记链接 ───
   '笔记链接': 'noteLink',
   '笔记连接': 'noteLink',       // 常见错别字
+  '发布链接': 'noteLink',       // 新版底表表头
 
   // ─── 运营标注字段（note_base 独有）───
   '合作形式': 'cooperationForm',
@@ -61,8 +62,10 @@ export const NOTE_BASE_COLUMN_MAP: Record<string, string> = {
   '内容实际消耗金额': 'contentCost',
   '内容消耗金额': 'contentCost',       // 新表头别名
   '达人金额': 'contentCost',           // 旧别名
+  '资源含税成本价': 'contentCost',     // 新版底表表头（必填）
   '内容实际结算金额': 'contentSettlement',
   '内容结算金额': 'contentSettlement', // 新表头别名
+  '资源含税售价': 'contentSettlement', // 新版底表表头（必填）
   '投流实际消耗': 'adSpend',
   '投流消耗金额': 'adSpend',           // 新表头别名
   '投流金额': 'adSpend',               // 旧别名
@@ -91,6 +94,7 @@ export const DISPLAY_ONLY_COLUMN_MAP: Record<string, string> = {
   '评论量': 'cmtNum',
   '评论': 'cmtNum',              // 短别名
   '分享量': 'shareNum',
+  '转发量': 'shareNum',          // 新版底表表头
   '转发': 'shareNum',            // 短别名（转发=分享）
   '关注量': 'followNum',
   // 爆文标记
@@ -132,6 +136,35 @@ export const DISPLAY_ONLY_COLUMN_MAP: Record<string, string> = {
   '笔记发布日期': 'notePublishDate',
   '数据更新日期': 'dataUpdateDate',
 };
+
+// ─── Required Columns ───
+
+/**
+ * 必填列名列表 — 新版底表Excel必须包含这5列（或其已知别名）。
+ * 缺少任何一列对应的映射时 parseNoteBaseExcel 将返回解析错误。
+ *
+ * 校验逻辑：对每个必填字段名，检查表头中是否存在至少一个列（通过 NOTE_BASE_COLUMN_MAP）映射到该字段。
+ * 这样既能识别新表头（如"发布链接"→noteLink），也能兼容旧表头（如"笔记链接"→noteLink）。
+ */
+export const REQUIRED_COLUMNS: string[] = [
+  '发布链接',
+  '内容方向',
+  '笔记类型',
+  '资源含税成本价',
+  '资源含税售价',
+];
+
+/**
+ * 必填字段名 — 这些是 note_base 表中必须有值的字段。
+ * 用于校验表头中是否至少有一列映射到每个必填字段。
+ */
+export const REQUIRED_FIELD_NAMES: string[] = [
+  'noteLink',
+  'contentDirection',
+  'kolType',
+  'contentCost',
+  'contentSettlement',
+];
 
 // ─── Helper Functions ───
 
@@ -191,6 +224,25 @@ function parseBoolean(value: unknown): boolean {
 // ─── Core Parse Function ───
 
 /**
+ * Check if a set of header keys contains any known column names.
+ * Uses normalizeHeader() on each key and checks against both column maps.
+ */
+export function headersContainKnownColumns(headers: string[]): boolean {
+  for (const header of headers) {
+    const normalized = normalizeHeader(header);
+    if (
+      NOTE_BASE_COLUMN_MAP[header] ||
+      NOTE_BASE_COLUMN_MAP[normalized] ||
+      DISPLAY_ONLY_COLUMN_MAP[header] ||
+      DISPLAY_ONLY_COLUMN_MAP[normalized]
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Parse a note-base Excel file buffer into structured records.
  *
  * Pure function — no database access, no side effects.
@@ -214,10 +266,95 @@ export function parseNoteBaseExcel(buffer: Buffer): ParseResult {
   }
 
   const sheet = workbook.Sheets[sheetResult.sheetName];
-  const rawRows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+
+  // ─── Hyperlink Resolution ───
+  // Some Excel files store URLs as hyperlinks (cell.l.Target) with empty or truncated display text (cell.v).
+  // Pre-process: for any cell where .v is empty/missing but .l.Target exists, set .v = .l.Target.
+  // This ensures sheet_to_json will return the actual URL instead of empty string.
+  if (sheet['!ref']) {
+    const sheetRange = XLSX.utils.decode_range(sheet['!ref']);
+    for (let r = sheetRange.s.r; r <= sheetRange.e.r; r++) {
+      for (let c = sheetRange.s.c; c <= sheetRange.e.c; c++) {
+        const cellAddr = XLSX.utils.encode_cell({ r, c });
+        const cell = sheet[cellAddr];
+        if (cell && cell.l && cell.l.Target) {
+          const displayVal = cell.v != null ? String(cell.v).trim() : '';
+          // If display value is empty or doesn't look like a URL, use hyperlink Target
+          if (!displayVal || (!displayVal.startsWith('http') && !displayVal.startsWith('//'))) {
+            cell.v = cell.l.Target;
+            cell.w = cell.l.Target;
+            cell.h = cell.l.Target;
+          }
+        }
+      }
+    }
+  }
+
+  let rawRows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(sheet, { defval: '' });
 
   if (rawRows.length === 0) {
     return { records: [], warnings: ['文件中没有数据行'], skippedRows: 0 };
+  }
+
+  // ─── Header Row Auto-Detection ───
+  // Scan up to the first 5 rows to find a row containing known column names.
+  // Many real-world Excel files have 1-3 title/description rows before the actual header.
+  const firstRowKeys = Object.keys(rawRows[0]);
+  if (!headersContainKnownColumns(firstRowKeys)) {
+    // Row 1 doesn't match → try rows 2..5 as header
+    let found = false;
+    const range = XLSX.utils.decode_range(sheet['!ref'] || 'A1');
+    const maxHeaderRow = Math.min(4, range.e.r); // Try up to row 5 (0-indexed: 4)
+
+    for (let startRow = 1; startRow <= maxHeaderRow; startRow++) {
+      const tryRange = { ...range, s: { ...range.s, r: startRow } };
+      const retryRows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(sheet, { defval: '', range: tryRange });
+
+      if (retryRows.length > 0) {
+        const retryKeys = Object.keys(retryRows[0]);
+        if (headersContainKnownColumns(retryKeys)) {
+          rawRows = retryRows;
+          found = true;
+          break;
+        }
+      }
+    }
+
+    if (!found) {
+      // None of the first 5 rows contain known headers
+      const allHeaders = Object.keys(rawRows[0] || {});
+      return { records: [], warnings: [`未识别到有效表头。文件中的列名: [${allHeaders.join(', ')}]。需要的列: ${REQUIRED_COLUMNS.join('、')}`], skippedRows: 0 };
+    }
+  }
+
+  // ─── Required Column Validation ───
+  // Check that all 5 mandatory fields are covered by at least one header column.
+  // A field is considered present if any header (raw or normalized) maps to it via NOTE_BASE_COLUMN_MAP.
+  const headers = rawRows.length > 0 ? Object.keys(rawRows[0]) : [];
+  const mappedFieldNames = new Set<string>();
+  for (const header of headers) {
+    const normalized = normalizeHeader(header);
+    const fieldName = NOTE_BASE_COLUMN_MAP[header] || NOTE_BASE_COLUMN_MAP[normalized];
+    if (fieldName) {
+      mappedFieldNames.add(fieldName);
+    }
+  }
+  const missingFields = REQUIRED_FIELD_NAMES.filter((field) => !mappedFieldNames.has(field));
+  if (missingFields.length > 0) {
+    // Map field names back to Chinese column names for user-friendly error message
+    const fieldToChineseMap: Record<string, string> = {
+      noteLink: '发布链接',
+      contentDirection: '内容方向',
+      kolType: '笔记类型',
+      contentCost: '资源含税成本价',
+      contentSettlement: '资源含税售价',
+    };
+    const missingChinese = missingFields.map((f) => fieldToChineseMap[f] || f);
+    return {
+      records: [],
+      warnings: [`缺少必填列: ${missingChinese.join('、')}`],
+      skippedRows: 0,
+    };
   }
 
   const records: ParsedNoteBaseRow[] = [];

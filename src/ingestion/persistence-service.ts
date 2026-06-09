@@ -46,8 +46,12 @@ export interface DataPersistenceService {
   findProject(projectId: string): Promise<{ startDate: Date; endDate: Date; brand: string; category: string; executionStartDate: Date | null; lingxiAccountId: string | null; lingxiTaxonomyPath: string | null } | null>;
   /** 查找项目底表中的所有 noteId */
   findNoteIdsByProject(projectId: string): Promise<string[]>;
-  /** 从 note_base 回填数据到 notes 表（非官方合作笔记，蒲公英未爬到的） */
-  fillNotesFromNoteBase(projectId: string, noteIds: string[]): Promise<void>;
+  /**
+   * 从 note_base 回填数据到 notes 表（两步逻辑）。
+   * Step 1: 对所有笔记（allNoteIds）拷贝必带字段（noteLink, contentDirection, noteType, kolPrice, serviceFee）。
+   * Step 2: 对非官方合作笔记（missingNoteIds）额外拷贝 metrics 数据并标记 dataSource='note_base'。
+   */
+  fillNotesFromNoteBase(projectId: string, allNoteIds: string[], missingNoteIds: string[]): Promise<void>;
 }
 
 /**
@@ -441,72 +445,89 @@ export class PrismaDataPersistenceService implements DataPersistenceService {
   }
 
   /**
-   * 从 note_base 回填数据到 notes 表。
-   * 用于非官方合作笔记——蒲公英 API 无法爬取这些笔记的数据，
-   * 需要将底表中的指标数据拷贝到 notes 表供报告生成使用。
-   * 标记 dataSource = 'note_base' 以区分。
+   * 从 note_base 回填数据到 notes 表（两步逻辑）。
+   *
+   * Step 1（所有笔记）: 对 allNoteIds 中的每条笔记，从 note_base 拷贝必带字段：
+   *   noteLink, contentDirection, noteType(←kolType), kolPrice(←contentCost), serviceFee(←contentSettlement)
+   *   upsert 时 update 仅覆盖这5个字段，不触碰 metric 字段或 dataSource。
+   *
+   * Step 2（仅非官方合作笔记）: 对 missingNoteIds 中的笔记，额外写入：
+   *   totalCost, cooperationForm, impNum, readNum, engageNum, likeNum, favNum, cmtNum, shareNum
+   *   并标记 dataSource = 'note_base'。
    */
-  async fillNotesFromNoteBase(projectId: string, noteIds: string[]): Promise<void> {
-    if (noteIds.length === 0) return;
+  async fillNotesFromNoteBase(projectId: string, allNoteIds: string[], missingNoteIds: string[]): Promise<void> {
+    if (allNoteIds.length === 0) return;
 
+    // Fetch all relevant note_base records in one query
     const noteBaseRecords = await prisma.noteBase.findMany({
-      where: { projectId, noteId: { in: noteIds } },
+      where: { projectId, noteId: { in: allNoteIds } },
     });
 
     if (noteBaseRecords.length === 0) return;
 
-    await prisma.$transaction(
-      noteBaseRecords.map((nb) => {
-        const metrics = (nb.metrics as Record<string, number | string> | null) ?? {};
+    const noteBaseMap = new Map(noteBaseRecords.map((nb) => [nb.noteId, nb]));
 
+    // Step 1: Upsert all notes with only the 5 required fields
+    const step1Ops = allNoteIds
+      .filter((noteId) => noteBaseMap.has(noteId))
+      .map((noteId) => {
+        const nb = noteBaseMap.get(noteId)!;
         return prisma.note.upsert({
           where: {
-            projectId_noteId: { projectId, noteId: nb.noteId },
+            projectId_noteId: { projectId, noteId },
           },
           create: {
             projectId,
-            noteId: nb.noteId,
+            noteId,
             noteLink: nb.noteLink ?? undefined,
-            kolNickName: nb.kolNickName ?? undefined,
-            kolFanNum: nb.kolFanNum ?? undefined,
+            contentDirection: nb.contentDirection ?? undefined,
             noteType: nb.kolType ?? undefined,
-            spuName: nb.spuName ?? undefined,
             kolPrice: nb.contentCost,
             serviceFee: nb.contentSettlement,
-            impNum: toInt(metrics.impNum),
-            readNum: toInt(metrics.readNum),
-            engageNum: toInt(metrics.engageNum),
-            likeNum: toInt(metrics.likeNum),
-            favNum: toInt(metrics.favNum),
-            cmtNum: toInt(metrics.cmtNum),
-            shareNum: toInt(metrics.shareNum),
-            isUnderwater: !(nb.isRegistered),  // 非报备 = 水下
-            underwaterPrice: nb.contentCost,
-            dataSource: 'note_base',
           },
           update: {
-            // Only update if current record is also from note_base (don't overwrite API data)
+            // Only overwrite the 5 required fields — do NOT touch metrics or dataSource
             noteLink: nb.noteLink ?? undefined,
-            kolNickName: nb.kolNickName ?? undefined,
-            kolFanNum: nb.kolFanNum ?? undefined,
+            contentDirection: nb.contentDirection ?? undefined,
             noteType: nb.kolType ?? undefined,
-            spuName: nb.spuName ?? undefined,
             kolPrice: nb.contentCost,
             serviceFee: nb.contentSettlement,
-            impNum: toInt(metrics.impNum),
-            readNum: toInt(metrics.readNum),
-            engageNum: toInt(metrics.engageNum),
-            likeNum: toInt(metrics.likeNum),
-            favNum: toInt(metrics.favNum),
-            cmtNum: toInt(metrics.cmtNum),
-            shareNum: toInt(metrics.shareNum),
-            isUnderwater: !(nb.isRegistered),
-            underwaterPrice: nb.contentCost,
-            dataSource: 'note_base',
           },
         });
-      })
-    );
+      });
+
+    if (step1Ops.length > 0) {
+      await prisma.$transaction(step1Ops);
+    }
+
+    // Step 2: For missing (non-official) notes, additionally write metrics + dataSource
+    const step2NoteIds = missingNoteIds.filter((noteId) => noteBaseMap.has(noteId));
+    if (step2NoteIds.length === 0) return;
+
+    const step2Ops = step2NoteIds.map((noteId) => {
+      const nb = noteBaseMap.get(noteId)!;
+      const metrics = (nb.metrics as Record<string, number | string> | null) ?? {};
+
+      return prisma.note.update({
+        where: {
+          projectId_noteId: { projectId, noteId },
+        },
+        data: {
+          totalCost: nb.totalCost,
+          cooperationForm: nb.cooperationForm ?? undefined,
+          impNum: toInt(metrics.impNum),
+          readNum: toInt(metrics.readNum),
+          engageNum: toInt(metrics.engageNum),
+          likeNum: toInt(metrics.likeNum),
+          favNum: toInt(metrics.favNum),
+          cmtNum: toInt(metrics.cmtNum),
+          shareNum: toInt(metrics.shareNum),
+          dataSource: 'note_base',
+        },
+      });
+    });
+
+    await prisma.$transaction(step2Ops);
   }
 }
 

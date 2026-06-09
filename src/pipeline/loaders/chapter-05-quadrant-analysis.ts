@@ -8,15 +8,14 @@ import { normalizeBenchmarkValue, BenchmarkRange } from '../../shared/types';
  * 按笔记维度计算质量评分和投流评分，进行四象限分类。
  *
  * 数据来源：
- * - notes: 蒲公英数据（imp_num, read_num, engage_num, kol_nick_name, note_type）
- * - note_base: 笔记底表（content_cost, content_direction）
+ * - notes: 统一笔记表（imp_num, read_num, engage_num, kol_nick_name, note_type, kolPrice, contentDirection）
  * - juguang_data: 聚光数据（fee, impression, click, interaction）按note_id关联
  * - review_configs: 大盘均值（作为象限分界线）
  *
  * 计算逻辑：
- * - 笔记CPM = (note_base.content_cost + juguang.fee) / notes.imp_num * 1000
- * - 笔记CPC = (note_base.content_cost + juguang.fee) / notes.read_num
- * - 笔记CPE = (note_base.content_cost + juguang.fee) / 互动量
+ * - 笔记CPM = (notes.kolPrice + juguang.fee) / notes.imp_num * 1000
+ * - 笔记CPC = (notes.kolPrice + juguang.fee) / notes.read_num
+ * - 笔记CPE = (notes.kolPrice + juguang.fee) / 互动量
  * - 笔记CTR = notes.read_num / notes.imp_num
  * - 投流CPM = juguang.fee / juguang.impression * 1000
  * - 投流CPC = juguang.fee / juguang.click
@@ -29,7 +28,7 @@ import { normalizeBenchmarkValue, BenchmarkRange } from '../../shared/types';
 export class QuadrantAnalysisDataLoader extends BaseChapterDataLoader {
   chapterNumber = 5;
   chapterName = '综合分析';
-  requiredDataSources = ['notes', 'note_base', 'juguang_data', 'review_configs'];
+  requiredDataSources = ['notes', 'juguang_data', 'review_configs'];
   requiredFields = [
     'quadrant_notes_table', 'quadrant_summary',
     'high_quality_high_traffic', 'high_quality_low_traffic',
@@ -82,7 +81,7 @@ export class QuadrantAnalysisDataLoader extends BaseChapterDataLoader {
     variables['benchmark_cpe'] = benchmarkCpe.toFixed(2);
     variables['benchmark_ctr'] = benchmarkCtr.toFixed(2);
 
-    // ── 1. 加载蒲公英笔记数据 ──
+    // ── 1. 加载笔记数据（统一从 notes 表读取，包含 kolPrice 和 contentDirection） ──
     let notes: Array<{
       noteId: string;
       kolNickName: string | null;
@@ -94,6 +93,8 @@ export class QuadrantAnalysisDataLoader extends BaseChapterDataLoader {
       favNum: number;
       cmtNum: number;
       shareNum: number;
+      kolPrice: unknown; // Decimal type from Prisma
+      contentDirection: string | null;
     }> = [];
 
     try {
@@ -110,29 +111,15 @@ export class QuadrantAnalysisDataLoader extends BaseChapterDataLoader {
           favNum: true,
           cmtNum: true,
           shareNum: true,
+          kolPrice: true,
+          contentDirection: true,
         },
       });
     } catch (error) {
       console.warn(`[QuadrantAnalysisDataLoader] Failed to load notes: ${error}`);
     }
 
-    // ── 2. 加载笔记底表（content_cost, content_direction） ──
-    const noteBaseMap = new Map<string, { contentCost: number; contentDirection: string | null }>();
-
-    try {
-      const noteBaseResult = await this.prisma.$queryRaw<Array<{ note_id: string; content_cost: number; content_direction: string | null }>>`
-        SELECT note_id, content_cost::float, content_direction
-        FROM note_base WHERE project_id = ${projectId}::uuid
-      `;
-      for (const row of noteBaseResult) {
-        noteBaseMap.set(row.note_id, {
-          contentCost: row.content_cost ?? 0,
-          contentDirection: row.content_direction,
-        });
-      }
-    } catch (error) {
-      console.warn(`[QuadrantAnalysisDataLoader] Failed to load note_base: ${error}`);
-    }
+    // ── 2. (Removed: note_base no longer queried — kolPrice and contentDirection now read from notes table) ──
 
     // ── 3. 加载聚光数据（按note_id关联） ──
     const juguangMap = new Map<string, { fee: number; impression: number; click: number; interaction: number }>();
@@ -200,9 +187,8 @@ export class QuadrantAnalysisDataLoader extends BaseChapterDataLoader {
         continue;
       }
 
-      const noteBase = noteBaseMap.get(note.noteId);
-      const contentCost = noteBase?.contentCost ?? 0;
-      const contentDirection = noteBase?.contentDirection ?? '';
+      const contentCost = Number(note.kolPrice) || 0;
+      const contentDirection = note.contentDirection ?? '';
       const juguangFee = juguang.fee;
       const totalCost = contentCost + juguangFee;
 
@@ -318,14 +304,14 @@ export class QuadrantAnalysisDataLoader extends BaseChapterDataLoader {
     // 溯源展示数据库原始行数据 + 计算公式
     const traceItems: TraceItem[] = [];
 
-    // 四象限分析 — 展示每篇笔记的原始数据（notes + note_base + juguang_data 关联后的原始字段）
+    // 四象限分析 — 展示每篇笔记的原始数据（notes + juguang_data 关联后的原始字段）
     if (analyzedNotes.length > 0) {
       traceItems.push({
         traceId: 'ch5_quadrant_summary',
         chapterNumber: 5,
         label: '四象限笔记原始数据',
-        sourceTable: 'notes + note_base + juguang_data',
-        sourceQuery: `SELECT n.note_id, n.kol_nick_name, n.note_type, n.imp_num, n.read_num, n.engage_num, n.like_num, n.fav_num, n.cmt_num, n.share_num, nb.content_cost, nb.content_direction, j.fee AS juguang_fee, j.impression AS juguang_imp, j.click AS juguang_click, j.interaction AS juguang_interaction\nFROM notes n\nLEFT JOIN note_base nb ON n.note_id = nb.note_id AND nb.project_id = '${projectId}'\nLEFT JOIN (SELECT note_id, SUM(fee) fee, SUM(impression) impression, SUM(click) click, SUM(interaction) interaction FROM juguang_data WHERE project_id = '${projectId}' GROUP BY note_id) j ON n.note_id = j.note_id\nWHERE n.project_id = '${projectId}';`,
+        sourceTable: 'notes + juguang_data',
+        sourceQuery: `SELECT n.note_id, n.kol_nick_name, n.note_type, n.imp_num, n.read_num, n.engage_num, n.like_num, n.fav_num, n.cmt_num, n.share_num, n.kol_price, n.content_direction, j.fee AS juguang_fee, j.impression AS juguang_imp, j.click AS juguang_click, j.interaction AS juguang_interaction\nFROM notes n\nLEFT JOIN (SELECT note_id, SUM(fee) fee, SUM(impression) impression, SUM(click) click, SUM(interaction) interaction FROM juguang_data WHERE project_id = '${projectId}' GROUP BY note_id) j ON n.note_id = j.note_id\nWHERE n.project_id = '${projectId}';`,
         totalRows: analyzedNotes.length,
         columns: [
           { key: 'noteId', label: 'note_id', type: 'string' },
@@ -335,7 +321,7 @@ export class QuadrantAnalysisDataLoader extends BaseChapterDataLoader {
           { key: 'impNum', label: 'imp_num', type: 'number' },
           { key: 'readNum', label: 'read_num', type: 'number' },
           { key: 'engagement', label: 'engagement', type: 'number' },
-          { key: 'contentCost', label: 'content_cost', type: 'number' },
+          { key: 'contentCost', label: 'kol_price', type: 'number' },
           { key: 'juguangFee', label: 'juguang_fee', type: 'number' },
         ],
         dataRows: analyzedNotes.slice(0, 200).map(n => ({
@@ -350,8 +336,8 @@ export class QuadrantAnalysisDataLoader extends BaseChapterDataLoader {
           juguangFee: n.juguangFee,
         })) as unknown as Record<string, unknown>[],
         calculations: [
-          { metric: '笔记CPM', formula: '(content_cost + juguang_fee) / imp_num * 1000', inputs: { '大盘CPM(分界线)': benchmarkCpm }, result: '每篇笔记单独计算' },
-          { metric: '笔记CPE', formula: '(content_cost + juguang_fee) / engagement', inputs: { '大盘CPE(分界线)': benchmarkCpe }, result: '每篇笔记单独计算' },
+          { metric: '笔记CPM', formula: '(kol_price + juguang_fee) / imp_num * 1000', inputs: { '大盘CPM(分界线)': benchmarkCpm }, result: '每篇笔记单独计算' },
+          { metric: '笔记CPE', formula: '(kol_price + juguang_fee) / engagement', inputs: { '大盘CPE(分界线)': benchmarkCpe }, result: '每篇笔记单独计算' },
           { metric: '笔记CTR', formula: 'read_num / imp_num * 100', inputs: { '大盘CTR(分界线)': benchmarkCtr }, result: '每篇笔记单独计算' },
           { metric: '象限判定', formula: '笔记质量(CPM/CPE低于大盘 或 CTR高于大盘) × 投流质量(CPM/CPE低于大盘)', inputs: { '分析笔记数': analyzedNotes.length, '排除笔记数(无投流)': excludedCount }, result: `高质高投${quadrantGroups['高质高投'].length}篇, 高质低投${quadrantGroups['高质低投'].length}篇, 低质高投${quadrantGroups['低质高投'].length}篇, 低质低投${quadrantGroups['低质低投'].length}篇` },
         ],

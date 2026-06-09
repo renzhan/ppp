@@ -2,10 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Prisma } from '../../../../../../generated/prisma';
 import { getSession, hashPassword } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { isValidPhone } from '@/lib/phone-validator';
 
 const USER_SELECT = {
   id: true,
   username: true,
+  phone: true,
   displayName: true,
   role: true,
   mustChangePassword: true,
@@ -84,11 +86,19 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { username, displayName, realName, role, password } = await request.json();
+    const { username, displayName, realName, role, password, phone } = await request.json();
 
     if (!username) {
       return NextResponse.json(
         { error: '用户名（花名）不能为空' },
+        { status: 400 }
+      );
+    }
+
+    // Validate phone format if provided
+    if (phone && !isValidPhone(phone)) {
+      return NextResponse.json(
+        { error: '手机号格式不正确' },
         { status: 400 }
       );
     }
@@ -110,6 +120,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Check phone uniqueness if provided
+    if (phone) {
+      const existingPhone = await prisma.user.findUnique({ where: { phone } });
+      if (existingPhone) {
+        return NextResponse.json(
+          { error: '手机号已存在' },
+          { status: 409 }
+        );
+      }
+    }
+
     const validRole = ['admin', 'VP', 'AD', 'AM', '组长', 'AE'].includes(role) ? role : 'AE';
     const permissionLevel = validRole === 'admin' ? 0 : validRole === 'VP' ? 1 : validRole === 'AD' ? 2 : validRole === 'AM' ? 3 : validRole === '组长' ? 4 : 5;
 
@@ -124,10 +145,12 @@ export async function POST(request: NextRequest) {
         permissionLevel,
         mustChangePassword: true,
         isActive: true,
+        ...(phone && { phone }),
       },
       select: {
         id: true,
         username: true,
+        phone: true,
         displayName: true,
         role: true,
         isActive: true,
