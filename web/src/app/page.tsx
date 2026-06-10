@@ -50,8 +50,10 @@ interface Project {
   brand: string;
   category: string;
   businessLine: string | null;
+  noteCount: number;
   startDate: string;
   endDate: string;
+  participants: string[];
   createdAt: string;
   createdBy: string | null;
   createdByDisplayName: string | null;
@@ -302,6 +304,9 @@ export default function ProjectListPage() {
                     <TableHead className={listTableHeadClass}>品牌业务线</TableHead>
                     <TableHead className={listTableHeadClass}>品牌行业类目</TableHead>
                     <TableHead className={listTableHeadClass}>创建者</TableHead>
+                    <TableHead className={listTableHeadClass}>笔记数量</TableHead>
+                    <TableHead className={listTableHeadClass}>项目结束日期</TableHead>
+                    <TableHead className={listTableHeadClass}>参与者</TableHead>
                     <TableHead className={listTableActionHeadClass}>操作</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -322,6 +327,15 @@ export default function ProjectListPage() {
                       </TableCell>
                       <TableCell className={cn(listTableCellClass, 'whitespace-nowrap')}>
                         {project.createdByDisplayName || '-'}
+                      </TableCell>
+                      <TableCell className={cn(listTableCellClass, 'whitespace-nowrap')}>
+                        {project.noteCount || 0}
+                      </TableCell>
+                      <TableCell className={cn(listTableCellClass, 'whitespace-nowrap')}>
+                        {project.endDate ? new Date(project.endDate).toLocaleDateString('zh-CN') : '-'}
+                      </TableCell>
+                      <TableCell className={cn(listTableCellClass, 'whitespace-nowrap')}>
+                        {project.participants?.length > 0 ? `${project.participants.length}人` : '-'}
                       </TableCell>
                       <TableCell className={cn(listTableActionCellClass, 'whitespace-nowrap')}>
                         <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
