@@ -67,6 +67,16 @@ async function runBackgroundGeneration(reviewConfigId: string, projectId: string
   }
   activeGenerations.set(reviewConfigId, true);
 
+  // Helper: log to both console and file
+  const genLogDir = path.resolve(process.cwd(), '..', 'logs', 'prompts', reviewConfigId);
+  try { fs.mkdirSync(genLogDir, { recursive: true }); } catch { /* ignore */ }
+  const logToFile = (msg: string) => {
+    console.log(msg);
+    try {
+      fs.appendFileSync(path.join(genLogDir, '_generation.log'), `${new Date().toISOString()} ${msg}\n`);
+    } catch { /* ignore */ }
+  };
+
   try {
     const project = await prisma.project.findUnique({
       where: { id: projectId },
@@ -109,7 +119,7 @@ async function runBackgroundGeneration(reviewConfigId: string, projectId: string
     const processChapter = async (index: number) => {
       const chapterDef = CHAPTER_DEFS[index];
       const chapterStartTime = Date.now();
-      console.log(`[ReportGen] 开始生成 ch${chapterDef.number}_${chapterDef.id} (${reviewConfigId})`);
+      logToFile(`[ReportGen] 开始生成 ch${chapterDef.number}_${chapterDef.id}`);
       try {
         const template = templateLoader.loadTemplate(chapterDef.number);
         const title = template.metadata.chapter_name;
@@ -181,7 +191,7 @@ async function runBackgroundGeneration(reviewConfigId: string, projectId: string
         };
 
         const elapsed = ((Date.now() - chapterStartTime) / 1000).toFixed(1);
-        console.log(`[ReportGen] ✅ ch${chapterDef.number}_${chapterDef.id} 完成 (${elapsed}s, ${content.length}字符)`);
+        logToFile(`[ReportGen] ✅ ch${chapterDef.number}_${chapterDef.id} 完成 (${elapsed}s, ${content.length}字符)`);
 
         if (dataContext.traceItems && dataContext.traceItems.length > 0) {
           allTraceItems.push(...dataContext.traceItems);
@@ -189,9 +199,9 @@ async function runBackgroundGeneration(reviewConfigId: string, projectId: string
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : '生成失败';
         const elapsed = ((Date.now() - chapterStartTime) / 1000).toFixed(1);
-        console.error(`[ReportGen] ❌ ch${chapterDef.number}_${chapterDef.id} 失败 (${elapsed}s): ${errorMsg}`);
+        logToFile(`[ReportGen] ❌ ch${chapterDef.number}_${chapterDef.id} 失败 (${elapsed}s): ${errorMsg}`);
         if (err instanceof Error && err.stack) {
-          console.error(`[ReportGen]    Stack: ${err.stack.split('\n').slice(0, 3).join(' | ')}`);
+          logToFile(`[ReportGen]    Stack: ${err.stack.split('\n').slice(0, 3).join(' | ')}`);
         }
         const template = templateLoader.loadTemplate(chapterDef.number);
         chapterResults[index] = {
@@ -244,8 +254,10 @@ async function runBackgroundGeneration(reviewConfigId: string, projectId: string
       });
     }
 
-    console.log(`[ReportGen] Completed: ${reviewConfigId}, ${finalChapters.length} chapters`);
+    logToFile(`[ReportGen] Completed: ${finalChapters.length} chapters`);
   } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    logToFile(`[ReportGen] Failed: ${errMsg}`);
     console.error(`[ReportGen] Failed: ${reviewConfigId}`, err);
     await prisma.reviewConfig.update({
       where: { id: reviewConfigId },
