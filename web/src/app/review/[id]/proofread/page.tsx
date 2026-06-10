@@ -121,8 +121,9 @@ export default function ProofreadPage({ params }: { params: { id: string } }) {
 
         // If report already exists, load it
         if (data.reportContent?.type === 'chapters' && data.reportContent.chapters?.length) {
-          setChapters(data.reportContent.chapters);
-          setActiveChapterId(data.reportContent.chapters[0].id);
+          const sortedChapters = [...data.reportContent.chapters].sort((a: ChapterData, b: ChapterData) => a.number - b.number);
+          setChapters(sortedChapters);
+          setActiveChapterId(sortedChapters[0].id);
           // Initialize chapterStatuses from loaded chapters (all completed)
           setChapterStatuses(
             data.reportContent.chapters.map((ch: ChapterData) => ({
@@ -216,7 +217,7 @@ export default function ProofreadPage({ params }: { params: { id: string } }) {
             if (existing) {
               return prev.map((c) => (c.id === chapter.id ? chapter : c));
             }
-            const updated = [...prev, chapter];
+            const updated = [...prev, chapter].sort((a, b) => a.number - b.number);
             // If all chapters received, auto-transition to ready
             if (updated.length >= CHAPTER_DEFS.length) {
               eventSource.close();

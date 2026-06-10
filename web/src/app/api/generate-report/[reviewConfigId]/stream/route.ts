@@ -226,7 +226,9 @@ async function runBackgroundGeneration(reviewConfigId: string, projectId: string
     await Promise.all(executing);
 
     // Final save with completed status
-    const finalChapters = chapterResults.filter((r): r is NonNullable<typeof r> => r !== null);
+    const finalChapters = chapterResults
+      .filter((r): r is NonNullable<typeof r> => r !== null)
+      .sort((a, b) => a.number - b.number);
     await prisma.reviewConfig.update({
       where: { id: reviewConfigId },
       data: {
