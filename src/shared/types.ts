@@ -285,6 +285,7 @@ export interface BrandData {
   postSearchRank?: number;         // 搜索量行业排名（投后）
   preSearchVolume?: number;        // 搜索量（投前）
   preSearchRank?: number;          // 搜索量行业排名（投前）
+  screenshots?: ScreenshotData[];  // 灵犀后台截图
 }
 
 /**
@@ -313,7 +314,6 @@ export interface KeywordData {
  */
 export interface ScreenshotData {
   type: string;                    // soc_sov / audience / mind
-  period: string;                  // 周期
   filePath: string;                // 截图文件路径
 }
 

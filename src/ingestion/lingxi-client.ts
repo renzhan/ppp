@@ -72,23 +72,18 @@ export class LingxiClient {
   // ── asset_analyse + move_analyse → 品牌数据 ──
 
   async fetchBrandData(brandId: string, startDate: string, endDate: string, taxonomyNames?: string | string[], preStartDate?: string, preEndDate?: string): Promise<BrandData> {
-    const res = await this.callTask('asset_analyse', brandId, { endDate });
-    const captured = res.data?.captured ?? [];
+    const screenshots: ScreenshotData[] = [];
+
+    // asset_analyse：AIPS / TI / brandRank（一次调用搞定）
+    const aaParams: Record<string, unknown> = { endDate };
+    if (taxonomyNames) aaParams.taxonomyNames = taxonomyNames;
+    const aaRes = await this.callTask('asset_analyse', brandId, aaParams);
+    const captured = aaRes.data?.captured ?? [];
+    screenshots.push(...(await this.saveScreenshots(aaRes)));
 
     const aips = extractAips(captured);
     const ti = extractTi(captured);
-
-    // 品牌行业排名（需要 taxonomyNames）
-    let brandRank: number | undefined;
-    if (taxonomyNames) {
-      try {
-        const rankRes = await this.callTask('asset_analyse', brandId, { endDate, taxonomyNames });
-        const rankCaptured = rankRes.data?.captured ?? [];
-        brandRank = extractBrandRank(rankCaptured);
-      } catch (e) {
-        console.error(`[lingxi] brand rank 失败: ${(e as Error).message}`);
-      }
-    }
+    const brandRank = taxonomyNames ? extractBrandRank(captured) : undefined;
 
     // 品牌排名/渗透率数据（需要 taxonomyNames）
     let rankData: Partial<BrandData> = {};
@@ -99,6 +94,7 @@ export class LingxiClient {
         });
         const rankCaptured = rankRes.data?.captured ?? [];
         rankData = extractBrandRankData(rankCaptured, 'post');
+        screenshots.push(...(await this.saveScreenshots(rankRes)));
       } catch (e) {
         console.error(`[lingxi] brand_rank 失败: ${(e as Error).message}`);
       }
@@ -113,6 +109,7 @@ export class LingxiClient {
           const preData = extractBrandRankData(preCaptured, 'pre');
           rankData.preSearchVolume = preData.preSearchVolume;
           rankData.preSearchRank = preData.preSearchRank;
+          screenshots.push(...(await this.saveScreenshots(preRes)));
         } catch (e) {
           console.error(`[lingxi] brand_rank 投前失败: ${(e as Error).message}`);
         }
@@ -125,6 +122,7 @@ export class LingxiClient {
       const moveRes = await this.callTask('move_analyse', brandId, { startDate, endDate });
       const moveCaptured = moveRes.data?.captured ?? [];
       moveData = extractMoveAnalyseData(moveCaptured, startDate, endDate);
+      screenshots.push(...(await this.saveScreenshots(moveRes)));
     } catch (e) {
       console.error(`[lingxi] move_analyse 失败: ${(e as Error).message}`);
     }
@@ -136,28 +134,28 @@ export class LingxiClient {
       brandRank,
       ...rankData,
       ...moveData,
+      screenshots: screenshots.length > 0 ? screenshots : undefined,
     };
   }
 
   // ── 截图 ──
 
-  async extractScreenshots(res: LingxiTaskResponse, projectId: string): Promise<ScreenshotData[]> {
+  private async saveScreenshots(res: LingxiTaskResponse): Promise<ScreenshotData[]> {
     const screenshots = res.data?.screenshots ?? [];
-    const result: ScreenshotData[] = [];
-    const dir = path.resolve('web/public/screenshots', projectId);
+    if (screenshots.length === 0) return [];
+
+    const ts = Date.now();
+    const dir = path.resolve('web/public/screenshots/lingxi');
     fs.mkdirSync(dir, { recursive: true });
 
+    const result: ScreenshotData[] = [];
     for (const ss of screenshots) {
-      const safeName = ss.name.replace(/[^a-zA-Z0-9_一-龥-]/g, '_');
-      const filePath = path.join(dir, `${safeName}.png`);
+      const safeName = ss.name.replace(/[^a-zA-Z0-9一-鿿_-]/g, '_');
+      const fileName = `${ts}_${safeName}.png`;
+      const filePath = path.join(dir, fileName);
       fs.writeFileSync(filePath, Buffer.from(ss.base64, 'base64'));
-      result.push({
-        type: safeName,
-        period: getPeriod(),
-        filePath: `/screenshots/${projectId}/${safeName}.png`,
-      });
+      result.push({ type: ss.name, filePath: `/screenshots/lingxi/${fileName}` });
     }
-
     return result;
   }
 
