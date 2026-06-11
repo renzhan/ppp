@@ -134,27 +134,32 @@ export async function POST(
       return count;
     }, { timeout: 30000 });
 
-    // 异步触发蒲公英数据爬取（不阻塞响应）
+    // 同步等待蒲公英+灵犀数据爬取完成（确保首次创建项目后数据立即可用）
+    let ingestionResult: { pugongyingNotes: { length: number }; errors: string[] } | null = null;
     try {
       const { DataIngestionService } = await import('@/ingestion/index');
       const ingestionService = new DataIngestionService();
-      ingestionService.ingestBaseData(projectId).then((result) => {
-        if (result.errors.length > 0) {
-          console.warn(`[NoteBaseUpload] 蒲公英爬取部分失败 (project: ${projectId}):`, result.errors);
-        } else {
-          console.log(`[NoteBaseUpload] 蒲公英爬取完成 (project: ${projectId}): ${result.pugongyingNotes.length} 篇笔记`);
-        }
-      }).catch((err) => {
-        console.error(`[NoteBaseUpload] 蒲公英爬取异常 (project: ${projectId}):`, err);
-      });
-    } catch (importErr) {
-      console.error('[NoteBaseUpload] 无法加载 DataIngestionService:', importErr);
+      console.log(`[NoteBaseUpload] 开始同步拉取蒲公英+灵犀数据 (project: ${projectId}, noteCount: ${noteCount})`);
+      const ingestionStart = Date.now();
+      ingestionResult = await ingestionService.ingestBaseData(projectId);
+      const elapsed = ((Date.now() - ingestionStart) / 1000).toFixed(1);
+      if (ingestionResult.errors.length > 0) {
+        console.warn(`[NoteBaseUpload] 蒲公英/灵犀爬取部分失败 (project: ${projectId}, ${elapsed}s):`, ingestionResult.errors);
+      } else {
+        console.log(`[NoteBaseUpload] 蒲公英/灵犀爬取完成 (project: ${projectId}, ${elapsed}s): ${ingestionResult.pugongyingNotes.length} 篇笔记`);
+      }
+    } catch (ingestionErr) {
+      const msg = ingestionErr instanceof Error ? ingestionErr.message : String(ingestionErr);
+      console.error(`[NoteBaseUpload] 蒲公英/灵犀爬取异常 (project: ${projectId}):`, msg);
     }
 
     return NextResponse.json({
       success: true,
       noteCount,
       warnings: parseResult.warnings,
+      ingestion: ingestionResult
+        ? { notesIngested: ingestionResult.pugongyingNotes.length, errors: ingestionResult.errors }
+        : null,
     });
   } catch (error) {
     console.error('POST /api/upload/note-base error:', error);

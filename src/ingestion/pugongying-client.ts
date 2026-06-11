@@ -187,19 +187,13 @@ export class PugongyingClient {
       allNotes.push(...rawNotes.map(mapToNote));
     }
 
-    // 采集媒体（封面图+视频），失败不影响笔记数据
-    try {
-      const media = await this.fetchNoteMedia(noteIds);
-      for (const note of allNotes) {
-        const m = media[note.noteId];
-        if (m) {
-          note.coverImages = m.coverImages;
-          note.videoPath = m.videoPath;
-        }
-      }
-    } catch (e) {
+    // 采集媒体（封面图+视频）— 异步执行，不阻塞主流程
+    this.fetchNoteMedia(noteIds).then((media) => {
+      // 媒体信息已下载到本地，后续读取时从文件系统获取
+      console.log(`[pugongying] 媒体采集完成: ${Object.keys(media).length} 篇笔记`);
+    }).catch((e) => {
       console.error(`[pugongying] 媒体采集失败: ${(e as Error).message}`);
-    }
+    });
 
     return allNotes;
   }

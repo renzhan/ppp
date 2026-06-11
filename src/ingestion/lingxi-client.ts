@@ -19,7 +19,7 @@ export interface LingxiClientConfig {
 
 // ── Constants ──
 
-const DEFAULT_TIMEOUT = 120_000;
+const DEFAULT_TIMEOUT = 45_000;
 const MAX_RETRIES = 2;
 
 // ── Raw types ──
@@ -320,7 +320,7 @@ async function withRetry<T>(fn: () => Promise<T>, retries = MAX_RETRIES): Promis
       // 不重试标记为 noRetry 的错误（如 4xx 客户端错误）
       if ((e as any)?.noRetry) throw e;
       if (attempt === retries) throw e;
-      await new Promise((r) => setTimeout(r, 3000 * Math.pow(2, attempt)));
+      await new Promise((r) => setTimeout(r, 2000 * Math.pow(2, attempt)));
     }
   }
   throw new Error('unreachable');

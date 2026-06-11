@@ -1178,7 +1178,7 @@ function NewReviewPageContent() {
           disabled={createReview.isPending}
         >
           {createReview.isPending ? <Loading size="sm" /> : null}
-          开始复盘
+          {createReview.isPending ? '创建中，正在同步投流数据...' : '开始复盘'}
         </Button>
       </div>
     </div>

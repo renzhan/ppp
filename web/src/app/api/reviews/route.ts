@@ -220,7 +220,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Trigger juguang data ingestion if advertiserIds is non-empty (fire-and-forget, no await)
+    // Trigger juguang data ingestion if advertiserIds is non-empty (同步等待完成)
     if (sanitizedAdvertiserIds.length > 0) {
       // 从投流周期计算最小/最大日期
       const phases = Array.isArray(launchPhases) ? launchPhases as Array<{ startDate?: string; endDate?: string }> : [];
@@ -231,24 +231,22 @@ export async function POST(request: NextRequest) {
       if (startDate && endDate) {
         const ingestionService = new DataIngestionService();
         const numericAdvertiserIds = sanitizedAdvertiserIds.map((id) => Number(id));
-        console.log('[POST /api/reviews] 调用 ingestJuguangData (fire-and-forget):', JSON.stringify({
+        console.log('[POST /api/reviews] 调用 ingestJuguangData (同步等待):', JSON.stringify({
           projectId,
           advertiserIds: numericAdvertiserIds,
           startDate,
           endDate,
           reviewConfigId: reviewConfig.id,
         }));
-        ingestionService.ingestJuguangData(projectId, numericAdvertiserIds, startDate, endDate, reviewConfig.id)
-          .then((juguangResult) => {
-            console.log('[POST /api/reviews] ingestJuguangData 完成:', JSON.stringify({
-              juguangNotesCount: juguangResult.juguangNotes.length,
-              errors: juguangResult.errors,
-              sampleNotes: juguangResult.juguangNotes.slice(0, 3),
-            }));
-          })
-          .catch((ingestionError) => {
-            console.error('POST /api/reviews ingestion error (non-blocking):', ingestionError);
-          });
+        try {
+          const juguangResult = await ingestionService.ingestJuguangData(projectId, numericAdvertiserIds, startDate, endDate, reviewConfig.id);
+          console.log('[POST /api/reviews] ingestJuguangData 完成:', JSON.stringify({
+            juguangNotesCount: juguangResult.juguangNotes.length,
+            errors: juguangResult.errors,
+          }));
+        } catch (ingestionError) {
+          console.error('POST /api/reviews ingestion error:', ingestionError);
+        }
       }
     }
 

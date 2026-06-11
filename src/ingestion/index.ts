@@ -78,32 +78,34 @@ export class DataIngestionService {
     const ctx = await this.resolveProjectContext(projectId);
     const errors: string[] = [];
 
-    // 蒲公英笔记
+    // 蒲公英笔记 + 灵犀 并行拉取
     let pugongyingNotes: PugongyingNote[] = [];
-    try {
-      pugongyingNotes = await this.paichachaClient.fetchPugongyingData(ctx.noteIds);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      errors.push(`Failed to fetch pugongying data: ${message}`);
-    }
-
-    // 灵犀（仅当项目配置了灵犀账号 ID 时才采集）
     let lingxiData: LingxiData | undefined;
-    if (ctx.lingxiBrandId) {
-      try {
-        lingxiData = await this.paichachaClient.fetchLingxiData(
+
+    const pugongyingPromise = this.paichachaClient.fetchPugongyingData(ctx.noteIds)
+      .then((notes) => { pugongyingNotes = notes; })
+      .catch((error) => {
+        const message = error instanceof Error ? error.message : String(error);
+        errors.push(`Failed to fetch pugongying data: ${message}`);
+      });
+
+    const lingxiPromise = ctx.lingxiBrandId
+      ? this.paichachaClient.fetchLingxiData(
           ctx.lingxiBrandId,
           ctx.execStart,
           ctx.currentEnd,
           ctx.taxonomyNames,
           ctx.preStart,
           ctx.preEnd,
-        );
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        errors.push(`Failed to fetch lingxi data: ${message}`);
-      }
-    }
+        )
+          .then((data) => { lingxiData = data; })
+          .catch((error) => {
+            const message = error instanceof Error ? error.message : String(error);
+            errors.push(`Failed to fetch lingxi data: ${message}`);
+          })
+      : Promise.resolve();
+
+    await Promise.all([pugongyingPromise, lingxiPromise]);
 
     // 保留已有水下/水下价格
     if (pugongyingNotes.length > 0) {

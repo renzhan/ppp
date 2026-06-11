@@ -467,7 +467,7 @@ export class PrismaDataPersistenceService implements DataPersistenceService {
 
     const noteBaseMap = new Map(noteBaseRecords.map((nb) => [nb.noteId, nb]));
 
-    // Step 1: Upsert all notes with only the 5 required fields
+    // Step 1: Upsert all notes with only the core fields from note_base
     const step1Ops = allNoteIds
       .filter((noteId) => noteBaseMap.has(noteId))
       .map((noteId) => {
@@ -480,15 +480,13 @@ export class PrismaDataPersistenceService implements DataPersistenceService {
             projectId,
             noteId,
             noteLink: nb.noteLink ?? undefined,
-            contentDirection: nb.contentDirection ?? undefined,
             noteType: nb.kolType ?? undefined,
             kolPrice: nb.contentCost,
             serviceFee: nb.contentSettlement,
           },
           update: {
-            // Only overwrite the 5 required fields — do NOT touch metrics or dataSource
+            // Only overwrite the core fields — do NOT touch metrics or dataSource
             noteLink: nb.noteLink ?? undefined,
-            contentDirection: nb.contentDirection ?? undefined,
             noteType: nb.kolType ?? undefined,
             kolPrice: nb.contentCost,
             serviceFee: nb.contentSettlement,
@@ -513,8 +511,7 @@ export class PrismaDataPersistenceService implements DataPersistenceService {
           projectId_noteId: { projectId, noteId },
         },
         data: {
-          totalCost: nb.totalCost,
-          cooperationForm: nb.cooperationForm ?? undefined,
+          cooperateType: nb.cooperationForm ?? undefined,
           impNum: toInt(metrics.impNum),
           readNum: toInt(metrics.readNum),
           engageNum: toInt(metrics.engageNum),
