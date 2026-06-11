@@ -98,7 +98,7 @@ export class QuadrantAnalysisDataLoader extends BaseChapterDataLoader {
     }> = [];
 
     try {
-      notes = await this.prisma.note.findMany({
+      const rawNotes = await this.prisma.note.findMany({
         where: { projectId },
         select: {
           noteId: true,
@@ -112,14 +112,25 @@ export class QuadrantAnalysisDataLoader extends BaseChapterDataLoader {
           cmtNum: true,
           shareNum: true,
           kolPrice: true,
-          contentDirection: true,
         },
       });
+
+      // Get contentDirection from note_base
+      const noteBaseDirs = await this.prisma.noteBase.findMany({
+        where: { projectId },
+        select: { noteId: true, contentDirection: true },
+      });
+      const dirMap = new Map(noteBaseDirs.map(nb => [nb.noteId, nb.contentDirection]));
+
+      notes = rawNotes.map(n => ({
+        ...n,
+        contentDirection: dirMap.get(n.noteId) || null,
+      }));
     } catch (error) {
       console.warn(`[QuadrantAnalysisDataLoader] Failed to load notes: ${error}`);
     }
 
-    // ── 2. (Removed: note_base no longer queried — kolPrice and contentDirection now read from notes table) ──
+    // ── 2. contentDirection loaded from note_base above ──
 
     // ── 3. 加载聚光数据（按note_id关联） ──
     const juguangMap = new Map<string, { fee: number; impression: number; click: number; interaction: number }>();

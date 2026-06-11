@@ -8,13 +8,13 @@ export interface ParsedNoteBaseRow {
   noteLink: string;
   kolNickName: string | null;
   kolFanNum: number;
-  cooperationForm: string | null;
-  isRegistered: boolean;
-  contentDirection: string | null;
-  kolType: string | null;
+  cooperationForm: string | null;    // 内容形式: 视频报备/图文报备/视频软文/图文软文
+  isRegistered: boolean;             // 是否报备 (derived from cooperationForm)
+  contentDirection: string | null;   // 内容方向
+  kolType: string | null;            // 笔记类型
   spuName: string | null;
-  contentCost: number;
-  contentSettlement: number;
+  contentCost: number;               // 资源含税成本价
+  contentSettlement: number;         // 资源含税售价
   adSpend: number;
   adSettlement: number;
   totalCost: number;
@@ -35,6 +35,16 @@ export interface ParseResult {
  *
  * 使用 note_base 表正确字段名（cooperationForm、isRegistered、contentCost 等），
  * 而非 notes 表字段名（noteType、isUnderwater、kolPrice 等）。
+ *
+ * ═══ 最终版底表表头 ═══
+ * 发布链接（必须是长链接）| 内容形式 | 内容方向 | 笔记类型 | 资源含税成本价 | 资源含税售价 |
+ * 曝光量 | 阅读量 | 点赞量 | 收藏量 | 评论量 | 分享量 | 关注量 | 互动量
+ *
+ * 内容形式说明：
+ * - 视频报备 / 图文报备 → 报备笔记 (isRegistered = true)
+ * - 视频软文 / 图文软文 → 非报备笔记 (isRegistered = false)
+ * 报备同义词：官方合作 / 水上
+ * 非报备同义词：非官方合作 / 水下
  */
 export const NOTE_BASE_COLUMN_MAP: Record<string, string> = {
   // ─── 忽略列 ───
@@ -51,21 +61,21 @@ export const NOTE_BASE_COLUMN_MAP: Record<string, string> = {
 
   // ─── 运营标注字段（note_base 独有）───
   '合作形式': 'cooperationForm',
-  '内容形式': 'cooperationForm', // 别名
+  '内容形式': 'cooperationForm', // 最终版底表表头（即是合作形式）
   '是否报备': 'isRegistered',
   '内容方向': 'contentDirection',
   '达人类型': 'kolType',
-  '笔记类型': 'kolType',         // 别名
+  '笔记类型': 'kolType',         // 最终版底表表头
   '对应SPU': 'spuName',
 
   // ─── 费用字段（note_base 独有）───
   '内容实际消耗金额': 'contentCost',
   '内容消耗金额': 'contentCost',       // 新表头别名
   '达人金额': 'contentCost',           // 旧别名
-  '资源含税成本价': 'contentCost',     // 新版底表表头（必填）
+  '资源含税成本价': 'contentCost',     // 最终版底表表头
   '内容实际结算金额': 'contentSettlement',
   '内容结算金额': 'contentSettlement', // 新表头别名
-  '资源含税售价': 'contentSettlement', // 新版底表表头（必填）
+  '资源含税售价': 'contentSettlement', // 最终版底表表头
   '投流实际消耗': 'adSpend',
   '投流消耗金额': 'adSpend',           // 新表头别名
   '投流金额': 'adSpend',               // 旧别名
@@ -78,9 +88,12 @@ export const NOTE_BASE_COLUMN_MAP: Record<string, string> = {
 /**
  * 数据指标列映射 — 这些字段存入 note_base.metrics JSON 字段，同时前端展示。
  * 包含所有 Excel 中的数据指标列（基础指标 + 投流/自然流 + CPM/CPE/CPC + 回搜等）。
+ *
+ * 注意：最终版底表中 曝光量/阅读量/点赞量/收藏量/评论量/分享量/关注量/互动量 作为核心指标，
+ * 仍存入 metrics JSON，但也用于非报备笔记的计算。
  */
 export const DISPLAY_ONLY_COLUMN_MAP: Record<string, string> = {
-  // 基础数据指标
+  // 基础数据指标（最终版底表核心字段）
   '曝光量': 'impNum',
   '曝光': 'impNum',             // 短别名
   '阅读量': 'readNum',
@@ -140,18 +153,16 @@ export const DISPLAY_ONLY_COLUMN_MAP: Record<string, string> = {
 // ─── Required Columns ───
 
 /**
- * 必填列名列表 — 新版底表Excel必须包含这5列（或其已知别名）。
+ * 必填列名列表 — 新版底表Excel必须包含这些列（或其已知别名）。
  * 缺少任何一列对应的映射时 parseNoteBaseExcel 将返回解析错误。
  *
- * 校验逻辑：对每个必填字段名，检查表头中是否存在至少一个列（通过 NOTE_BASE_COLUMN_MAP）映射到该字段。
- * 这样既能识别新表头（如"发布链接"→noteLink），也能兼容旧表头（如"笔记链接"→noteLink）。
+ * 最终版必填字段：发布链接、内容形式、内容方向、笔记类型
  */
 export const REQUIRED_COLUMNS: string[] = [
   '发布链接',
+  '内容形式',
   '内容方向',
   '笔记类型',
-  '资源含税成本价',
-  '资源含税售价',
 ];
 
 /**
@@ -160,11 +171,37 @@ export const REQUIRED_COLUMNS: string[] = [
  */
 export const REQUIRED_FIELD_NAMES: string[] = [
   'noteLink',
+  'cooperationForm',
   'contentDirection',
   'kolType',
-  'contentCost',
-  'contentSettlement',
 ];
+
+// ─── Content Form Constants ───
+
+/** 报备笔记内容形式 */
+export const REGISTERED_FORMS = ['视频报备', '图文报备'];
+/** 非报备笔记内容形式 */
+export const UNREGISTERED_FORMS = ['视频软文', '图文软文'];
+/** 所有有效内容形式 */
+export const ALL_CONTENT_FORMS = [...REGISTERED_FORMS, ...UNREGISTERED_FORMS];
+
+/**
+ * 根据内容形式判断是否为报备笔记
+ * 报备：视频报备、图文报备
+ * 非报备：视频软文、图文软文
+ */
+export function isRegisteredByForm(cooperationForm: string | null | undefined): boolean {
+  if (!cooperationForm) return false;
+  return REGISTERED_FORMS.includes(cooperationForm.trim());
+}
+
+/**
+ * 根据内容形式判断是否为非报备笔记
+ */
+export function isUnregisteredByForm(cooperationForm: string | null | undefined): boolean {
+  if (!cooperationForm) return false;
+  return UNREGISTERED_FORMS.includes(cooperationForm.trim());
+}
 
 // ─── Helper Functions ───
 
@@ -248,6 +285,10 @@ export function headersContainKnownColumns(headers: string[]): boolean {
  * Pure function — no database access, no side effects.
  * Filters out rows where noteLink is empty.
  * Extracts noteId from noteLink using extractNoteIdFromLink.
+ *
+ * 内容形式 → isRegistered 自动推导：
+ * - 视频报备/图文报备 → isRegistered = true
+ * - 视频软文/图文软文 → isRegistered = false
  */
 export function parseNoteBaseExcel(buffer: Buffer): ParseResult {
   const workbook = XLSX.read(buffer, { type: 'buffer' });
@@ -328,8 +369,7 @@ export function parseNoteBaseExcel(buffer: Buffer): ParseResult {
   }
 
   // ─── Required Column Validation ───
-  // Check that all 5 mandatory fields are covered by at least one header column.
-  // A field is considered present if any header (raw or normalized) maps to it via NOTE_BASE_COLUMN_MAP.
+  // Check that all mandatory fields are covered by at least one header column.
   const headers = rawRows.length > 0 ? Object.keys(rawRows[0]) : [];
   const mappedFieldNames = new Set<string>();
   for (const header of headers) {
@@ -344,6 +384,7 @@ export function parseNoteBaseExcel(buffer: Buffer): ParseResult {
     // Map field names back to Chinese column names for user-friendly error message
     const fieldToChineseMap: Record<string, string> = {
       noteLink: '发布链接',
+      cooperationForm: '内容形式',
       contentDirection: '内容方向',
       kolType: '笔记类型',
       contentCost: '资源含税成本价',
@@ -422,13 +463,23 @@ export function parseNoteBaseExcel(buffer: Buffer): ParseResult {
       warnings.push(warning);
     }
 
+    // ─── Derive isRegistered from cooperationForm (内容形式) ───
+    const cooperationForm = mapped.cooperationForm ? String(mapped.cooperationForm).trim() : null;
+    let isRegistered: boolean;
+    if (cooperationForm) {
+      isRegistered = isRegisteredByForm(cooperationForm);
+    } else {
+      // Fallback to explicit isRegistered field if cooperationForm not set
+      isRegistered = parseBoolean(mapped.isRegistered);
+    }
+
     const record: ParsedNoteBaseRow = {
       noteId,
       noteLink,
       kolNickName: mapped.kolNickName ? String(mapped.kolNickName).trim() : null,
       kolFanNum: Math.round(parseNumber(mapped.kolFanNum)),
-      cooperationForm: mapped.cooperationForm ? String(mapped.cooperationForm).trim() : null,
-      isRegistered: parseBoolean(mapped.isRegistered),
+      cooperationForm,
+      isRegistered,
       contentDirection: mapped.contentDirection ? String(mapped.contentDirection).trim() : null,
       kolType: mapped.kolType ? String(mapped.kolType).trim() : null,
       spuName: mapped.spuName ? String(mapped.spuName).trim() : null,

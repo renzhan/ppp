@@ -5,39 +5,66 @@ import { normalizeBenchmarkValue, BenchmarkRange } from '../../shared/types';
 /**
  * Chapter 3 (Data Overview / 数据总览) Data Loader
  *
- * 按字段映射表收集数据，涉及以下表：
- * - notes: 笔记数据（总篇数、曝光、阅读、互动、爆文、博主报价kolPrice、平台服务费serviceFee）
- * - juguang_data: 聚光数据（投流消耗fee、展现impression、点击click、互动interaction）
- * - review_configs: 复盘配置（KPI目标、大盘均值、互动口径、爆文口径、金额口径）
- * - lingxi_data: 灵犀数据（AIPS人群、TI人群）
+ * ═══ 重构版 ═══
  *
- * 关键计算公式：
- * - 总费用 = IF(内容金额口径='消耗', SUM(kol_price+service_fee), SUM(service_fee))
- *          + IF(投流金额口径='消耗', SUM(fee), SUM(fee))  [⚠️ ISSUE-007: settlement caliber falls back to consumption]
- * - 总互动 = IF(互动口径='含关注量', SUM(engage_num), SUM(like+fav+cmt+share))
- * - 爆文 = IF(爆文计算方式='千互', COUNT(like+fav+cmt>=1000), COUNT(like>=1000))
- * - 自然流指标 = 蒲公英指标 - 聚光指标
- * - 自然流CPX = 总费用 / 自然流指标
+ * 核心变更：根据业务底表(note_base)的「内容形式」字段区分报备/非报备笔记，
+ * 分别使用不同数据源计算指标，然后合并。
+ *
+ * 报备笔记 = note_base.cooperation_form IN ('视频报备', '图文报备')
+ *   - 数据指标（曝光、阅读、互动等）：从蒲公英API(notes表)获取
+ *   - 费用：IF(内容金额口径='资源含税成本价', kol_price + total_platform_price, 资源含税售价)
+ *     其中 kol_price, total_platform_price 来自蒲公英(notes表)
+ *     资源含税售价 来自 note_base.content_settlement
+ *
+ * 非报备笔记 = note_base.cooperation_form IN ('视频软文', '图文软文')
+ *   - 数据指标（曝光、阅读、互动等）：完全从业务底表(note_base.metrics)获取
+ *   - 费用：IF(内容金额口径='资源含税成本价', 资源含税成本价, 资源含税售价)
+ *     资源含税成本价 = note_base.content_cost
+ *     资源含税售价 = note_base.content_settlement
+ *
+ * 合并逻辑：
+ *   合并消费 = 报备消费 + 非报备消费
+ *   合并曝光 = 报备曝光 + 非报备曝光
+ *   合并阅读 = 报备阅读 + 非报备阅读
+ *   合并互动 = 报备互动 + 非报备互动
+ *   合并发布数 = 报备发布数 + 非报备发布数
+ *   合并爆文数 = 报备爆文数 + 非报备爆文数
+ *   整体CPM = 合并消费 / 合并曝光 × 1000
+ *   整体CPC = 合并消费 / 合并阅读
+ *   整体CPE = 合并消费 / 合并互动
+ *   整体CTR = 合并阅读 / 合并曝光 × 100%
+ *   整体爆文率 = 合并爆文数 / 合并发布数 × 100%
+ *
+ * 数据源：
+ * - note_base: 业务底表（内容形式、内容方向、笔记类型、费用、非报备指标）
+ * - notes: 蒲公英数据（报备笔记的数据指标）
+ * - juguang_data: 聚光数据（投流消耗、展现、点击、互动、TI人群）
+ * - review_configs: 复盘配置（KPI目标、大盘均值、互动口径、爆文口径、内容金额口径）
+ * - lingxi_data: 灵犀数据（AIPS人群、TI人群）
  */
 export class DataOverviewDataLoader extends BaseChapterDataLoader {
   chapterNumber = 3;
   chapterName = '数据总览';
-  requiredDataSources = ['notes', 'juguang_data', 'review_configs', 'lingxi_data'];
+  requiredDataSources = ['note_base', 'notes', 'juguang_data', 'review_configs', 'lingxi_data'];
   requiredFields = [
     'project_name', 'brand',
-    'note_count', 'total_cost', 'content_cost', 'traffic_cost',
+    'note_count', 'total_cost', 'content_cost',
+    'registered_cost', 'unregistered_cost',
+    'registered_note_count', 'unregistered_note_count',
     'total_impressions', 'total_reads', 'total_engagement',
     'total_likes', 'total_favs', 'total_comments', 'total_shares',
     'viral_count', 'viral_rate',
     'cpm', 'cpc', 'cpe', 'ctr',
-    'juguang_fee', 'juguang_impression', 'juguang_click', 'juguang_interaction',
-    'natural_impressions', 'natural_reads', 'natural_engagement',
-    'natural_cpm', 'natural_cpc', 'natural_cpe', 'natural_ctr',
     'kpi_impression', 'kpi_read', 'kpi_engagement', 'kpi_viral_rate',
     'kpi_cpm', 'kpi_cpc', 'kpi_cpe', 'kpi_ctr',
     'impression_completion', 'read_completion', 'engagement_completion',
     'viral_rate_completion', 'cpm_completion', 'cpc_completion', 'cpe_completion', 'ctr_completion',
   ];
+
+  /** 报备内容形式 */
+  private static REGISTERED_FORMS = ['视频报备', '图文报备'];
+  /** 非报备内容形式 */
+  private static UNREGISTERED_FORMS = ['视频软文', '图文软文'];
 
   constructor(prisma: InstanceType<typeof PrismaClient>) {
     super(prisma);
@@ -50,8 +77,7 @@ export class DataOverviewDataLoader extends BaseChapterDataLoader {
     let engagementMetric = 'exclude_follow'; // 默认不含关注
     let viralMetric = 'like_comment_share';  // 默认千互（赞+藏+评）
     let viralThreshold = 1000;               // 默认爆文阈值
-    let contentCostCaliber = 'consumption';  // 默认消耗口径
-    let trafficCostCaliber = 'consumption';  // 默认消耗口径
+    let contentCostCaliber = '资源含税成本价';  // 内容金额口径，默认资源含税成本价
     let kpi: Record<string, number> = {};
     let benchmark: Record<string, unknown> = {};
 
@@ -79,13 +105,9 @@ export class DataOverviewDataLoader extends BaseChapterDataLoader {
         if (reviewConfig.viralThreshold != null && reviewConfig.viralThreshold > 0) {
           viralThreshold = reviewConfig.viralThreshold;
         }
-        // contentCostCaliber / trafficCostCaliber stored in modules JSON
         const modules = reviewConfig.modules as Record<string, unknown> | null;
         if (modules?.contentCostCaliber) {
           contentCostCaliber = modules.contentCostCaliber as string;
-        }
-        if (modules?.trafficCostCaliber) {
-          trafficCostCaliber = modules.trafficCostCaliber as string;
         }
         if (reviewConfig.kpiTargets && typeof reviewConfig.kpiTargets === 'object') {
           kpi = reviewConfig.kpiTargets as Record<string, number>;
@@ -98,11 +120,10 @@ export class DataOverviewDataLoader extends BaseChapterDataLoader {
       console.warn(`[DataOverviewDataLoader] Failed to load review_configs: ${error}`);
     }
 
-    variables['engagement_metric'] = engagementMetric;
-    variables['viral_metric'] = viralMetric;
+    variables['engagement_metric'] = engagementMetric === 'include_follow' ? '含关注' : '不含关注';
+    variables['viral_metric'] = viralMetric === 'like_only' ? `千赞（赞≥${viralThreshold}）` : `千互（赞+藏+评≥${viralThreshold}）`;
     variables['viral_threshold'] = String(viralThreshold);
     variables['content_cost_caliber'] = contentCostCaliber;
-    variables['traffic_cost_caliber'] = trafficCostCaliber;
 
     // ── 1. 项目基本信息 ──
     try {
@@ -121,22 +142,56 @@ export class DataOverviewDataLoader extends BaseChapterDataLoader {
       console.warn(`[DataOverviewDataLoader] Failed to load project: ${error}`);
     }
 
-    // ── 2. 笔记数据 (notes) → 总篇数、曝光、阅读、互动、爆文、博主报价、服务费 ──
-    let noteCount = 0;
-    let totalImpressions = 0;
-    let totalReads = 0;
-    let totalLikes = 0;
-    let totalFavs = 0;
-    let totalComments = 0;
-    let totalShares = 0;
-    let totalFollows = 0;
-    let totalEngageNum = 0; // engage_num 原始字段
-    let kolPriceSum = 0;
-    let serviceFeeSum = 0;
-    let viralCount = 0;
+    // ── 2. 加载业务底表 (note_base) ──
+    interface NoteBaseRow {
+      noteId: string;
+      cooperationForm: string | null;
+      contentDirection: string | null;
+      kolType: string | null;
+      contentCost: number;         // 资源含税成本价
+      contentSettlement: number;   // 资源含税售价
+      metrics: Record<string, number> | null;
+    }
 
-    // 保留原始行数据用于溯源
-    let rawNoteRows: Array<{
+    let noteBaseRows: NoteBaseRow[] = [];
+    try {
+      const raw = await this.prisma.noteBase.findMany({
+        where: { projectId },
+        select: {
+          noteId: true,
+          cooperationForm: true,
+          contentDirection: true,
+          kolType: true,
+          contentCost: true,
+          contentSettlement: true,
+          metrics: true,
+        },
+      });
+      noteBaseRows = raw.map(r => ({
+        noteId: r.noteId,
+        cooperationForm: r.cooperationForm,
+        contentDirection: r.contentDirection,
+        kolType: r.kolType,
+        contentCost: Number(r.contentCost),
+        contentSettlement: Number(r.contentSettlement),
+        metrics: r.metrics as Record<string, number> | null,
+      }));
+    } catch (error) {
+      console.warn(`[DataOverviewDataLoader] Failed to load note_base: ${error}`);
+    }
+
+    // 分类：报备 vs 非报备
+    const registeredNoteBase = noteBaseRows.filter(
+      r => r.cooperationForm && DataOverviewDataLoader.REGISTERED_FORMS.includes(r.cooperationForm)
+    );
+    const unregisteredNoteBase = noteBaseRows.filter(
+      r => r.cooperationForm && DataOverviewDataLoader.UNREGISTERED_FORMS.includes(r.cooperationForm)
+    );
+
+    const registeredNoteIds = new Set(registeredNoteBase.map(r => r.noteId));
+
+    // ── 3. 加载蒲公英笔记数据 (notes) — 仅用于报备笔记的指标 ──
+    interface PugongyingRow {
       noteId: string;
       impNum: number;
       readNum: number;
@@ -147,9 +202,10 @@ export class DataOverviewDataLoader extends BaseChapterDataLoader {
       shareNum: number;
       followNum: number;
       kolPrice: number;
-      serviceFee: number;
-    }> = [];
+      totalPlatformPrice: number;
+    }
 
+    let pugongyingNotes: PugongyingRow[] = [];
     try {
       const notes = await this.prisma.note.findMany({
         where: { projectId },
@@ -164,11 +220,10 @@ export class DataOverviewDataLoader extends BaseChapterDataLoader {
           shareNum: true,
           followNum: true,
           kolPrice: true,
-          serviceFee: true,
+          totalPlatformPrice: true,
         },
       });
-
-      rawNoteRows = notes.map(n => ({
+      pugongyingNotes = notes.map(n => ({
         noteId: n.noteId,
         impNum: n.impNum,
         readNum: n.readNum,
@@ -179,44 +234,140 @@ export class DataOverviewDataLoader extends BaseChapterDataLoader {
         shareNum: n.shareNum,
         followNum: n.followNum,
         kolPrice: Number(n.kolPrice),
-        serviceFee: Number(n.serviceFee),
+        totalPlatformPrice: Number(n.totalPlatformPrice),
       }));
-
-      for (const n of notes) {
-        totalImpressions += n.impNum;
-        totalReads += n.readNum;
-        totalEngageNum += n.engageNum;
-        totalLikes += n.likeNum;
-        totalFavs += n.favNum;
-        totalComments += n.cmtNum;
-        totalShares += n.shareNum;
-        totalFollows += n.followNum;
-        kolPriceSum += Number(n.kolPrice);
-        serviceFeeSum += Number(n.serviceFee);
-
-        // 爆文判断
-        if (viralMetric === 'like_only') {
-          // 千赞：like >= viralThreshold
-          if (n.likeNum >= viralThreshold) viralCount++;
-        } else {
-          // 千互（默认）：like + fav + cmt >= viralThreshold
-          if (n.likeNum + n.favNum + n.cmtNum >= viralThreshold) viralCount++;
-        }
-      }
     } catch (error) {
       console.warn(`[DataOverviewDataLoader] Failed to load notes: ${error}`);
     }
 
-    noteCount = rawNoteRows.length;
-    variables['note_count'] = String(noteCount);
+    // 只保留报备笔记的蒲公英数据
+    const registeredPugongying = pugongyingNotes.filter(n => registeredNoteIds.has(n.noteId));
+    // 创建 noteId → PugongyingRow 映射
+    const pugongyingMap = new Map(pugongyingNotes.map(n => [n.noteId, n]));
 
-    // 总互动（根据口径）
-    let totalEngagement: number;
-    if (engagementMetric === 'include_follow') {
-      totalEngagement = totalEngageNum; // engage_num 已含关注
-    } else {
-      totalEngagement = totalLikes + totalFavs + totalComments + totalShares;
+    // ── 4. 计算报备笔记的指标 ──
+    let regImpressions = 0, regReads = 0, regEngagement = 0;
+    let regLikes = 0, regFavs = 0, regComments = 0, regShares = 0, regFollows = 0;
+    let regViralCount = 0;
+    let regCost = 0;
+
+    for (const note of registeredPugongying) {
+      regImpressions += note.impNum;
+      regReads += note.readNum;
+      regLikes += note.likeNum;
+      regFavs += note.favNum;
+      regComments += note.cmtNum;
+      regShares += note.shareNum;
+      regFollows += note.followNum;
+
+      // 互动量（按口径）
+      if (engagementMetric === 'include_follow') {
+        regEngagement += note.engageNum; // engage_num含关注
+      } else {
+        regEngagement += note.likeNum + note.favNum + note.cmtNum + note.shareNum;
+      }
+
+      // 爆文判断（报备用蒲公英 like_num/cmt_num/fav_num）
+      if (viralMetric === 'like_only') {
+        if (note.likeNum >= viralThreshold) regViralCount++;
+      } else {
+        if (note.likeNum + note.cmtNum + note.favNum >= viralThreshold) regViralCount++;
+      }
     }
+
+    // 报备费用计算：
+    // IF(内容金额口径='资源含税成本价', SUM(kol_price + total_platform_price), SUM(资源含税售价))
+    if (contentCostCaliber === '资源含税成本价') {
+      for (const note of registeredPugongying) {
+        regCost += note.kolPrice + note.totalPlatformPrice;
+      }
+    } else {
+      // 资源含税售价 来自 note_base.content_settlement
+      for (const nb of registeredNoteBase) {
+        regCost += nb.contentSettlement;
+      }
+    }
+
+    // ── 5. 计算非报备笔记的指标（完全来自业务底表 metrics） ──
+    let unregImpressions = 0, unregReads = 0, unregEngagement = 0;
+    let unregLikes = 0, unregFavs = 0, unregComments = 0, unregShares = 0, unregFollows = 0;
+    let unregViralCount = 0;
+    let unregCost = 0;
+
+    for (const nb of unregisteredNoteBase) {
+      const m = nb.metrics || {};
+      const impNum = Number(m.impNum || 0);
+      const readNum = Number(m.readNum || 0);
+      const likeNum = Number(m.likeNum || 0);
+      const favNum = Number(m.favNum || 0);
+      const cmtNum = Number(m.cmtNum || 0);
+      const shareNum = Number(m.shareNum || 0);
+      const followNum = Number(m.followNum || 0);
+      const engageNum = Number(m.engageNum || 0);
+
+      unregImpressions += impNum;
+      unregReads += readNum;
+      unregLikes += likeNum;
+      unregFavs += favNum;
+      unregComments += cmtNum;
+      unregShares += shareNum;
+      unregFollows += followNum;
+
+      // 非报备互动量
+      if (engagementMetric === 'include_follow') {
+        // 含关注：点赞+收藏+评论+分享+关注
+        unregEngagement += likeNum + favNum + cmtNum + shareNum + followNum;
+      } else {
+        // 不含关注：点赞+收藏+评论+分享
+        unregEngagement += likeNum + favNum + cmtNum + shareNum;
+      }
+
+      // 非报备爆文判断（用业务底表的 点赞量/收藏量/评论量）
+      if (viralMetric === 'like_only') {
+        if (likeNum >= viralThreshold) unregViralCount++;
+      } else {
+        if (likeNum + favNum + cmtNum >= viralThreshold) unregViralCount++;
+      }
+    }
+
+    // 非报备费用计算：
+    // IF(内容金额口径='资源含税成本价', SUM(资源含税成本价), SUM(资源含税售价))
+    for (const nb of unregisteredNoteBase) {
+      if (contentCostCaliber === '资源含税成本价') {
+        unregCost += nb.contentCost;
+      } else {
+        unregCost += nb.contentSettlement;
+      }
+    }
+
+    // ── 6. 合并指标 ──
+    const totalNoteCount = registeredNoteBase.length + unregisteredNoteBase.length;
+    const totalImpressions = regImpressions + unregImpressions;
+    const totalReads = regReads + unregReads;
+    const totalEngagement = regEngagement + unregEngagement;
+    const totalLikes = regLikes + unregLikes;
+    const totalFavs = regFavs + unregFavs;
+    const totalComments = regComments + unregComments;
+    const totalShares = regShares + unregShares;
+    const totalFollows = regFollows + unregFollows;
+    const totalViralCount = regViralCount + unregViralCount;
+    const totalContentCost = regCost + unregCost;
+
+    // 整体效率指标（合并分子÷合并分母）
+    const viralRate = totalNoteCount > 0 ? (totalViralCount / totalNoteCount) * 100 : 0;
+    const ctr = totalImpressions > 0 ? (totalReads / totalImpressions) * 100 : 0;
+    const cpm = totalImpressions > 0 ? (totalContentCost / totalImpressions) * 1000 : 0;
+    const cpc = totalReads > 0 ? totalContentCost / totalReads : 0;
+    const cpe = totalEngagement > 0 ? totalContentCost / totalEngagement : 0;
+
+    // 设置变量
+    variables['note_count'] = String(totalNoteCount);
+    variables['registered_note_count'] = String(registeredNoteBase.length);
+    variables['unregistered_note_count'] = String(unregisteredNoteBase.length);
+    variables['total_cost'] = totalContentCost.toFixed(2);
+    variables['content_cost'] = totalContentCost.toFixed(2);
+    variables['registered_cost'] = regCost.toFixed(2);
+    variables['unregistered_cost'] = unregCost.toFixed(2);
 
     variables['total_impressions'] = String(totalImpressions);
     variables['total_reads'] = String(totalReads);
@@ -227,21 +378,26 @@ export class DataOverviewDataLoader extends BaseChapterDataLoader {
     variables['total_shares'] = String(totalShares);
     variables['total_follows'] = String(totalFollows);
 
-    // 爆文率 = 爆文数 / 总笔记篇数(notes)
-    const viralRate = noteCount > 0 ? (viralCount / noteCount) * 100 : 0;
-    variables['viral_count'] = String(viralCount);
+    // 报备拆分
+    variables['reg_impressions'] = String(regImpressions);
+    variables['reg_reads'] = String(regReads);
+    variables['reg_engagement'] = String(regEngagement);
+    variables['reg_viral_count'] = String(regViralCount);
+    // 非报备拆分
+    variables['unreg_impressions'] = String(unregImpressions);
+    variables['unreg_reads'] = String(unregReads);
+    variables['unreg_engagement'] = String(unregEngagement);
+    variables['unreg_viral_count'] = String(unregViralCount);
+
+    variables['viral_count'] = String(totalViralCount);
     variables['viral_rate'] = viralRate.toFixed(1);
-
-    // CTR = 总阅读 / 总曝光 * 100
-    const ctr = totalImpressions > 0 ? (totalReads / totalImpressions) * 100 : 0;
     variables['ctr'] = ctr.toFixed(2);
+    variables['cpm'] = cpm.toFixed(2);
+    variables['cpc'] = cpc.toFixed(2);
+    variables['cpe'] = cpe.toFixed(2);
 
-    // ── 3. 聚光数据 (juguang_data) ──
-    let jgFee = 0;
-    let jgImpression = 0;
-    let jgClick = 0;
-    let jgInteraction = 0;
-
+    // ── 7. 聚光数据 (juguang_data) ──
+    let jgFee = 0, jgImpression = 0, jgClick = 0, jgInteraction = 0, jgTiUserNum = 0;
     try {
       const juguangAgg = await this.prisma.juguangData.aggregate({
         where: { projectId },
@@ -253,78 +409,40 @@ export class DataOverviewDataLoader extends BaseChapterDataLoader {
           tiUserNum: true,
         },
       });
-
       jgFee = Number(juguangAgg._sum.fee || 0);
       jgImpression = Number(juguangAgg._sum.impression || 0);
       jgClick = Number(juguangAgg._sum.click || 0);
       jgInteraction = Number(juguangAgg._sum.interaction || 0);
+      jgTiUserNum = Number(juguangAgg._sum.tiUserNum || 0);
 
       variables['juguang_fee'] = jgFee.toFixed(2);
       variables['juguang_impression'] = String(jgImpression);
       variables['juguang_click'] = String(jgClick);
       variables['juguang_interaction'] = String(jgInteraction);
-      variables['juguang_ti_user_num'] = String(Number(juguangAgg._sum.tiUserNum || 0));
+      variables['juguang_ti_user_num'] = String(jgTiUserNum);
     } catch (error) {
       console.warn(`[DataOverviewDataLoader] Failed to load juguang_data: ${error}`);
     }
 
-    // ── 4. 计算总费用（根据口径） ──
-    // 内容费用: 消耗口径=kolPrice+serviceFee, 结算口径=serviceFee (from notes)
-    let contentCost: number;
-    let trafficCost: number;
-
-    if (contentCostCaliber === 'settlement') {
-      contentCost = serviceFeeSum; // notes.SUM(serviceFee) — 资源含税售价
-    } else {
-      contentCost = kolPriceSum + serviceFeeSum; // notes.SUM(kol_price) + notes.SUM(service_fee)
-    }
-
-    // ⚠️ ISSUE-007: adSpend no longer available from notes table.
-    // Settlement caliber falls back to consumption caliber (juguang_data.fee).
-    if (trafficCostCaliber === 'settlement') {
-      console.warn(`[DataOverviewDataLoader] trafficCostCaliber='settlement' but adSpend is no longer available (ISSUE-007). Falling back to consumption caliber (juguang_data.fee).`);
-      trafficCost = jgFee; // fallback to consumption caliber
-    } else {
-      trafficCost = jgFee; // 聚光.fee (consumption caliber)
-    }
-
-    const totalCost = contentCost + trafficCost;
-
-    variables['content_cost'] = contentCost.toFixed(2);
-    variables['traffic_cost'] = trafficCost.toFixed(2);
-    variables['total_cost'] = totalCost.toFixed(2);
-
-    // ── 5. 综合CPM/CPC/CPE（总费用 / notes指标） ──
-    const cpm = totalImpressions > 0 ? (totalCost / totalImpressions) * 1000 : 0;
-    const cpc = totalReads > 0 ? totalCost / totalReads : 0;
-    const cpe = totalEngagement > 0 ? totalCost / totalEngagement : 0;
-
-    variables['cpm'] = cpm.toFixed(2);
-    variables['cpc'] = cpc.toFixed(2);
-    variables['cpe'] = cpe.toFixed(2);
-
-    // ── 6. 自然流指标 = notes - 聚光 ──
-    const naturalImp = Math.max(0, totalImpressions - jgImpression);
-    const naturalRead = Math.max(0, totalReads - jgClick);
-    const naturalEng = Math.max(0, totalEngagement - jgInteraction);
+    // ── 8. 自然流指标（仅对报备笔记有意义） ──
+    const naturalImp = Math.max(0, regImpressions - jgImpression);
+    const naturalRead = Math.max(0, regReads - jgClick);
+    const naturalEng = Math.max(0, regEngagement - jgInteraction);
 
     variables['natural_impressions'] = String(naturalImp);
     variables['natural_reads'] = String(naturalRead);
     variables['natural_engagement'] = String(naturalEng);
-
-    // 自然流CPX = 总费用 / 自然流指标（分子用总费用）
-    variables['natural_cpm'] = naturalImp > 0 ? ((totalCost / naturalImp) * 1000).toFixed(2) : '0';
-    variables['natural_cpc'] = naturalRead > 0 ? (totalCost / naturalRead).toFixed(2) : '0';
-    variables['natural_cpe'] = naturalEng > 0 ? (totalCost / naturalEng).toFixed(2) : '0';
+    variables['natural_cpm'] = naturalImp > 0 ? ((totalContentCost / naturalImp) * 1000).toFixed(2) : '0';
+    variables['natural_cpc'] = naturalRead > 0 ? (totalContentCost / naturalRead).toFixed(2) : '0';
+    variables['natural_cpe'] = naturalEng > 0 ? (totalContentCost / naturalEng).toFixed(2) : '0';
     variables['natural_ctr'] = naturalImp > 0 ? ((naturalRead / naturalImp) * 100).toFixed(2) : '0';
 
-    // ── 7. KPI目标与完成率 ──
-    // KPI字段映射（前端传入的key → 变量名）
+    // ── 9. KPI目标与完成率 ──
     const kpiMapping: Record<string, { varKey: string; actual: number; isCost: boolean }> = {
       totalImpression: { varKey: 'impression', actual: totalImpressions, isCost: false },
       totalRead: { varKey: 'read', actual: totalReads, isCost: false },
       totalEngagement: { varKey: 'engagement', actual: totalEngagement, isCost: false },
-      viralPosts1k: { varKey: 'viral_count', actual: viralCount, isCost: false },
+      viralPosts1k: { varKey: 'viral_count', actual: totalViralCount, isCost: false },
       cpm: { varKey: 'cpm', actual: cpm, isCost: true },
       cpc: { varKey: 'cpc', actual: cpc, isCost: true },
       cpe: { varKey: 'cpe', actual: cpe, isCost: true },
@@ -335,34 +453,36 @@ export class DataOverviewDataLoader extends BaseChapterDataLoader {
       const kpiValue = kpi[kpiKey];
       if (kpiValue != null && kpiValue > 0) {
         variables[`kpi_${config.varKey}`] = String(kpiValue);
-
-        // 完成率计算
         let completion: number;
         if (config.isCost) {
-          // 成本类：KPI/实际*100（越低越好，KPI是上限）
           completion = config.actual > 0 ? (kpiValue / config.actual) * 100 : 0;
         } else {
-          // 量级类：实际/KPI*100
           completion = (config.actual / kpiValue) * 100;
         }
         variables[`${config.varKey}_completion`] = completion.toFixed(1);
       }
     }
 
-    // ── 8. 大盘均值 ──
+    // 爆文率完成率
+    const kpiViralRate = kpi.viralRate;
+    if (kpiViralRate != null && kpiViralRate > 0) {
+      variables['kpi_viral_rate'] = String(kpiViralRate);
+      variables['viral_rate_completion'] = ((viralRate / kpiViralRate) * 100).toFixed(1);
+    }
+
+    // ── 10. 大盘均值 ──
     if (benchmark.ctr) variables['benchmark_ctr'] = String(benchmark.ctr);
     if (benchmark.cpm) variables['benchmark_cpm'] = String(benchmark.cpm);
     if (benchmark.cpc) variables['benchmark_cpc'] = String(benchmark.cpc);
     if (benchmark.cpe) variables['benchmark_cpe'] = String(benchmark.cpe);
     if (benchmark.engagementRate) variables['benchmark_engagement_rate'] = String(benchmark.engagementRate);
 
-    // ── 9. 灵犀数据 (lingxi_data) → AIPS/TI人群 ──
+    // ── 11. 灵犀数据 (lingxi_data) → AIPS/TI人群 ──
     try {
       const lingxiRecords = await this.prisma.lingxiData.findMany({
         where: { projectId },
         select: { dataType: true, dataContent: true },
       });
-
       for (const record of lingxiRecords) {
         const content = record.dataContent as Record<string, unknown>;
         if (record.dataType === 'brand' && content) {
@@ -378,108 +498,72 @@ export class DataOverviewDataLoader extends BaseChapterDataLoader {
       console.warn(`[DataOverviewDataLoader] Failed to load lingxi_data: ${error}`);
     }
 
-    // ── 10. 构建溯源数据 (traceItems) ──
-    // 溯源展示数据库原始行数据 + 计算公式，让人工可以核对
+    // ── 12. 构建溯源数据 (traceItems) ──
     const traceItems: TraceItem[] = [];
 
-    // 整体投放数据溯源 — 展示 notes 表原始行数据
+    // 报备+非报备合并数据溯源
     traceItems.push({
       traceId: 'ch3_overview_stats',
       chapterNumber: 3,
-      label: '整体投放数据',
-      sourceTable: 'notes',
-      sourceQuery: `SELECT id AS note_id, imp_num, read_num, engage_num, like_num, fav_num, cmt_num, share_num, follow_num, kol_price, service_fee\nFROM notes WHERE project_id = '${projectId}';`,
-      totalRows: rawNoteRows.length,
+      label: '数据总览（报备+非报备合并）',
+      sourceTable: 'note_base + notes(蒲公英)',
+      sourceQuery: `-- 报备笔记指标来自 notes 表（蒲公英API）\nSELECT note_id, imp_num, read_num, like_num, fav_num, cmt_num, share_num, kol_price, total_platform_price FROM notes WHERE project_id = '${projectId}' AND note_id IN (报备noteId列表);\n-- 非报备笔记指标来自 note_base.metrics JSON\nSELECT note_id, cooperation_form, content_cost, content_settlement, metrics FROM note_base WHERE project_id = '${projectId}' AND cooperation_form IN ('视频软文','图文软文');`,
+      totalRows: totalNoteCount,
       columns: [
-        { key: 'noteId', label: 'note_id', type: 'string' },
-        { key: 'impNum', label: 'imp_num', type: 'number' },
-        { key: 'readNum', label: 'read_num', type: 'number' },
-        { key: 'engageNum', label: 'engage_num', type: 'number' },
-        { key: 'likeNum', label: 'like_num', type: 'number' },
-        { key: 'favNum', label: 'fav_num', type: 'number' },
-        { key: 'cmtNum', label: 'cmt_num', type: 'number' },
-        { key: 'shareNum', label: 'share_num', type: 'number' },
-        { key: 'followNum', label: 'follow_num', type: 'number' },
-        { key: 'kolPrice', label: 'kol_price', type: 'number' },
-        { key: 'serviceFee', label: 'service_fee', type: 'number' },
+        { key: 'category', label: '分类', type: 'string' },
+        { key: 'noteCount', label: '篇数', type: 'number' },
+        { key: 'cost', label: '消费', type: 'number' },
+        { key: 'impressions', label: '曝光', type: 'number' },
+        { key: 'reads', label: '阅读', type: 'number' },
+        { key: 'engagement', label: '互动', type: 'number' },
+        { key: 'viralCount', label: '爆文数', type: 'number' },
       ],
-      dataRows: rawNoteRows as unknown as Record<string, unknown>[],
+      dataRows: [
+        { category: '报备', noteCount: registeredNoteBase.length, cost: Number(regCost.toFixed(2)), impressions: regImpressions, reads: regReads, engagement: regEngagement, viralCount: regViralCount },
+        { category: '非报备', noteCount: unregisteredNoteBase.length, cost: Number(unregCost.toFixed(2)), impressions: unregImpressions, reads: unregReads, engagement: unregEngagement, viralCount: unregViralCount },
+        { category: '合并', noteCount: totalNoteCount, cost: Number(totalContentCost.toFixed(2)), impressions: totalImpressions, reads: totalReads, engagement: totalEngagement, viralCount: totalViralCount },
+      ],
       calculations: [
-        { metric: '总笔记篇数', formula: 'notes.COUNT(*)', inputs: { 'notes行数': noteCount }, result: noteCount },
-        { metric: '内容费用', formula: contentCostCaliber === 'settlement' ? 'notes.SUM(service_fee)' : 'notes.SUM(kol_price) + notes.SUM(service_fee)', inputs: contentCostCaliber === 'settlement' ? { 'SUM(service_fee)': serviceFeeSum } : { 'SUM(kol_price)': kolPriceSum, 'SUM(service_fee)': serviceFeeSum }, result: contentCost },
-        { metric: '投流费用', formula: 'juguang_data.SUM(fee) [⚠️ ISSUE-007: settlement caliber unavailable, using consumption]', inputs: { 'SUM(fee)': jgFee }, result: trafficCost },
-        { metric: '总费用', formula: '内容费用 + 投流费用', inputs: { '内容费用': contentCost, '投流费用': trafficCost }, result: totalCost },
-        { metric: 'CPM', formula: '总费用 / SUM(imp_num) * 1000', inputs: { '总费用': totalCost, 'SUM(imp_num)': totalImpressions }, result: Number(cpm.toFixed(2)) },
-        { metric: 'CPC', formula: '总费用 / SUM(read_num)', inputs: { '总费用': totalCost, 'SUM(read_num)': totalReads }, result: Number(cpc.toFixed(2)) },
-        { metric: 'CPE', formula: '总费用 / SUM(互动)', inputs: { '总费用': totalCost, 'SUM(互动)': totalEngagement }, result: Number(cpe.toFixed(2)) },
-        { metric: 'CTR', formula: 'SUM(read_num) / SUM(imp_num) * 100', inputs: { 'SUM(read_num)': totalReads, 'SUM(imp_num)': totalImpressions }, result: Number(ctr.toFixed(2)) },
+        { metric: '内容金额口径', formula: `当前口径: ${contentCostCaliber}`, inputs: { '报备费用公式': contentCostCaliber === '资源含税成本价' ? 'SUM(kol_price+total_platform_price)' : 'SUM(note_base.content_settlement)', '非报备费用公式': contentCostCaliber === '资源含税成本价' ? 'SUM(note_base.content_cost)' : 'SUM(note_base.content_settlement)' }, result: `${totalContentCost.toFixed(2)}元` },
+        { metric: '互动口径', formula: engagementMetric === 'include_follow' ? '含关注(赞+藏+评+分享+关注)' : '不含关注(赞+藏+评+分享)', inputs: { '报备互动': regEngagement, '非报备互动': unregEngagement }, result: totalEngagement },
+        { metric: '爆文口径', formula: viralMetric === 'like_only' ? `赞≥${viralThreshold}` : `赞+藏+评≥${viralThreshold}`, inputs: { '报备爆文': regViralCount, '非报备爆文': unregViralCount }, result: totalViralCount },
+        { metric: '整体CPM', formula: '合并消费 / 合并曝光 × 1000', inputs: { '合并消费': totalContentCost, '合并曝光': totalImpressions }, result: Number(cpm.toFixed(2)) },
+        { metric: '整体CPC', formula: '合并消费 / 合并阅读', inputs: { '合并消费': totalContentCost, '合并阅读': totalReads }, result: Number(cpc.toFixed(2)) },
+        { metric: '整体CPE', formula: '合并消费 / 合并互动', inputs: { '合并消费': totalContentCost, '合并互动': totalEngagement }, result: Number(cpe.toFixed(2)) },
+        { metric: '整体CTR', formula: '合并阅读 / 合并曝光 × 100%', inputs: { '合并阅读': totalReads, '合并曝光': totalImpressions }, result: Number(ctr.toFixed(2)) },
+        { metric: '整体爆文率', formula: '合并爆文数 / 合并发布数 × 100%', inputs: { '合并爆文数': totalViralCount, '合并发布数': totalNoteCount }, result: Number(viralRate.toFixed(1)) },
       ],
     });
 
-    // KPI达成表溯源 — 同样展示 notes 原始行（KPI的实际值就是从这些行聚合来的）
+    // KPI达成表溯源
     if (Object.keys(kpi).length > 0) {
       traceItems.push({
         traceId: 'ch3_kpi_table',
         chapterNumber: 3,
         label: 'KPI达成数据',
-        sourceTable: 'review_configs.kpi_targets + notes + juguang_data',
-        sourceQuery: `SELECT kpi_targets FROM review_configs WHERE project_id = '${projectId}' ORDER BY created_at DESC LIMIT 1;\nSELECT id AS note_id, imp_num, read_num, engage_num, like_num, fav_num, cmt_num, share_num, kol_price, service_fee FROM notes WHERE project_id = '${projectId}';`,
-        totalRows: rawNoteRows.length,
+        sourceTable: 'review_configs.kpi_targets',
+        sourceQuery: `SELECT kpi_targets FROM review_configs WHERE project_id = '${projectId}' ORDER BY created_at DESC LIMIT 1;`,
+        totalRows: 1,
         columns: [
-          { key: 'noteId', label: 'note_id', type: 'string' },
-          { key: 'impNum', label: 'imp_num', type: 'number' },
-          { key: 'readNum', label: 'read_num', type: 'number' },
-          { key: 'engageNum', label: 'engage_num', type: 'number' },
-          { key: 'likeNum', label: 'like_num', type: 'number' },
-          { key: 'favNum', label: 'fav_num', type: 'number' },
-          { key: 'cmtNum', label: 'cmt_num', type: 'number' },
-          { key: 'shareNum', label: 'share_num', type: 'number' },
-          { key: 'kolPrice', label: 'kol_price', type: 'number' },
-          { key: 'serviceFee', label: 'service_fee', type: 'number' },
+          { key: 'metric', label: '指标', type: 'string' },
+          { key: 'target', label: 'KPI目标', type: 'number' },
+          { key: 'actual', label: '实际达成', type: 'number' },
+          { key: 'completion', label: '完成率%', type: 'number' },
         ],
-        dataRows: rawNoteRows as unknown as Record<string, unknown>[],
+        dataRows: Object.entries(kpiMapping).filter(([k]) => kpi[k] != null).map(([kpiKey, config]) => ({
+          metric: config.varKey,
+          target: kpi[kpiKey],
+          actual: Number(config.actual.toFixed(2)),
+          completion: Number(variables[`${config.varKey}_completion`] || '0'),
+        })),
         calculations: [
-          { metric: '总曝光(实际)', formula: 'SUM(imp_num)', inputs: { '行数': rawNoteRows.length }, result: totalImpressions },
-          { metric: '总阅读(实际)', formula: 'SUM(read_num)', inputs: { '行数': rawNoteRows.length }, result: totalReads },
-          { metric: '总互动(实际)', formula: engagementMetric === 'include_follow' ? 'SUM(engage_num)' : 'SUM(like_num + fav_num + cmt_num + share_num)', inputs: engagementMetric === 'include_follow' ? { 'SUM(engage_num)': totalEngagement } : { 'SUM(like)': totalLikes, 'SUM(fav)': totalFavs, 'SUM(cmt)': totalComments, 'SUM(share)': totalShares }, result: totalEngagement },
-          { metric: '爆文率', formula: `COUNT(${viralMetric === 'like_only' ? `like_num>=${viralThreshold}` : `like+fav+cmt>=${viralThreshold}`}) / notes.COUNT(*) * 100`, inputs: { '爆文数': viralCount, '总篇数(notes)': noteCount, '爆文阈值': viralThreshold }, result: Number(viralRate.toFixed(1)) },
-          { metric: 'CPM', formula: '总费用 / SUM(imp_num) * 1000', inputs: { '总费用': totalCost, 'SUM(imp_num)': totalImpressions }, result: Number(cpm.toFixed(2)) },
-          { metric: 'CPC', formula: '总费用 / SUM(read_num)', inputs: { '总费用': totalCost, 'SUM(read_num)': totalReads }, result: Number(cpc.toFixed(2)) },
-          { metric: 'CPE', formula: '总费用 / SUM(互动)', inputs: { '总费用': totalCost, 'SUM(互动)': totalEngagement }, result: Number(cpe.toFixed(2)) },
-          { metric: 'CTR', formula: 'SUM(read_num) / SUM(imp_num) * 100', inputs: { 'SUM(read_num)': totalReads, 'SUM(imp_num)': totalImpressions }, result: Number(ctr.toFixed(2)) },
-          { metric: '完成率(量级类)', formula: '实际值 / KPI目标 * 100', inputs: { 'KPI配置': JSON.stringify(kpi) }, result: '见上方各指标' },
-          { metric: '完成率(成本类)', formula: 'KPI目标 / 实际值 * 100（越低越好）', inputs: {}, result: '见上方各指标' },
+          { metric: '量级类完成率', formula: '实际值 / KPI目标 × 100', inputs: {}, result: '见表格' },
+          { metric: '成本类完成率', formula: 'KPI目标 / 实际值 × 100（越低越好）', inputs: {}, result: '见表格' },
         ],
       });
     }
 
-    // 自然流vs投流对比溯源 — 展示 notes 原始行 + juguang_data 原始行
-    traceItems.push({
-      traceId: 'ch3_natural_vs_paid',
-      chapterNumber: 3,
-      label: '自然流vs投流对比',
-      sourceTable: 'notes + juguang_data',
-      sourceQuery: `SELECT id AS note_id, imp_num, read_num, engage_num FROM notes WHERE project_id = '${projectId}';\nSELECT SUM(impression), SUM(click), SUM(interaction) FROM juguang_data WHERE project_id = '${projectId}';`,
-      totalRows: rawNoteRows.length,
-      columns: [
-        { key: 'noteId', label: 'note_id', type: 'string' },
-        { key: 'impNum', label: 'imp_num', type: 'number' },
-        { key: 'readNum', label: 'read_num', type: 'number' },
-        { key: 'engageNum', label: 'engage_num', type: 'number' },
-      ],
-      dataRows: rawNoteRows.map(n => ({ noteId: n.noteId, impNum: n.impNum, readNum: n.readNum, engageNum: n.engageNum })) as unknown as Record<string, unknown>[],
-      calculations: [
-        { metric: '蒲公英总曝光', formula: 'notes.SUM(imp_num)', inputs: { 'SUM(imp_num)': totalImpressions }, result: totalImpressions },
-        { metric: '聚光总曝光', formula: 'juguang_data.SUM(impression)', inputs: { 'SUM(impression)': jgImpression }, result: jgImpression },
-        { metric: '自然曝光', formula: 'MAX(0, 蒲公英曝光 - 聚光曝光)', inputs: { '蒲公英曝光': totalImpressions, '聚光曝光': jgImpression }, result: naturalImp },
-        { metric: '蒲公英总阅读', formula: 'notes.SUM(read_num)', inputs: { 'SUM(read_num)': totalReads }, result: totalReads },
-        { metric: '聚光总点击', formula: 'juguang_data.SUM(click)', inputs: { 'SUM(click)': jgClick }, result: jgClick },
-        { metric: '自然阅读', formula: 'MAX(0, 蒲公英阅读 - 聚光点击)', inputs: { '蒲公英阅读': totalReads, '聚光点击': jgClick }, result: naturalRead },
-        { metric: '自然互动', formula: 'MAX(0, 蒲公英互动 - 聚光互动)', inputs: { '蒲公英互动': totalEngagement, '聚光互动': jgInteraction }, result: naturalEng },
-      ],
-    });
-
-    // 大盘对比溯源 — 展示大盘配置原始值 + 计算公式
+    // 大盘对比溯源
     if (Object.keys(benchmark).length > 0) {
       const bmCtrR = normalizeBenchmarkValue(benchmark.ctr as number | BenchmarkRange | undefined);
       const bmCpmR = normalizeBenchmarkValue(benchmark.cpm as number | BenchmarkRange | undefined);
@@ -487,31 +571,13 @@ export class DataOverviewDataLoader extends BaseChapterDataLoader {
       const bmCpeR = normalizeBenchmarkValue(benchmark.cpe as number | BenchmarkRange | undefined);
 
       const benchmarkRawRows: Record<string, unknown>[] = [];
-      if (bmCtrR) benchmarkRawRows.push({ metric: 'CTR', benchmarkValue: `${bmCtrR.min}~${bmCtrR.max}`, unit: '%' });
-      if (bmCpmR) benchmarkRawRows.push({ metric: 'CPM', benchmarkValue: `${bmCpmR.min}~${bmCpmR.max}`, unit: '元' });
-      if (bmCpcR) benchmarkRawRows.push({ metric: 'CPC', benchmarkValue: `${bmCpcR.min}~${bmCpcR.max}`, unit: '元' });
-      if (bmCpeR) benchmarkRawRows.push({ metric: 'CPE', benchmarkValue: `${bmCpeR.min}~${bmCpeR.max}`, unit: '元' });
-
-      const benchmarkCalcs = [];
-      if (bmCtrR) {
-        const mid = (bmCtrR.min + bmCtrR.max) / 2;
-        benchmarkCalcs.push({ metric: 'CTR差异', formula: '(实际CTR - 大盘中位) / 大盘中位 * 100', inputs: { '实际CTR': Number(ctr.toFixed(2)), '大盘CTR': `${bmCtrR.min}~${bmCtrR.max}` }, result: mid > 0 ? ((ctr - mid) / mid * 100).toFixed(1) + '%' : 'N/A' });
-      }
-      if (bmCpmR) {
-        const mid = (bmCpmR.min + bmCpmR.max) / 2;
-        benchmarkCalcs.push({ metric: 'CPM差异', formula: '(1 - 实际CPM / 大盘中位) * 100', inputs: { '实际CPM': Number(cpm.toFixed(2)), '大盘CPM': `${bmCpmR.min}~${bmCpmR.max}` }, result: mid > 0 ? ((1 - cpm / mid) * 100).toFixed(1) + '%' : 'N/A' });
-      }
-      if (bmCpcR) {
-        const mid = (bmCpcR.min + bmCpcR.max) / 2;
-        benchmarkCalcs.push({ metric: 'CPC差异', formula: '(1 - 实际CPC / 大盘中位) * 100', inputs: { '实际CPC': Number(cpc.toFixed(2)), '大盘CPC': `${bmCpcR.min}~${bmCpcR.max}` }, result: mid > 0 ? ((1 - cpc / mid) * 100).toFixed(1) + '%' : 'N/A' });
-      }
-      if (bmCpeR) {
-        const mid = (bmCpeR.min + bmCpeR.max) / 2;
-        benchmarkCalcs.push({ metric: 'CPE差异', formula: '(1 - 实际CPE / 大盘中位) * 100', inputs: { '实际CPE': Number(cpe.toFixed(2)), '大盘CPE': `${bmCpeR.min}~${bmCpeR.max}` }, result: mid > 0 ? ((1 - cpe / mid) * 100).toFixed(1) + '%' : 'N/A' });
-      }
+      if (bmCtrR) benchmarkRawRows.push({ metric: 'CTR', benchmarkValue: `${bmCtrR.min}~${bmCtrR.max}`, actual: ctr.toFixed(2), unit: '%' });
+      if (bmCpmR) benchmarkRawRows.push({ metric: 'CPM', benchmarkValue: `${bmCpmR.min}~${bmCpmR.max}`, actual: cpm.toFixed(2), unit: '元' });
+      if (bmCpcR) benchmarkRawRows.push({ metric: 'CPC', benchmarkValue: `${bmCpcR.min}~${bmCpcR.max}`, actual: cpc.toFixed(2), unit: '元' });
+      if (bmCpeR) benchmarkRawRows.push({ metric: 'CPE', benchmarkValue: `${bmCpeR.min}~${bmCpeR.max}`, actual: cpe.toFixed(2), unit: '元' });
 
       traceItems.push({
-        traceId: 'ch3_benchmark_compare',
+        traceId: 'ch3_benchmark',
         chapterNumber: 3,
         label: '大盘对比',
         sourceTable: 'review_configs.benchmark',
@@ -519,11 +585,11 @@ export class DataOverviewDataLoader extends BaseChapterDataLoader {
         totalRows: benchmarkRawRows.length,
         columns: [
           { key: 'metric', label: '指标', type: 'string' },
-          { key: 'benchmarkValue', label: '大盘均值(原始配置)', type: 'number' },
+          { key: 'benchmarkValue', label: '大盘均值', type: 'string' },
+          { key: 'actual', label: '实际值', type: 'number' },
           { key: 'unit', label: '单位', type: 'string' },
         ],
         dataRows: benchmarkRawRows,
-        calculations: benchmarkCalcs,
       });
     }
 
