@@ -5,7 +5,14 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Plus, Trash2, Upload, FileText, AlertCircle, ArrowLeft } from 'lucide-react';
 import { Loading } from '@/components/ui/loading';
-import { DateRangePicker } from '@/components/ui/date-range-picker';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { FormField } from '@/components/ui/form-field';
+import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
 import { validateRangeInput } from '@/lib/range-validator';
 import { selectAllModules, deselectAllModules } from '@/lib/module-toggle';
 
@@ -77,15 +84,11 @@ interface KpiTargets {
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const DEFAULT_INFLUENCER_TIERS: InfluencerTier[] = [
-  { id: generateId(), name: '头部', fanRangeMin: 1000000, fanRangeMax: 99999999 },
-  { id: generateId(), name: '腰部', fanRangeMin: 100000, fanRangeMax: 999999 },
-  { id: generateId(), name: '尾部', fanRangeMin: 10000, fanRangeMax: 99999 },
+
 ];
 
 const DEFAULT_LAUNCH_PHASES: LaunchPhase[] = [
-  { id: generateId(), name: '预热期', startDate: '', endDate: '' },
-  { id: generateId(), name: '爆发期', startDate: '', endDate: '' },
-  { id: generateId(), name: '持续期', startDate: '', endDate: '' },
+
 ];
 
 const REPORT_MODULES = [
@@ -145,7 +148,8 @@ function NewReviewPageContent() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [contentCostCaliber, setContentCostCaliber] = useState<'consumption' | 'settlement'>('consumption');
   const [trafficCostCaliber, setTrafficCostCaliber] = useState<'consumption' | 'settlement'>('consumption');
-  const [viralThreshold, setViralThreshold] = useState<string>('1000');
+  const [viralThresholdLikeCommentShare, setViralThresholdLikeCommentShare] = useState<string>('');
+  const [viralThresholdLikeOnly, setViralThresholdLikeOnly] = useState<string>('');
   const [hasUnofficialCooperation, setHasUnofficialCooperation] = useState<boolean>(false);
   const [executionPeriodStart, setExecutionPeriodStart] = useState('');
   const [executionPeriodEnd, setExecutionPeriodEnd] = useState('');
@@ -159,8 +163,8 @@ function NewReviewPageContent() {
 
   // ─── Refs for scroll-to-error ────────────────────────────────────────────
   const benchmarkSectionRef = useRef<HTMLDivElement>(null);
-  const tierSectionRef = useRef<HTMLDivElement>(null);
-  const phaseSectionRef = useRef<HTMLDivElement>(null);
+  const calculationLogicSectionRef = useRef<HTMLDivElement>(null);
+  const launchConfigSectionRef = useRef<HTMLDivElement>(null);
 
   // ─── Data Fetching ───────────────────────────────────────────────────────
   // Fetch project info by projectId (from URL param or edit mode)
@@ -200,6 +204,7 @@ function NewReviewPageContent() {
     kpiTargets: Record<string, number | null>;
     engagementMetric: string;
     viralMetric: string;
+    viralThreshold?: number | null;
     modules: Record<string, unknown>;
     launchPhases: LaunchPhase[];
     advertiserIds: string[];
@@ -271,6 +276,11 @@ function NewReviewPageContent() {
     }
     if (editReview.viralMetric) {
       setViralMetric(editReview.viralMetric as any);
+    }
+    if (editReview.viralThreshold != null) {
+      const threshold = String(editReview.viralThreshold);
+      setViralThresholdLikeCommentShare(threshold);
+      setViralThresholdLikeOnly(threshold);
     }
 
     // Pre-fill modules (ignore removed modules: audienceAnalysis, competitorAnalysis)
@@ -405,6 +415,26 @@ function NewReviewPageContent() {
     setSubmitError(null);
   };
 
+  const addAdvertiserId = () => {
+    const value = advertiserIdInput.trim();
+    if (!value) return;
+    if (!/^\d+$/.test(value)) {
+      setAdvertiserIdError('投放ID必须为纯数字');
+      return;
+    }
+    if (advertiserIds.includes(value)) {
+      setAdvertiserIdError('投放ID不能重复');
+      return;
+    }
+    if (advertiserIds.length >= 5) {
+      setAdvertiserIdError('最多添加5个投放ID');
+      return;
+    }
+    setAdvertiserIds([...advertiserIds, value]);
+    setAdvertiserIdInput('');
+    setAdvertiserIdError(null);
+  };
+
   // ─── Validation Helpers ─────────────────────────────────────────────────
   const validateSingleBenchmark = (key: string, min: string, max: string) => {
     const minVal = min.trim() ? parseFloat(min) : null;
@@ -513,10 +543,10 @@ function NewReviewPageContent() {
       // Scroll to first error section
       if (!benchmarkValid && benchmarkSectionRef.current) {
         benchmarkSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      } else if (!tiersValid && tierSectionRef.current) {
-        tierSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      } else if (!phasesValid && phaseSectionRef.current) {
-        phaseSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } else if (!tiersValid && calculationLogicSectionRef.current) {
+        calculationLogicSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } else if (!phasesValid && launchConfigSectionRef.current) {
+        launchConfigSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
       return;
     }
@@ -534,6 +564,10 @@ function NewReviewPageContent() {
       parsedKpi[k] = v ? parseFloat(v) : null;
     });
 
+    const activeViralThreshold = viralMetric === 'like_only'
+      ? viralThresholdLikeOnly
+      : viralThresholdLikeCommentShare;
+
     createReview.mutate({
       projectId: selectedProjectId,
       benchmark: parsedBenchmark,
@@ -541,7 +575,7 @@ function NewReviewPageContent() {
       kpiTargets: parsedKpi,
       engagementMetric,
       viralMetric,
-      viralThreshold: viralThreshold ? parseInt(viralThreshold) : null,
+      viralThreshold: activeViralThreshold ? parseInt(activeViralThreshold) : null,
       modules: { ...modules, contentCostCaliber, trafficCostCaliber },
       launchPhases,
       hasUnofficialCooperation,
@@ -558,16 +592,17 @@ function NewReviewPageContent() {
     <div className="mx-auto max-w-4xl space-y-8 pb-12">
       <div>
         <div className="flex items-center gap-3">
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="icon-sm"
             onClick={() => router.back()}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-500 transition hover:bg-gray-100 hover:text-gray-900"
+            className="text-gray-500 hover:text-gray-900"
           >
             <ArrowLeft size={20} />
-          </button>
-          <h1 className="text-2xl font-bold tracking-tight text-gray-900">{editFromId ? '编辑复盘' : '新建复盘'}</h1>
+          </Button>
+          <h1 className="text-2xl tracking-tight text-gray-900">{editFromId ? '编辑复盘' : '新建复盘'}</h1>
         </div>
-        <p className="mt-1 text-sm text-gray-500">{editFromId ? '修改复盘参数，将基于新参数生成新的复盘报告' : '配置复盘参数，系统将基于笔记数据生成复盘报告'}</p>
       </div>
 
       {/* Section: 项目信息 */}
@@ -592,76 +627,72 @@ function NewReviewPageContent() {
           return (
             <div className="space-y-3 mb-3">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                {/* 品类 */}
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-gray-600">品类</label>
-                  <select
+                <FormField label="品类">
+                  <Select
                     value={selectedCategory}
-                    onChange={(e) => {
-                      // Find the first project matching this category (or clear)
-                      if (!e.target.value) { setSelectedProjectId(''); return; }
-                      const first = projects.find(p => p.category === e.target.value);
+                    onValueChange={(value) => {
+                      if (!value) { setSelectedProjectId(''); return; }
+                      const first = projects.find(p => p.category === value);
                       if (first) setSelectedProjectId(first.id);
                     }}
-                    className="h-10 w-full rounded-lg border border-gray-200 px-3 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
                   >
-                    <option value="">全部品类</option>
-                    {categories.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                </div>
-                {/* 品牌 */}
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-gray-600">品牌</label>
-                  <select
+                    <SelectTrigger className="h-10 rounded-lg border-gray-200 focus-visible:ring-brand/20" />
+                    <SelectContent>
+                      <SelectItem value="">全部品类</SelectItem>
+                      {categories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </FormField>
+                <FormField label="品牌">
+                  <Select
                     value={selectedBrand}
-                    onChange={(e) => {
-                      if (!e.target.value) { setSelectedProjectId(''); return; }
-                      const first = projects.find(p => p.brand === e.target.value && (!selectedCategory || p.category === selectedCategory));
+                    onValueChange={(value) => {
+                      if (!value) { setSelectedProjectId(''); return; }
+                      const first = projects.find(p => p.brand === value && (!selectedCategory || p.category === selectedCategory));
                       if (first) setSelectedProjectId(first.id);
                     }}
-                    className="h-10 w-full rounded-lg border border-gray-200 px-3 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
                   >
-                    <option value="">全部品牌</option>
-                    {brandsForCategory.map(b => <option key={b} value={b}>{b}</option>)}
-                  </select>
-                </div>
-                {/* 业务线 */}
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-gray-600">业务线</label>
-                  <select
+                    <SelectTrigger className="h-10 rounded-lg border-gray-200 focus-visible:ring-brand/20" />
+                    <SelectContent>
+                      <SelectItem value="">全部品牌</SelectItem>
+                      {brandsForCategory.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </FormField>
+                <FormField label="业务线">
+                  <Select
                     value={selectedLine}
-                    onChange={(e) => {
-                      if (!e.target.value) { return; }
+                    onValueChange={(value) => {
+                      if (!value) return;
                       const first = projects.find(p =>
                         (!selectedCategory || p.category === selectedCategory) &&
                         (!selectedBrand || p.brand === selectedBrand) &&
-                        (p.businessLine || '') === e.target.value
+                        (p.businessLine || '') === value
                       );
                       if (first) setSelectedProjectId(first.id);
                     }}
-                    className="h-10 w-full rounded-lg border border-gray-200 px-3 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
                   >
-                    <option value="">全部业务线</option>
-                    {linesForBrand.map(l => <option key={l} value={l}>{l}</option>)}
-                  </select>
-                </div>
+                    <SelectTrigger className="h-10 rounded-lg border-gray-200 focus-visible:ring-brand/20" />
+                    <SelectContent>
+                      <SelectItem value="">全部业务线</SelectItem>
+                      {linesForBrand.map(l => <SelectItem key={l} value={l}>{l}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </FormField>
               </div>
-              {/* 项目选择 */}
-              <div>
-                <label className="mb-1 block text-xs font-medium text-gray-600">项目 <span className="text-rose-500">*</span></label>
-                <select
-                  value={selectedProjectId}
-                  onChange={(e) => setSelectedProjectId(e.target.value)}
-                  className="h-10 w-full rounded-lg border border-gray-200 px-3 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
-                >
-                  <option value="">请选择项目</option>
-                  {filteredProjects.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.projectName}（{p.noteCount}篇笔记）
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <FormField label={<><span>项目</span> <span className="text-rose-500">*</span></>}>
+                <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
+                  <SelectTrigger className="h-10 rounded-lg border-gray-200 focus-visible:ring-brand/20" />
+                  <SelectContent>
+                    <SelectItem value="">请选择项目</SelectItem>
+                    {filteredProjects.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.projectName}（{p.noteCount}篇笔记）
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FormField>
             </div>
           );
         })()}
@@ -699,12 +730,31 @@ function NewReviewPageContent() {
         ) : null}
       </FormSection>
 
-
+    {/* Section: KPI目标配置 */}
+    <FormSection title="KPI指标">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+          <NumberInput label="总曝光" value={kpiTargets.totalImpression} onChange={(v) => setKpiTargets({ ...kpiTargets, totalImpression: v })} />
+          <NumberInput label="总阅读" value={kpiTargets.totalRead} onChange={(v) => setKpiTargets({ ...kpiTargets, totalRead: v })} />
+          <NumberInput label="总互动" value={kpiTargets.totalEngagement} onChange={(v) => setKpiTargets({ ...kpiTargets, totalEngagement: v })} />
+          <NumberInput label="爆文数" value={kpiTargets.viralPosts1k} onChange={(v) => setKpiTargets({ ...kpiTargets, viralPosts1k: v })} />
+          <NumberInput label="爆文率 (%)" value={kpiTargets.viralPosts10k} onChange={(v) => setKpiTargets({ ...kpiTargets, viralPosts10k: v })} />
+        </div>
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+          <NumberInput label="CPM (元)" value={kpiTargets.cpm} onChange={(v) => setKpiTargets({ ...kpiTargets, cpm: v })} />
+          <NumberInput label="CPC (元)" value={kpiTargets.cpc} onChange={(v) => setKpiTargets({ ...kpiTargets, cpc: v })} />
+          <NumberInput label="CPE (元)" value={kpiTargets.cpe} onChange={(v) => setKpiTargets({ ...kpiTargets, cpe: v })} />
+          <NumberInput label="CTR (%)" value={kpiTargets.ctr} onChange={(v) => setKpiTargets({ ...kpiTargets, ctr: v })} />
+        </div>
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+          <NumberInput label="品牌 AIPS 人群数" value={kpiTargets.audienceBrandTotal} onChange={(v) => setKpiTargets({ ...kpiTargets, audienceBrandTotal: v })} />
+          <NumberInput label="品牌 TI 人群数" value={kpiTargets.audienceBrandTi} onChange={(v) => setKpiTargets({ ...kpiTargets, audienceBrandTi: v })} />
+        </div>
+      </FormSection>
 
       {/* Section: 大盘数据 */}
       <div ref={benchmarkSectionRef}>
       <FormSection title="大盘数据">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="space-y-4">
           <RangeInput
             label="CTR (%)"
             minValue={benchmark.ctr.min}
@@ -715,7 +765,7 @@ function NewReviewPageContent() {
             error={benchmarkErrors.ctr}
           />
           <RangeInput
-            label="CPM"
+            label="CPM (元)"
             minValue={benchmark.cpm.min}
             maxValue={benchmark.cpm.max}
             onMinChange={(v) => setBenchmark({ ...benchmark, cpm: { ...benchmark.cpm, min: v } })}
@@ -724,7 +774,7 @@ function NewReviewPageContent() {
             error={benchmarkErrors.cpm}
           />
           <RangeInput
-            label="CPC"
+            label="CPC (元)"
             minValue={benchmark.cpc.min}
             maxValue={benchmark.cpc.max}
             onMinChange={(v) => setBenchmark({ ...benchmark, cpc: { ...benchmark.cpc, min: v } })}
@@ -733,7 +783,7 @@ function NewReviewPageContent() {
             error={benchmarkErrors.cpc}
           />
           <RangeInput
-            label="CPE"
+            label="CPE (元)"
             minValue={benchmark.cpe.min}
             maxValue={benchmark.cpe.max}
             onMinChange={(v) => setBenchmark({ ...benchmark, cpe: { ...benchmark.cpe, min: v } })}
@@ -754,374 +804,310 @@ function NewReviewPageContent() {
       </FormSection>
       </div>
 
-      {/* Section: 达人层级配置 */}
-      <div ref={tierSectionRef}>
-      <FormSection title="达人层级配置">
-        <div className="space-y-3">
-          {influencerTiers.map((tier) => (
-            <div key={tier.id} className="flex items-center gap-3">
+      {/* Section: 计算逻辑 */}
+      <div ref={calculationLogicSectionRef}>
+      <FormSection title="计算逻辑">
+        <div className="space-y-6">
+          <FormField label="是否含非报备笔记">
+            <RadioGroup
+              name="hasUnofficialCooperation"
+              className="gap-10"
+              value={hasUnofficialCooperation ? 'yes' : 'no'}
+              onValueChange={(v) => setHasUnofficialCooperation(v === 'yes')}
+            >
+              <RadioGroupItem value="yes">是</RadioGroupItem>
+              <RadioGroupItem value="no">否</RadioGroupItem>
+            </RadioGroup>
+          </FormField>
+
+          <FormField label="内容金额口径">
+            <RadioGroup
+              name="contentCostCaliber"
+              className="gap-10"
+              value={contentCostCaliber}
+              onValueChange={(v) => setContentCostCaliber(v as 'consumption' | 'settlement')}
+            >
+              <RadioGroupItem value="consumption">资源含税成本价</RadioGroupItem>
+              <RadioGroupItem value="settlement">资源含税售价</RadioGroupItem>
+            </RadioGroup>
+          </FormField>
+
+          <div className="space-y-3">
+            <Label className="font-normal text-gray-500">爆文统计口径</Label>
+            <div className="flex gap-10">
+            <div className="flex flex-wrap items-center gap-3">
               <input
-                type="text"
-                placeholder="层级名称"
-                value={tier.name}
-                onChange={(e) => handleTierChange(tier.id, 'name', e.target.value)}
-                className="w-28 rounded-sm border border-gray-300 px-3 h-10 text-sm placeholder:text-gray-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+                type="radio"
+                id="viralMetric-like_comment_share"
+                name="viralMetric"
+                checked={viralMetric === 'like_comment_share'}
+                onChange={() => setViralMetric('like_comment_share')}
+                className="h-4 w-4 border-gray-300 text-brand focus:ring-brand/50"
               />
-              <input
+              <Label htmlFor="viralMetric-like_comment_share" className="cursor-pointer font-normal text-gray-700">
+                转评赞
+              </Label>
+              <Input
                 type="number"
-                placeholder="粉丝下限"
-                value={tier.fanRangeMin || ''}
-                onChange={(e) => handleTierChange(tier.id, 'fanRangeMin', Number(e.target.value))}
-                className="w-32 rounded-sm border border-gray-300 px-3 h-10 text-sm placeholder:text-gray-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+                min={1}
+                variant="form"
+                value={viralThresholdLikeCommentShare}
+                onChange={(e) => setViralThresholdLikeCommentShare(e.target.value)}
+                placeholder="阈值"
+                disabled={viralMetric !== 'like_comment_share'}
+                className="w-28"
               />
-              <span className="text-gray-400">-</span>
-              <input
-                type="number"
-                placeholder="粉丝上限"
-                value={tier.fanRangeMax || ''}
-                onChange={(e) => handleTierChange(tier.id, 'fanRangeMax', Number(e.target.value))}
-                className="w-32 rounded-sm border border-gray-300 px-3 h-10 text-sm placeholder:text-gray-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
-              />
-              <button
-                type="button"
-                onClick={() => handleRemoveTier(tier.id)}
-                className="rounded p-1 text-gray-400 transition hover:bg-rose-50 hover:text-rose-500"
-              >
-                <Trash2 size={16} />
-              </button>
             </div>
-          ))}
-          <button
-            type="button"
-            onClick={handleAddTier}
-            className="inline-flex items-center gap-1 rounded-md border border-dashed border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600 transition hover:border-brand hover:text-brand"
-          >
-            <Plus size={14} />
-            添加层级
-          </button>
-          {tierError && <p className="mt-2 text-xs text-rose-500">{tierError}</p>}
+            <div className="flex flex-wrap items-center gap-3">
+              <input
+                type="radio"
+                id="viralMetric-like_only"
+                name="viralMetric"
+                checked={viralMetric === 'like_only'}
+                onChange={() => setViralMetric('like_only')}
+                className="h-4 w-4 border-gray-300 text-brand focus:ring-brand/50"
+              />
+              <Label htmlFor="viralMetric-like_only" className="cursor-pointer font-normal text-gray-700">
+                赞
+              </Label>
+              <Input
+                type="number"
+                min={1}
+                variant="form"
+                value={viralThresholdLikeOnly}
+                onChange={(e) => setViralThresholdLikeOnly(e.target.value)}
+                placeholder="阈值"
+                disabled={viralMetric !== 'like_only'}
+                className="w-28"
+              />
+            </div>
+            </div>
+          </div>
+
+          <FormField label="互动统计口径">
+            <RadioGroup
+              name="engagementMetric"
+              value={engagementMetric}
+              onValueChange={(v) => setEngagementMetric(v as 'exclude_follow' | 'include_follow')}
+            >
+              <RadioGroupItem value="exclude_follow">不含关注</RadioGroupItem>
+              <RadioGroupItem value="include_follow">含关注</RadioGroupItem>
+            </RadioGroup>
+          </FormField>
+
+          <div className="space-y-3">
+            <Label className="font-normal text-gray-500">达人层级配置</Label>
+            <div className="space-y-3">
+            {influencerTiers.map((tier) => (
+              <div key={tier.id} className="flex flex-wrap items-center gap-3">
+                <Input
+                  variant="form"
+                  placeholder="层级名称"
+                  value={tier.name}
+                  onChange={(e) => handleTierChange(tier.id, 'name', e.target.value)}
+                  className="w-28"
+                />
+                <Input
+                  type="number"
+                  variant="form"
+                  placeholder="粉丝下限"
+                  value={tier.fanRangeMin || ''}
+                  onChange={(e) => handleTierChange(tier.id, 'fanRangeMin', Number(e.target.value))}
+                  className="w-32"
+                />
+                <span className="text-gray-400">-</span>
+                <Input
+                  type="number"
+                  variant="form"
+                  placeholder="粉丝上限"
+                  value={tier.fanRangeMax || ''}
+                  onChange={(e) => handleTierChange(tier.id, 'fanRangeMax', Number(e.target.value))}
+                  className="w-32"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={() => handleRemoveTier(tier.id)}
+                  className="text-gray-400 hover:text-rose-500"
+                >
+                  <Trash2 size={16} />
+                </Button>
+              </div>
+            ))}
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleAddTier}
+              className="border-dashed"
+            >
+              <Plus size={14} />
+              添加层级
+            </Button>
+            {tierError && <p className="text-xs text-rose-500">{tierError}</p>}
+          </div>
         </div>
       </FormSection>
       </div>
 
-      {/* Section: KPI目标配置 */}
-      <FormSection title="复盘目标（KPI）">
-        <div className="space-y-4">
-          {/* 是否有（非官方）合作 */}
-          <div>
-            <label className="mb-2 block text-xs font-medium text-gray-600">是否有（非官方）合作</label>
-            <div className="flex gap-4">
-              <RadioOption
-                name="hasUnofficialCooperation"
-                value="yes"
-                checked={hasUnofficialCooperation === true}
-                onChange={() => setHasUnofficialCooperation(true)}
-                label="是"
-              />
-              <RadioOption
-                name="hasUnofficialCooperation"
-                value="no"
-                checked={hasUnofficialCooperation === false}
-                onChange={() => setHasUnofficialCooperation(false)}
-                label="否"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-            <NumberInput label="总曝光" value={kpiTargets.totalImpression} onChange={(v) => setKpiTargets({ ...kpiTargets, totalImpression: v })} />
-            <NumberInput label="总阅读" value={kpiTargets.totalRead} onChange={(v) => setKpiTargets({ ...kpiTargets, totalRead: v })} />
-            <NumberInput label="总互动" value={kpiTargets.totalEngagement} onChange={(v) => setKpiTargets({ ...kpiTargets, totalEngagement: v })} />
-            <NumberInput label="爆文数" value={kpiTargets.viralPosts1k} onChange={(v) => setKpiTargets({ ...kpiTargets, viralPosts1k: v })} />
-            <NumberInput label="爆文率(%)" value={kpiTargets.viralPosts10k} onChange={(v) => setKpiTargets({ ...kpiTargets, viralPosts10k: v })} />
-          </div>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-            <NumberInput label="CPM" value={kpiTargets.cpm} onChange={(v) => setKpiTargets({ ...kpiTargets, cpm: v })} />
-            <NumberInput label="CPC" value={kpiTargets.cpc} onChange={(v) => setKpiTargets({ ...kpiTargets, cpc: v })} />
-            <NumberInput label="CPE" value={kpiTargets.cpe} onChange={(v) => setKpiTargets({ ...kpiTargets, cpe: v })} />
-            <NumberInput label="CTR (%)" value={kpiTargets.ctr} onChange={(v) => setKpiTargets({ ...kpiTargets, ctr: v })} />
-          </div>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-2">
-            <NumberInput label="人群资产-总-品牌" value={kpiTargets.audienceBrandTotal} onChange={(v) => setKpiTargets({ ...kpiTargets, audienceBrandTotal: v })} />
-            <NumberInput label="人群资产-TI-品牌" value={kpiTargets.audienceBrandTi} onChange={(v) => setKpiTargets({ ...kpiTargets, audienceBrandTi: v })} />
-          </div>
-        </div>
-      </FormSection>
-
-      {/* Section: 统计口径选择 */}
-      <FormSection title="统计口径选择">
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-          <div>
-            <label className="mb-2 block text-xs font-medium text-gray-600">互动统计口径</label>
-            <div className="flex gap-4">
-              <RadioOption
-                name="engagementMetric"
-                value="exclude_follow"
-                checked={engagementMetric === 'exclude_follow'}
-                onChange={() => setEngagementMetric('exclude_follow')}
-                label="不含关注"
-              />
-              <RadioOption
-                name="engagementMetric"
-                value="include_follow"
-                checked={engagementMetric === 'include_follow'}
-                onChange={() => setEngagementMetric('include_follow')}
-                label="含关注"
-              />
-            </div>
-          </div>
-          <div>
-            <label className="mb-2 block text-xs font-medium text-gray-600">爆文统计口径</label>
-            <div className="flex items-center gap-4">
-              <RadioOption
-                name="viralMetric"
-                value="like_comment_share"
-                checked={viralMetric === 'like_comment_share'}
-                onChange={() => setViralMetric('like_comment_share')}
-                label="转评赞"
-              />
-              <RadioOption
-                name="viralMetric"
-                value="like_only"
-                checked={viralMetric === 'like_only'}
-                onChange={() => setViralMetric('like_only')}
-                label="赞"
-              />
-              <div className="ml-4 flex items-center gap-2">
-                <label className="text-xs font-medium text-gray-600 whitespace-nowrap">爆文阈值（赞数）</label>
-                <input
-                  type="number"
-                  min={1}
-                  value={viralThreshold}
-                  onChange={(e) => setViralThreshold(e.target.value)}
-                  placeholder="1000"
-                  className="w-28 rounded-sm border border-gray-300 px-3 h-10 text-sm text-gray-900 placeholder:text-gray-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-      </FormSection>
-
-      {/* Section: 金额口径 */}
-      <FormSection title="金额口径">
-        <div className="space-y-4">
-          {/* 内容金额口径 */}
-          <div className="rounded-md border border-gray-200 bg-gray-50 p-3">
-            <label className="mb-2 block text-xs font-medium text-gray-600">内容金额口径</label>
-            <div className="flex gap-4">
-              <RadioOption
-                name="contentCostCaliber"
-                value="consumption"
-                checked={contentCostCaliber === 'consumption'}
-                onChange={() => setContentCostCaliber('consumption')}
-                label="内容消耗金额（博主报价+平台服务费）"
-              />
-              <RadioOption
-                name="contentCostCaliber"
-                value="settlement"
-                checked={contentCostCaliber === 'settlement'}
-                onChange={() => setContentCostCaliber('settlement')}
-                label="内容结算金额"
-              />
-            </div>
-          </div>
-
-          {/* 投流金额口径 */}
-          <div className="rounded-md border border-gray-200 bg-gray-50 p-3">
-            <label className="mb-2 block text-xs font-medium text-gray-600">投流金额口径</label>
-            <div className="flex gap-4">
-              <RadioOption
-                name="trafficCostCaliber"
-                value="consumption"
-                checked={trafficCostCaliber === 'consumption'}
-                onChange={() => setTrafficCostCaliber('consumption')}
-                label="投流消耗金额（聚光fee）"
-              />
-              <RadioOption
-                name="trafficCostCaliber"
-                value="settlement"
-                checked={trafficCostCaliber === 'settlement'}
-                onChange={() => setTrafficCostCaliber('settlement')}
-                label="投流结算金额"
-              />
-            </div>
-          </div>
-        </div>
-      </FormSection>
-
-      {/* Section: 报告模块开关 */}
-      <FormSection title="报告模块配置">
-        <div className="mb-3 flex gap-2">
-          <button
-            type="button"
-            onClick={() => setModules(selectAllModules(modules))}
-            className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600 transition hover:border-brand hover:text-brand"
-          >
-            全选
-          </button>
-          <button
-            type="button"
-            onClick={() => setModules(deselectAllModules(modules))}
-            className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600 transition hover:border-brand hover:text-brand"
-          >
-            取消全选
-          </button>
-        </div>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+      {/* Section: 模块配置 */}
+      <FormSection title="模块配置">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {REPORT_MODULES.map((mod) => (
             <label
               key={mod.key}
               className="flex cursor-pointer items-center gap-2 rounded-md border border-gray-200 px-3 py-2 transition hover:bg-gray-50"
             >
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={modules[mod.key] ?? true}
-                onChange={() => handleModuleToggle(mod.key)}
-                className="h-4 w-4 rounded border-gray-300 text-brand focus:ring-brand/50"
+                onCheckedChange={() => handleModuleToggle(mod.key)}
               />
               <span className="text-sm text-gray-700">{mod.label}</span>
             </label>
           ))}
         </div>
+        <div className="mt-4 flex items-center justify-end gap-2 text-sm">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setModules(selectAllModules(modules))}
+            className="h-auto px-2 py-1 text-gray-600 hover:text-brand"
+          >
+            全选
+          </Button>
+
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setModules(deselectAllModules(modules))}
+            className="h-auto px-2 py-1 text-gray-600 hover:text-brand"
+          >
+            清空选择
+          </Button>
+        </div>
       </FormSection>
 
-      {/* Section: 投流周期配置 */}
+      {/* Section: 投放配置 */}
       {modules.launchAnalysis && (
-        <div ref={phaseSectionRef}>
-        <FormSection title="投流周期配置">
-          <div className="space-y-3">
-            {launchPhases.map((phase) => (
-              <div key={phase.id} className="flex items-center gap-3">
-                <input
-                  type="text"
-                  placeholder="阶段名称"
-                  value={phase.name}
-                  onChange={(e) => handlePhaseChange(phase.id, 'name', e.target.value)}
-                  className="w-28 rounded-sm border border-gray-300 px-3 h-10 text-sm placeholder:text-gray-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
-                />
-                <DateRangePicker
-                  startDate={phase.startDate}
-                  endDate={phase.endDate}
-                  onChange={(start, end) => {
-                    setLaunchPhases(launchPhases.map((p) =>
-                      p.id === phase.id ? { ...p, startDate: start, endDate: end } : p
-                    ));
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={() => handleRemovePhase(phase.id)}
-                  className="rounded p-1 text-gray-400 transition hover:bg-rose-50 hover:text-rose-500"
-                >
-                  <Trash2 size={16} />
-                </button>
+        <div ref={launchConfigSectionRef}>
+        <FormSection title="投放配置">
+          <div className="space-y-6">
+            <div className="space-y-3">
+              <Label className="font-normal text-gray-500">投放ID</Label>
+              <div className="flex flex-wrap gap-2">
+                {advertiserIds.map((id, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center gap-1 rounded-md border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm text-gray-700"
+                  >
+                    <span>{id}</span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => {
+                        setAdvertiserIds(advertiserIds.filter((_, i) => i !== index));
+                        setAdvertiserIdError(null);
+                      }}
+                      className="h-6 w-6 text-gray-400 hover:text-rose-500"
+                    >
+                      <Trash2 size={14} />
+                    </Button>
+                  </div>
+                ))}
               </div>
-            ))}
-            <button
-              type="button"
-              onClick={handleAddPhase}
-              className="inline-flex items-center gap-1 rounded-md border border-dashed border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600 transition hover:border-brand hover:text-brand"
-            >
-              <Plus size={14} />
-              添加阶段
-            </button>
-            {phaseError && <p className="mt-2 text-xs text-rose-500">{phaseError}</p>}
+              <div className="flex flex-wrap items-center gap-2">
+                <Input
+                  variant="form"
+                  placeholder="输入投放ID（最多5个）"
+                  value={advertiserIdInput}
+                  onChange={(e) => {
+                    setAdvertiserIdInput(e.target.value);
+                    setAdvertiserIdError(null);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      addAdvertiserId();
+                    }
+                  }}
+                  className="w-64"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={addAdvertiserId}
+                  className="border-dashed"
+                >
+                  <Plus size={14} />
+                  添加
+                </Button>
+              </div>
+              {advertiserIdError && (
+                <p className="text-xs text-rose-500">{advertiserIdError}</p>
+              )}
+             
+            </div>
+
+            <div className="space-y-3">
+              <Label className="font-normal text-gray-500">投放周期</Label>
+              <div className="space-y-3">
+              {launchPhases.map((phase) => (
+                <div key={phase.id} className="flex flex-wrap items-center gap-3">
+                  <Input
+                    variant="form"
+                    placeholder="阶段名称"
+                    value={phase.name}
+                    onChange={(e) => handlePhaseChange(phase.id, 'name', e.target.value)}
+                    className="w-28"
+                  />
+                  <Input
+                    type="date"
+                    variant="form"
+                    value={phase.startDate}
+                    onChange={(e) => handlePhaseChange(phase.id, 'startDate', e.target.value)}
+                    className="w-40"
+                  />
+                  <span className="text-gray-400">至</span>
+                  <Input
+                    type="date"
+                    variant="form"
+                    value={phase.endDate}
+                    onChange={(e) => handlePhaseChange(phase.id, 'endDate', e.target.value)}
+                    className="w-40"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => handleRemovePhase(phase.id)}
+                    className="text-gray-400 hover:text-rose-500"
+                  >
+                    <Trash2 size={16} />
+                  </Button>
+                </div>
+              ))}
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleAddPhase}
+                className="border-dashed"
+              >
+                <Plus size={14} />
+                添加阶段
+              </Button>
+              {phaseError && <p className="text-xs text-rose-500">{phaseError}</p>}
+            </div>
           </div>
         </FormSection>
         </div>
-      )}
-
-      {/* Section: 投放ID */}
-      {modules.launchAnalysis && (
-        <FormSection title="投放ID">
-          <div className="space-y-3">
-            <div className="flex flex-wrap gap-2">
-              {advertiserIds.map((id, index) => (
-                <div
-                  key={index}
-                  className="flex items-center gap-1 rounded-md border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm text-gray-700"
-                >
-                  <span>{id}</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAdvertiserIds(advertiserIds.filter((_, i) => i !== index));
-                      setAdvertiserIdError(null);
-                    }}
-                    className="ml-1 rounded p-0.5 text-gray-400 transition hover:bg-rose-50 hover:text-rose-500"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              ))}
-            </div>
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                placeholder="输入投放ID（纯数字）"
-                value={advertiserIdInput}
-                onChange={(e) => {
-                  setAdvertiserIdInput(e.target.value);
-                  setAdvertiserIdError(null);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    const value = advertiserIdInput.trim();
-                    if (!value) return;
-                    if (!/^\d+$/.test(value)) {
-                      setAdvertiserIdError('投放ID必须为纯数字');
-                      return;
-                    }
-                    if (advertiserIds.includes(value)) {
-                      setAdvertiserIdError('投放ID不能重复');
-                      return;
-                    }
-                    if (advertiserIds.length >= 5) {
-                      setAdvertiserIdError('最多添加5个投放ID');
-                      return;
-                    }
-                    setAdvertiserIds([...advertiserIds, value]);
-                    setAdvertiserIdInput('');
-                    setAdvertiserIdError(null);
-                  }
-                }}
-                className="w-64 rounded-sm border border-gray-300 px-3 h-10 text-sm placeholder:text-gray-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  const value = advertiserIdInput.trim();
-                  if (!value) return;
-                  if (!/^\d+$/.test(value)) {
-                    setAdvertiserIdError('投放ID必须为纯数字');
-                    return;
-                  }
-                  if (advertiserIds.includes(value)) {
-                    setAdvertiserIdError('投放ID不能重复');
-                    return;
-                  }
-                  if (advertiserIds.length >= 5) {
-                    setAdvertiserIdError('最多添加5个投放ID');
-                    return;
-                  }
-                  setAdvertiserIds([...advertiserIds, value]);
-                  setAdvertiserIdInput('');
-                  setAdvertiserIdError(null);
-                }}
-                className="inline-flex items-center gap-1 rounded-md border border-dashed border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600 transition hover:border-brand hover:text-brand"
-              >
-                <Plus size={14} />
-                添加
-              </button>
-            </div>
-            {advertiserIdError && (
-              <p className="text-xs text-rose-500">{advertiserIdError}</p>
-            )}
-            <p className="text-xs text-gray-400">最多 5 个投放ID，用于拉取聚光投流数据</p>
-          </div>
-        </FormSection>
       )}
 
       {/* Section: 策划方案上传 */}
@@ -1146,8 +1132,10 @@ function NewReviewPageContent() {
         >
           <Upload size={24} className="mb-2 text-gray-400" />
           <p className="text-sm text-gray-600">拖拽文件到此处，或</p>
-          <label className="mt-2 inline-flex cursor-pointer items-center gap-2 rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50">
-            选择文件
+          <label className="mt-2 inline-flex cursor-pointer">
+            <span className="inline-flex h-10 items-center rounded-md border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 transition hover:bg-gray-50">
+              选择文件
+            </span>
             <input
               type="file"
               accept=".pdf,.docx,.doc,.pptx,.ppt"
@@ -1183,17 +1171,15 @@ function NewReviewPageContent() {
 
       {/* Submit Button */}
       <div className="flex justify-end">
-        <button
+        <Button
           type="button"
+          variant="submit"
           onClick={handleSubmit}
           disabled={createReview.isPending}
-          className="inline-flex h-[44px] items-center gap-2 rounded-md bg-brand px-6 text-sm font-medium text-white transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {createReview.isPending ? (
-            <Loading size="sm" />
-          ) : null}
+          {createReview.isPending ? <Loading size="sm" /> : null}
           开始复盘
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -1203,10 +1189,12 @@ function NewReviewPageContent() {
 
 function FormSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-lg border bg-white p-6">
-      <h2 className="mb-4 text-base font-bold text-gray-900">{title}</h2>
-      {children}
-    </section>
+    <Card>
+      <CardHeader className="pb-4">
+        <CardTitle>{title}</CardTitle>
+      </CardHeader>
+      <CardContent>{children}</CardContent>
+    </Card>
   );
 }
 
@@ -1220,17 +1208,16 @@ function NumberInput({
   onChange: (value: string) => void;
 }) {
   return (
-    <div>
-      <label className="mb-1 block text-sm font-medium text-gray-700">{label}</label>
-      <input
+    <FormField label={label}>
+      <Input
         type="number"
         step="any"
+        variant="form"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder="--"
-        className="block w-full rounded-sm border border-gray-300 px-3 h-10 text-sm text-gray-900 placeholder:text-gray-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
       />
-    </div>
+    </FormField>
   );
 }
 
@@ -1252,75 +1239,39 @@ function RangeInput({
   error?: string | null;
 }) {
   const handleChange = (value: string, onChange: (v: string) => void) => {
-    // Only allow digits, dots, and minus sign for numeric input
     const cleaned = value.replace(/[^\d.\-]/g, '');
     const result = validateRangeInput(cleaned);
     onChange(result.sanitizedValue);
   };
 
-  const inputBaseClass = "block w-full rounded-sm border px-3 h-10 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2";
-  const inputNormalClass = `${inputBaseClass} border-gray-300 focus:border-brand focus:ring-brand/20`;
-  const inputErrorClass = `${inputBaseClass} border-rose-400 bg-rose-50/30 focus:border-rose-500 focus:ring-rose-200`;
-
   return (
     <div>
-      <label className="mb-1 block text-sm font-medium text-gray-700">{label}</label>
-      <div className="flex items-center gap-2">
-        <div className="flex-1">
-          <span className="mb-0.5 block text-xs text-gray-500">最小值</span>
-          <input
+      <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+        <Label className="w-24 shrink-0 font-normal text-gray-700">{label}</Label>
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <Input
             type="text"
             inputMode="decimal"
+            variant="form"
             value={minValue}
             onChange={(e) => handleChange(e.target.value, onMinChange)}
             onBlur={onBlur}
-            placeholder="--"
-            className={error ? inputErrorClass : inputNormalClass}
+            placeholder="最小值"
+            className={error ? 'border-rose-400 bg-rose-50/30 focus-visible:ring-rose-200' : undefined}
           />
-        </div>
-        <span className="mt-5 text-gray-400">~</span>
-        <div className="flex-1">
-          <span className="mb-0.5 block text-xs text-gray-500">最大值</span>
-          <input
+          <Input
             type="text"
             inputMode="decimal"
+            variant="form"
             value={maxValue}
             onChange={(e) => handleChange(e.target.value, onMaxChange)}
             onBlur={onBlur}
-            placeholder="--"
-            className={error ? inputErrorClass : inputNormalClass}
+            placeholder="最大值"
+            className={error ? 'border-rose-400 bg-rose-50/30 focus-visible:ring-rose-200' : undefined}
           />
         </div>
       </div>
-      {error && <p className="mt-1 text-xs text-rose-500">{error}</p>}
+      {error && <p className="mt-1 pl-28 text-xs text-rose-500">{error}</p>}
     </div>
-  );
-}
-
-function RadioOption({
-  name,
-  value,
-  checked,
-  onChange,
-  label,
-}: {
-  name: string;
-  value: string;
-  checked: boolean;
-  onChange: () => void;
-  label: string;
-}) {
-  return (
-    <label className="flex cursor-pointer items-center gap-2">
-      <input
-        type="radio"
-        name={name}
-        value={value}
-        checked={checked}
-        onChange={onChange}
-        className="h-4 w-4 border-gray-300 text-brand focus:ring-brand/50"
-      />
-      <span className="text-sm text-gray-700">{label}</span>
-    </label>
   );
 }
