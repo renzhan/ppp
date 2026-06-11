@@ -102,30 +102,28 @@ describe('Report Generation: reads from notes table', () => {
     expect(rows.some((r: string) => r.includes('未分类') && r.includes('| 1 |'))).toBe(true);
   });
 
-  // ── Test 3: Quadrant analysis uses kolPrice from notes table ──
-  it('quadrant analysis reads kolPrice from notes table for per-note cost', async () => {
+  // ── Test 3: Quadrant analysis uses engageRate × 投流CPE classification ──
+  it('quadrant analysis reads engageRate and computes 投流CPE for classification', async () => {
     const notes = [
-      { noteId: 'q1', kolNickName: 'KOL1', noteType: '1', impNum: 5000, readNum: 1000, engageNum: 500, likeNum: 200, favNum: 150, cmtNum: 100, shareNum: 50, kolPrice: 2000, contentDirection: '种草' },
+      { noteId: 'q1', kolNickName: 'KOL1', engageRate: 0.08, kolPrice: 2000 },
     ];
     const juguangData = [
-      { noteId: 'q1', projectId: 'proj-1', fee: 3000, impression: 8000, click: 400, interaction: 200, tiUserNum: 100 },
+      { noteId: 'q1', projectId: 'proj-1', fee: 3000, interaction: 200 },
     ];
     const prisma = createMockPrisma({
       notes,
       juguangData,
-      reviewConfig: { benchmark: { cpm: 100, cpc: 5, cpe: 20, ctr: 10 }, engagementMetric: 'exclude_follow' },
     });
 
     const loader = new QuadrantAnalysisDataLoader(prisma);
     const result = await loader.load('proj-1');
 
-    // totalCost per note = kolPrice(2000) + juguangFee(3000) = 5000
-    // noteCpm = 5000 / 5000 * 1000 = 1000
+    // Only 1 traffic note → X_score=0.5, Y_score=0.5, quadrant='数据不足'
     expect(result.variables['total_analyzed_notes']).toBe('1');
     expect(result.variables['excluded_notes']).toBe('0');
-    // Quadrant table should contain this note's kolPrice-derived cost (2000)
-    expect(result.variables['quadrant_notes_table']).toContain('KOL1');
-    expect(result.variables['quadrant_notes_table']).toContain('2000');
+    // detail_table should contain this note's info
+    expect(result.variables['detail_table']).toContain('KOL1');
+    expect(result.variables['detail_table']).toContain('2000');
   });
 
   // ── Test 4: Note count from notes table matches expected ──

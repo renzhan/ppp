@@ -68,11 +68,15 @@ describe('Feature: report-generation-pipeline, Property 7: Report content struct
     { minLength: 1, maxLength: 3 }
   ).map((paragraphs) => paragraphs.join('\n\n'));
 
-  // Generator for a set of chapters that should fail (subset of 2-9)
+  // Generator for a set of chapters that should fail (subset of active non-static chapters: 2-7, 9)
   const failingChaptersArb = fc.subarray(
-    [2, 3, 4, 5, 6, 7, 8, 9],
+    [2, 3, 4, 5, 6, 7, 9],
     { minLength: 0, maxLength: 4 }
   );
+
+  // Active chapters (chapter 8 excluded per requirement 7.1)
+  const activeChapterNumbers = [1, 2, 3, 4, 5, 6, 7, 9, 10];
+  const activeChapterCount = activeChapterNumbers.length; // 9
 
   it('should always produce exactly 10 chapters in the report', async () => {
     await fc.assert(
@@ -108,8 +112,8 @@ describe('Feature: report-generation-pipeline, Property 7: Report content struct
             reviewConfigId: 'rc-1',
           });
 
-          // Exactly 10 chapters
-          expect(result.chapters).toHaveLength(10);
+          // Exactly 9 chapters (chapter 8 excluded)
+          expect(result.chapters).toHaveLength(activeChapterCount);
         }
       ),
       { numRuns: 20 }
@@ -150,13 +154,13 @@ describe('Feature: report-generation-pipeline, Property 7: Report content struct
             reviewConfigId: 'rc-1',
           });
 
-          // Chapter numbers should be sequential 1-10
+          // Chapter numbers should match active chapters (chapter 8 excluded)
           const chapterNumbers = result.chapters.map((c) => c.chapterNumber);
-          expect(chapterNumbers).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+          expect(chapterNumbers).toEqual(activeChapterNumbers);
 
           // All unique
           const uniqueNumbers = new Set(chapterNumbers);
-          expect(uniqueNumbers.size).toBe(10);
+          expect(uniqueNumbers.size).toBe(activeChapterCount);
         }
       ),
       { numRuns: 20 }
@@ -294,14 +298,14 @@ describe('Feature: report-generation-pipeline, Property 7: Report content struct
             reviewConfigId: 'rc-1',
           });
 
-          // Exactly 10 elements
-          expect(result.chapters).toHaveLength(10);
+          // Exactly 9 elements (chapter 8 excluded)
+          expect(result.chapters).toHaveLength(activeChapterCount);
 
-          for (let i = 0; i < 10; i++) {
+          for (let i = 0; i < activeChapterCount; i++) {
             const chapter = result.chapters[i];
 
-            // chapterNumber is integer 1-10, sequential
-            expect(chapter.chapterNumber).toBe(i + 1);
+            // chapterNumber matches active chapter numbers
+            expect(chapter.chapterNumber).toBe(activeChapterNumbers[i]);
             expect(Number.isInteger(chapter.chapterNumber)).toBe(true);
 
             // title is non-empty string

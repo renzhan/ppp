@@ -20,6 +20,10 @@ describe('Full Pipeline Integration (mocked LLM)', () => {
     '内容分析', '投流分析', '人群资产', '优化建议', '尾页',
   ];
 
+  // Chapter 8 (人群资产) is excluded per requirement 7.1
+  const activeChapterNumbers = [1, 2, 3, 4, 5, 6, 7, 9, 10];
+  const activeChapterCount = activeChapterNumbers.length; // 9
+
   function createMockTemplateLoader(): PromptTemplateLoader {
     return {
       loadTemplate: vi.fn((chapterNumber: number) => ({
@@ -90,11 +94,11 @@ describe('Full Pipeline Integration (mocked LLM)', () => {
         reviewConfigId: 'review-config-001',
       });
 
-      expect(result.chapters).toHaveLength(10);
+      expect(result.chapters).toHaveLength(activeChapterCount);
 
-      for (let i = 0; i < 10; i++) {
-        expect(result.chapters[i].chapterNumber).toBe(i + 1);
-        expect(result.chapters[i].title).toBe(chapterNames[i]);
+      for (let i = 0; i < activeChapterCount; i++) {
+        expect(result.chapters[i].chapterNumber).toBe(activeChapterNumbers[i]);
+        expect(result.chapters[i].title).toBe(chapterNames[activeChapterNumbers[i] - 1]);
         expect(result.chapters[i].status).toBe('generated');
         expect(result.chapters[i].content).toBeTruthy();
         expect(result.chapters[i].generatedAt).toBeTruthy();
@@ -121,11 +125,11 @@ describe('Full Pipeline Integration (mocked LLM)', () => {
         reviewConfigId: 'review-config-001',
       });
 
-      // Data loader should be called 10 times (once per chapter)
-      expect(loaderRegistry.loadChapterData).toHaveBeenCalledTimes(10);
+      // Data loader should be called for each active chapter
+      expect(loaderRegistry.loadChapterData).toHaveBeenCalledTimes(activeChapterCount);
 
-      for (let i = 1; i <= 10; i++) {
-        expect(loaderRegistry.loadChapterData).toHaveBeenCalledWith(i, 'project-001');
+      for (const chNum of activeChapterNumbers) {
+        expect(loaderRegistry.loadChapterData).toHaveBeenCalledWith(chNum, 'project-001');
       }
     });
   });
@@ -154,14 +158,14 @@ describe('Full Pipeline Integration (mocked LLM)', () => {
 
       const updateCall = mockPrisma.reviewConfig.update.mock.calls[0][0];
       expect(updateCall.where.id).toBe('review-config-001');
-      expect(updateCall.data.reportContent).toHaveLength(10);
+      expect(updateCall.data.reportContent).toHaveLength(activeChapterCount);
       expect(updateCall.data.status).toBe('completed');
 
       // Verify each chapter in the stored content
       const storedContent = updateCall.data.reportContent as ChapterResult[];
-      for (let i = 0; i < 10; i++) {
-        expect(storedContent[i].chapterNumber).toBe(i + 1);
-        expect(storedContent[i].title).toBe(chapterNames[i]);
+      for (let i = 0; i < activeChapterCount; i++) {
+        expect(storedContent[i].chapterNumber).toBe(activeChapterNumbers[i]);
+        expect(storedContent[i].title).toBe(chapterNames[activeChapterNumbers[i] - 1]);
         expect(storedContent[i].status).toBe('generated');
       }
     });
@@ -192,7 +196,7 @@ describe('Full Pipeline Integration (mocked LLM)', () => {
       const createCall = mockPrisma.reportVersion.create.mock.calls[0][0];
       expect(createCall.data.projectId).toBe('project-001');
       expect(createCall.data.versionNumber).toBe(1);
-      expect(createCall.data.content).toHaveLength(10);
+      expect(createCall.data.content).toHaveLength(activeChapterCount);
       expect(createCall.data.status).toBe('draft');
 
       // Verify result contains version info
@@ -253,8 +257,9 @@ describe('Full Pipeline Integration (mocked LLM)', () => {
         reviewConfigId: 'review-config-001',
       });
 
-      // LLM should be called 8 times (chapters 2-9 only)
-      expect(llmClient.chat).toHaveBeenCalledTimes(8);
+      // LLM should be called for non-static chapters only (chapters 2-7, 9 = 7 calls)
+      // Chapters 1 and 10 are static, chapter 8 is excluded
+      expect(llmClient.chat).toHaveBeenCalledTimes(7);
     });
   });
 });

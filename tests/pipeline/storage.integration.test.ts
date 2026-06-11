@@ -79,9 +79,9 @@ describe('ReviewConfig.reportContent Storage Integration', () => {
         reviewConfigId: 'review-config-001',
       });
 
-      // Verify it's an array of exactly 10 elements
+      // Verify it's an array of exactly 9 elements (chapter 8 excluded per requirement 7.1)
       expect(Array.isArray(storedContent)).toBe(true);
-      expect(storedContent).toHaveLength(10);
+      expect(storedContent).toHaveLength(9);
     });
 
     it('should have each element with required ChapterResult fields', async () => {
@@ -165,7 +165,8 @@ describe('ReviewConfig.reportContent Storage Integration', () => {
       });
 
       const chapterNumbers = storedContent.map((c) => c.chapterNumber);
-      expect(chapterNumbers).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+      // Chapter 8 (人群资产) is excluded per requirement 7.1
+      expect(chapterNumbers).toEqual([1, 2, 3, 4, 5, 6, 7, 9, 10]);
     });
 
     it('should store non-empty content for all successfully generated chapters', async () => {
@@ -289,8 +290,8 @@ describe('ReviewConfig.reportContent Storage Integration', () => {
       const serialized = JSON.stringify(storedContent);
       const deserialized = JSON.parse(serialized) as ChapterResult[];
 
-      expect(deserialized).toHaveLength(10);
-      for (let i = 0; i < 10; i++) {
+      expect(deserialized).toHaveLength(9);
+      for (let i = 0; i < 9; i++) {
         expect(deserialized[i].chapterNumber).toBe(storedContent[i].chapterNumber);
         expect(deserialized[i].title).toBe(storedContent[i].title);
         expect(deserialized[i].content).toBe(storedContent[i].content);
