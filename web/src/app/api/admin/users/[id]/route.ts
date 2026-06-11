@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { isValidPhone } from '@/lib/phone-validator';
 
 // PUT /api/admin/users/[id] - Update user
 export async function PUT(
@@ -14,7 +13,7 @@ export async function PUT(
   }
 
   try {
-    const { displayName, role, isActive, phone } = await request.json();
+    const { displayName, role, isActive } = await request.json();
     const { id } = params;
 
     const user = await prisma.user.findUnique({ where: { id } });
@@ -30,38 +29,17 @@ export async function PUT(
       );
     }
 
-    // Validate phone format if provided
-    if (phone !== undefined && phone !== null && phone !== '' && !isValidPhone(phone)) {
-      return NextResponse.json(
-        { error: '手机号格式不正确' },
-        { status: 400 }
-      );
-    }
-
-    // Check phone uniqueness if provided (exclude current user)
-    if (phone && isValidPhone(phone)) {
-      const existingPhone = await prisma.user.findUnique({ where: { phone } });
-      if (existingPhone && existingPhone.id !== id) {
-        return NextResponse.json(
-          { error: '手机号已存在' },
-          { status: 409 }
-        );
-      }
-    }
-
     const updated = await prisma.user.update({
       where: { id },
       data: {
         ...(displayName !== undefined && { displayName }),
         ...(role !== undefined && { role: ['admin', 'VP', 'AD', 'AM', '组长', 'AE'].includes(role) ? role : 'AE' }),
         ...(isActive !== undefined && { isActive }),
-        ...(phone !== undefined && { phone: phone || null }),
         updatedAt: new Date(),
       },
       select: {
         id: true,
         username: true,
-        phone: true,
         displayName: true,
         role: true,
         isActive: true,

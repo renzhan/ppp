@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Plus, Trash2, Upload, FileText, AlertCircle, ArrowLeft } from 'lucide-react';
 import { Loading } from '@/components/ui/loading';
+import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { validateRangeInput } from '@/lib/range-validator';
 import { selectAllModules, deselectAllModules } from '@/lib/module-toggle';
 
@@ -999,18 +1000,14 @@ function NewReviewPageContent() {
                   onChange={(e) => handlePhaseChange(phase.id, 'name', e.target.value)}
                   className="w-28 rounded-sm border border-gray-300 px-3 h-10 text-sm placeholder:text-gray-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
                 />
-                <input
-                  type="date"
-                  value={phase.startDate}
-                  onChange={(e) => handlePhaseChange(phase.id, 'startDate', e.target.value)}
-                  className="rounded-sm border border-gray-300 px-3 h-10 text-sm placeholder:text-gray-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
-                />
-                <span className="text-gray-400">至</span>
-                <input
-                  type="date"
-                  value={phase.endDate}
-                  onChange={(e) => handlePhaseChange(phase.id, 'endDate', e.target.value)}
-                  className="rounded-sm border border-gray-300 px-3 h-10 text-sm placeholder:text-gray-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+                <DateRangePicker
+                  startDate={phase.startDate}
+                  endDate={phase.endDate}
+                  onChange={(start, end) => {
+                    setLaunchPhases(launchPhases.map((p) =>
+                      p.id === phase.id ? { ...p, startDate: start, endDate: end } : p
+                    ));
+                  }}
                 />
                 <button
                   type="button"

@@ -13,7 +13,6 @@ export async function GET(request: NextRequest) {
     select: {
       id: true,
       username: true,
-      phone: true,
       displayName: true,
       role: true,
       mustChangePassword: true,
