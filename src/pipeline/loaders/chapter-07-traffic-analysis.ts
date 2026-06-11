@@ -51,16 +51,22 @@ export class TrafficAnalysisDataLoader extends BaseChapterDataLoader {
   async load(projectId: string): Promise<ChapterDataContext> {
     const variables: Record<string, string> = {};
 
-    // ── 0. 加载大盘均值 ──
+    // ── 0. 加载大盘均值 + 投流周期 ──
     let benchmarkRaw: Record<string, unknown> = {};
+    let launchPhases: Array<{ name: string; startDate: string; endDate: string }> = [];
     try {
       const reviewConfig = await this.prisma.reviewConfig.findFirst({
         where: { projectId },
-        select: { benchmark: true },
+        select: { benchmark: true, launchPhases: true },
         orderBy: { createdAt: 'desc' },
       });
       if (reviewConfig?.benchmark && typeof reviewConfig.benchmark === 'object') {
         benchmarkRaw = reviewConfig.benchmark as Record<string, unknown>;
+      }
+      if (reviewConfig?.launchPhases && Array.isArray(reviewConfig.launchPhases)) {
+        launchPhases = (reviewConfig.launchPhases as Array<{ name?: string; startDate?: string; endDate?: string }>)
+          .filter(p => p.name && p.startDate && p.endDate)
+          .map(p => ({ name: p.name!, startDate: p.startDate!, endDate: p.endDate! }));
       }
     } catch (error) {
       console.warn(`[TrafficAnalysisDataLoader] Failed to load review_configs: ${error}`);
@@ -93,6 +99,7 @@ export class TrafficAnalysisDataLoader extends BaseChapterDataLoader {
       searchCmtAfterRead: number;
       searchCmtAfterReadAvg: any;
       searchCmtClickCvr: any;
+      time: string | null;
     }
 
     let juguangRecords: JuguangRecord[] = [];
@@ -117,6 +124,7 @@ export class TrafficAnalysisDataLoader extends BaseChapterDataLoader {
           searchCmtAfterRead: true,
           searchCmtAfterReadAvg: true,
           searchCmtClickCvr: true,
+          time: true,
         },
       });
 
@@ -302,14 +310,12 @@ export class TrafficAnalysisDataLoader extends BaseChapterDataLoader {
 
       const noteRows = sortedNotes.map(([noteId, data]) => {
         const noteInfo = notesMap.get(noteId);
-        const baseInfo = noteBaseMap.get(noteId);
-        const noteCpm = data.impression > 0 ? ((data.fee / data.impression) * 1000).toFixed(2) : '-';
-        const noteCpc = data.click > 0 ? (data.fee / data.click).toFixed(2) : '-';
         const noteCpe = data.interaction > 0 ? (data.fee / data.interaction).toFixed(2) : '-';
         const noteCtr = data.impression > 0 ? ((data.click / data.impression) * 100).toFixed(2) + '%' : '-';
         const noteCpti = data.tiUserNum > 0 ? (data.fee / data.tiUserNum).toFixed(2) : '-';
+        const kolName = (noteInfo?.kolNickName && noteInfo.kolNickName.trim()) ? noteInfo.kolNickName : '未知达人';
 
-        return `| ${noteInfo?.kolNickName || noteId} | ${noteInfo?.noteType || '-'} | ${baseInfo?.contentDirection || '-'} | ${data.fee.toFixed(0)} | ${data.impression} | ${data.click} | ${data.interaction} | ${noteCpm} | ${noteCpc} | ${noteCpe} | ${noteCtr} | ${data.tiUserNum} | ${noteCpti} |`;
+        return `| ${kolName} | ${data.fee.toFixed(0)} | ${data.impression} | ${data.click} | ${noteCtr} | ${noteCpe} | ${noteCpti} | - |`;
       });
 
       variables['traffic_by_note'] = noteRows.length > 0 ? noteRows.join('\n') : '暂无笔记维度投流数据';
@@ -320,6 +326,12 @@ export class TrafficAnalysisDataLoader extends BaseChapterDataLoader {
 
     // ── 7. 按广告类型（投放位置）分析 ──
     variables['ad_type_analysis'] = this.buildGroupAnalysis(juguangRecords, 'placement', '广告类型');
+
+    // ── 7.1 广告类型汇总表 (ad_type_summary_table) ──
+    variables['ad_type_summary_table'] = this.buildAdTypeSummaryTable(juguangRecords);
+
+    // ── 7.2 每日趋势数据 (daily_trend_data) ──
+    variables['daily_trend_data'] = this.buildDailyTrendData(juguangRecords, launchPhases);
 
     // ── 8. 按人群定向分析 ──
     variables['targeting_analysis'] = this.buildGroupAnalysis(juguangRecords, 'targetsDetail', '精准定向');
@@ -482,5 +494,172 @@ export class TrafficAnalysisDataLoader extends BaseChapterDataLoader {
     });
 
     return [header, separator, ...rows].join('\n');
+  }
+
+  /**
+   * 构建广告类型汇总表 (ad_type_summary_table)。
+   * GROUP BY placement，输出 消费|展现量|点击量|互动量|CPM|CPC|CTR|CPE|CPI|CPTI + 总计行
+   */
+  private buildAdTypeSummaryTable(
+    records: Array<{
+      placement: string | null;
+      fee: any;
+      impression: number;
+      click: number;
+      interaction: number;
+      iUserNum: number;
+      tiUserNum: number;
+    }>,
+  ): string {
+    const groups = new Map<string, {
+      fee: number;
+      impression: number;
+      click: number;
+      interaction: number;
+      iUserNum: number;
+      tiUserNum: number;
+    }>();
+
+    let sumFee = 0;
+    let sumImpression = 0;
+    let sumClick = 0;
+    let sumInteraction = 0;
+    let sumIUserNum = 0;
+    let sumTiUserNum = 0;
+
+    for (const record of records) {
+      const key = record.placement;
+      if (!key) continue;
+
+      const fee = Number(record.fee);
+      sumFee += fee;
+      sumImpression += record.impression;
+      sumClick += record.click;
+      sumInteraction += record.interaction;
+      sumIUserNum += record.iUserNum;
+      sumTiUserNum += record.tiUserNum;
+
+      const existing = groups.get(key);
+      if (existing) {
+        existing.fee += fee;
+        existing.impression += record.impression;
+        existing.click += record.click;
+        existing.interaction += record.interaction;
+        existing.iUserNum += record.iUserNum;
+        existing.tiUserNum += record.tiUserNum;
+      } else {
+        groups.set(key, {
+          fee,
+          impression: record.impression,
+          click: record.click,
+          interaction: record.interaction,
+          iUserNum: record.iUserNum,
+          tiUserNum: record.tiUserNum,
+        });
+      }
+    }
+
+    if (groups.size === 0) {
+      return '暂无广告类型汇总数据';
+    }
+
+    const header = '| 广告类型 | 消费 | 展现量 | 点击量 | 互动量 | CPM | CPC | CTR | CPE | CPI | CPTI |';
+    const separator = '|---------|------|--------|--------|--------|-----|-----|-----|-----|-----|------|';
+
+    const sorted = Array.from(groups.entries()).sort((a, b) => b[1].fee - a[1].fee);
+
+    const formatRow = (name: string, data: { fee: number; impression: number; click: number; interaction: number; iUserNum: number; tiUserNum: number }) => {
+      const cpm = data.impression > 0 ? ((data.fee / data.impression) * 1000).toFixed(2) : '-';
+      const cpc = data.click > 0 ? (data.fee / data.click).toFixed(2) : '-';
+      const ctr = data.impression > 0 ? ((data.click / data.impression) * 100).toFixed(2) + '%' : '-';
+      const cpe = data.interaction > 0 ? (data.fee / data.interaction).toFixed(2) : '-';
+      const cpiVal = data.iUserNum > 0 ? (data.fee / data.iUserNum).toFixed(2) : '-';
+      const cptiVal = data.tiUserNum > 0 ? (data.fee / data.tiUserNum).toFixed(2) : '-';
+      return `| ${name} | ${data.fee.toFixed(0)} | ${data.impression} | ${data.click} | ${data.interaction} | ${cpm} | ${cpc} | ${ctr} | ${cpe} | ${cpiVal} | ${cptiVal} |`;
+    };
+
+    const rows = sorted.map(([key, data]) => {
+      const displayName = PLACEMENT_LABELS[key] || key;
+      return formatRow(displayName, data);
+    });
+
+    // 总计行
+    const totalRow = formatRow('总计', {
+      fee: sumFee,
+      impression: sumImpression,
+      click: sumClick,
+      interaction: sumInteraction,
+      iUserNum: sumIUserNum,
+      tiUserNum: sumTiUserNum,
+    });
+
+    return [header, separator, ...rows, totalRow].join('\n');
+  }
+
+  /**
+   * 构建每日趋势数据 (daily_trend_data)。
+   * GROUP BY time 字段，计算每日 CPM/CPC/CPE/fee，标注投放周期。
+   * 输出 JSON 字符串供前端图表渲染。
+   */
+  private buildDailyTrendData(
+    records: Array<{
+      time: string | null;
+      fee: any;
+      impression: number;
+      click: number;
+      interaction: number;
+    }>,
+    phases: Array<{ name: string; startDate: string; endDate: string }>,
+  ): string {
+    // GROUP BY time
+    const dailyMap = new Map<string, { fee: number; impression: number; click: number; interaction: number }>();
+
+    for (const record of records) {
+      if (!record.time) continue;
+      const date = record.time;
+      const existing = dailyMap.get(date);
+      const fee = Number(record.fee);
+      if (existing) {
+        existing.fee += fee;
+        existing.impression += record.impression;
+        existing.click += record.click;
+        existing.interaction += record.interaction;
+      } else {
+        dailyMap.set(date, {
+          fee,
+          impression: record.impression,
+          click: record.click,
+          interaction: record.interaction,
+        });
+      }
+    }
+
+    if (dailyMap.size === 0) {
+      return '[]';
+    }
+
+    // 按日期排序
+    const sortedDays = Array.from(dailyMap.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+
+    // 确定每天属于哪个投放周期
+    const getPeriod = (date: string): string => {
+      for (const phase of phases) {
+        if (date >= phase.startDate && date <= phase.endDate) {
+          return phase.name;
+        }
+      }
+      return '其他';
+    };
+
+    const trendData = sortedDays.map(([date, data]) => ({
+      date,
+      cpm: data.impression > 0 ? Number(((data.fee / data.impression) * 1000).toFixed(2)) : 0,
+      cpc: data.click > 0 ? Number((data.fee / data.click).toFixed(2)) : 0,
+      cpe: data.interaction > 0 ? Number((data.fee / data.interaction).toFixed(2)) : 0,
+      fee: Number(data.fee.toFixed(2)),
+      period: getPeriod(date),
+    }));
+
+    return JSON.stringify(trendData);
   }
 }

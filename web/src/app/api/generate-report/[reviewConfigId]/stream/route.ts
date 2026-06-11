@@ -69,7 +69,12 @@ async function runBackgroundGeneration(reviewConfigId: string, projectId: string
 
   // Helper: log to both console and file
   const genLogDir = path.resolve(process.cwd(), '..', 'logs', 'prompts', reviewConfigId);
-  try { fs.mkdirSync(genLogDir, { recursive: true }); } catch { /* ignore */ }
+  console.log(`[ReportGen] Log directory: ${genLogDir}, cwd: ${process.cwd()}`);
+  try {
+    fs.mkdirSync(genLogDir, { recursive: true });
+  } catch (e) {
+    console.error(`[ReportGen] ERROR creating log dir ${genLogDir}:`, e);
+  }
   const logToFile = (msg: string) => {
     console.log(msg);
     try {
@@ -159,7 +164,10 @@ async function runBackgroundGeneration(reviewConfigId: string, projectId: string
               `--- SYSTEM PROMPT ---\n${systemPrompt}\n\n` +
               `--- USER PROMPT ---\n${userPrompt}\n`;
             fs.writeFileSync(logFile, logContent, 'utf-8');
-          } catch { /* ignore logging errors */ }
+            console.log(`[ReportGen] Prompt logged to: ${logFile}`);
+          } catch (logErr) {
+            console.error(`[ReportGen] ERROR writing prompt log:`, logErr);
+          }
 
           // 动态超时：基础60s + 每1000 tokens加30s，上限300s
           const dynamicTimeout = Math.min(300000, 60000 + Math.ceil(estimatedTokens / 1000) * 30000);

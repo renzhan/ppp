@@ -471,11 +471,22 @@ export class DataOverviewDataLoader extends BaseChapterDataLoader {
     }
 
     // ── 10. 大盘均值 ──
-    if (benchmark.ctr) variables['benchmark_ctr'] = String(benchmark.ctr);
-    if (benchmark.cpm) variables['benchmark_cpm'] = String(benchmark.cpm);
-    if (benchmark.cpc) variables['benchmark_cpc'] = String(benchmark.cpc);
-    if (benchmark.cpe) variables['benchmark_cpe'] = String(benchmark.cpe);
-    if (benchmark.engagementRate) variables['benchmark_engagement_rate'] = String(benchmark.engagementRate);
+    // benchmark values may be stored as { min, max } range objects or plain numbers
+    const formatBenchmarkValue = (val: unknown): string => {
+      if (val == null) return '';
+      if (typeof val === 'number') return String(val);
+      if (typeof val === 'object' && val !== null && 'min' in val && 'max' in val) {
+        const range = val as { min: number; max: number };
+        return range.min === range.max ? String(range.min) : `${range.min}~${range.max}`;
+      }
+      return String(val);
+    };
+
+    if (benchmark.ctr) variables['benchmark_ctr'] = formatBenchmarkValue(benchmark.ctr);
+    if (benchmark.cpm) variables['benchmark_cpm'] = formatBenchmarkValue(benchmark.cpm);
+    if (benchmark.cpc) variables['benchmark_cpc'] = formatBenchmarkValue(benchmark.cpc);
+    if (benchmark.cpe) variables['benchmark_cpe'] = formatBenchmarkValue(benchmark.cpe);
+    if (benchmark.engagementRate) variables['benchmark_engagement_rate'] = formatBenchmarkValue(benchmark.engagementRate);
 
     // ── 11. 灵犀数据 (lingxi_data) → AIPS/TI人群 ──
     try {

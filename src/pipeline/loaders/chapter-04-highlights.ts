@@ -251,35 +251,35 @@ export class HighlightsDataLoader extends BaseChapterDataLoader {
       const aipsHighlights: string[] = [];
       const searchHighlights: string[] = [];
 
+      // Only take the FIRST (most recent) brand record to avoid duplicates
+      let brandRecordProcessed = false;
+
       for (const record of lingxiRecords) {
         const content = record.dataContent as Record<string, unknown>;
         if (!content) continue;
 
-        if (record.dataType === 'brand' || record.dataType === 'spu') {
+        if ((record.dataType === 'brand' || record.dataType === 'spu') && !brandRecordProcessed) {
+          brandRecordProcessed = true;
           const prefix = record.dataType === 'brand' ? '品牌' : 'SPU';
           if (content.aips) aipsHighlights.push(`${prefix} AIPS人群总数：${content.aips}`);
           if (content.ti) aipsHighlights.push(`${prefix} TI深度兴趣人群：${content.ti}`);
-          if (content.aipsChange) aipsHighlights.push(`${prefix} AIPS变化率：${content.aipsChange}`);
-          if (content.tiChange) aipsHighlights.push(`${prefix} TI变化率：${content.tiChange}`);
-          if (content.newAssets) aipsHighlights.push(`${prefix} 新增资产数：${content.newAssets}`);
+          // 本品变化率 (数据库字段: aipsCompareStartRatio / tiCompareStartRatio)
+          if (content.aipsCompareStartRatio != null) aipsHighlights.push(`${prefix} AIPS本品变化率：${content.aipsCompareStartRatio}%`);
+          if (content.tiCompareStartRatio != null) aipsHighlights.push(`${prefix} TI本品变化率：${content.tiCompareStartRatio}%`);
+          // 行业排名 (数据库字段: brandRank)
+          if (content.brandRank) aipsHighlights.push(`${prefix} AIPS人群规模行业排名：Top${content.brandRank}`);
+          if (content.newUserNum) aipsHighlights.push(`${prefix} 新增人群资产：${content.newUserNum}`);
+          if (content.aipsTransNum != null) aipsHighlights.push(`${prefix} AIPS人群变化数：${content.aipsTransNum}`);
+          if (content.tiTransNum != null) aipsHighlights.push(`${prefix} TI人群变化数：${content.tiTransNum}`);
         }
 
         if (record.dataType === 'search' || record.dataType === 'brand_search') {
           if (content.searchVolumeBefore) searchHighlights.push(`搜索量（投前）：${content.searchVolumeBefore}`);
           if (content.searchVolumeAfter) searchHighlights.push(`搜索量（投后）：${content.searchVolumeAfter}`);
-          if (content.searchRankBefore) searchHighlights.push(`搜索排名（投前）：${content.searchRankBefore}`);
-          if (content.searchRankAfter) searchHighlights.push(`搜索排名（投后）：${content.searchRankAfter}`);
-          if (content.brandHeat) searchHighlights.push(`品牌热度变化：${content.brandHeat}`);
-        }
-
-        if (record.dataType === 'aips') {
-          // 通用AIPS数据
-          if (content.total) aipsHighlights.push(`AIPS人群总数：${content.total}`);
-          if (content.awareness) aipsHighlights.push(`A(被看见)：${content.awareness}`);
-          if (content.interest) aipsHighlights.push(`I(被互动)：${content.interest}`);
-          if (content.trueInterest) aipsHighlights.push(`TI(被种草)：${content.trueInterest}`);
-          if (content.share) aipsHighlights.push(`S(被分享)：${content.share}`);
-          if (content.conversionRate) aipsHighlights.push(`流转率：${content.conversionRate}`);
+          if (content.preSearchRank) searchHighlights.push(`搜索排名（投前）：${content.preSearchRank}`);
+          if (content.postSearchRank) searchHighlights.push(`搜索排名（投后）：${content.postSearchRank}`);
+          if (content.preSearchVolume) searchHighlights.push(`搜索指数（投前）：${content.preSearchVolume}`);
+          if (content.postSearchVolume) searchHighlights.push(`搜索指数（投后）：${content.postSearchVolume}`);
         }
       }
 
@@ -304,6 +304,81 @@ export class HighlightsDataLoader extends BaseChapterDataLoader {
       `CPM：${cpm.toFixed(2)}，CPC：${cpc.toFixed(2)}，CPE：${cpe.toFixed(2)}，CTR：${ctr.toFixed(2)}%`,
       `爆文：${viralCount}篇（${viralRate.toFixed(1)}%）`,
     ].join('\n');
+
+    // ── 9.5 品牌心智数据解读（AIPS/TI） ──
+    // Extract aipsChange, tiChange, aipsIndustryRank from lingxi_data and build brand_mind_summary
+    let aipsChange: string | null = null;
+    let tiChange: string | null = null;
+    let aipsIndustryRank: string | null = null;
+    let aipsTotal: string | null = null;
+    let tiTotal: string | null = null;
+    let aipsTransNum: string | null = null;
+    let tiTransNum: string | null = null;
+    let screenshotPaths: string[] = [];
+
+    try {
+      const lingxiForMindSummary = await this.prisma.lingxiData.findMany({
+        where: { projectId },
+        select: { dataType: true, dataContent: true },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      for (const record of lingxiForMindSummary) {
+        const content = record.dataContent as Record<string, unknown>;
+        if (!content) continue;
+
+        if (record.dataType === 'brand' || record.dataType === 'spu') {
+          // Use correct DB field names: aipsCompareStartRatio, tiCompareStartRatio, brandRank
+          if (content.aipsCompareStartRatio != null && !aipsChange) {
+            aipsChange = String(content.aipsCompareStartRatio) + '%';
+          }
+          if (content.tiCompareStartRatio != null && !tiChange) {
+            tiChange = String(content.tiCompareStartRatio) + '%';
+          }
+          if (content.brandRank && !aipsIndustryRank) {
+            aipsIndustryRank = String(content.brandRank);
+          }
+          if (content.aips && !aipsTotal) {
+            aipsTotal = String(content.aips);
+          }
+          if (content.ti && !tiTotal) {
+            tiTotal = String(content.ti);
+          }
+          if (content.aipsTransNum != null && !aipsTransNum) {
+            aipsTransNum = String(content.aipsTransNum);
+          }
+          if (content.tiTransNum != null && !tiTransNum) {
+            tiTransNum = String(content.tiTransNum);
+          }
+          // Extract screenshots if available
+          if (Array.isArray(content.screenshots) && content.screenshots.length > 0 && screenshotPaths.length === 0) {
+            screenshotPaths = (content.screenshots as Array<{ type: string; filePath: string }>)
+              .map(s => `${s.type}: ${s.filePath}`);
+          }
+        }
+      }
+    } catch (error) {
+      console.warn(`[HighlightsDataLoader] Failed to load lingxi_data for brand mind summary: ${error}`);
+    }
+
+    // Generate brand_mind_summary variable — structured data for AI to generate 品牌心智数据解读
+    const brandMindParts: string[] = [];
+    if (aipsTotal) brandMindParts.push(`AIPS人群总数：${aipsTotal}`);
+    if (aipsTransNum) brandMindParts.push(`AIPS人群变化数：${aipsTransNum}`);
+    if (aipsChange) brandMindParts.push(`AIPS本品变化率：${aipsChange}`);
+    if (tiTotal) brandMindParts.push(`TI深度兴趣人群：${tiTotal}`);
+    if (tiTransNum) brandMindParts.push(`TI人群变化数：${tiTransNum}`);
+    if (tiChange) brandMindParts.push(`TI本品变化率：${tiChange}`);
+    if (aipsIndustryRank) brandMindParts.push(`AIPS人群规模行业排名：Top${aipsIndustryRank}`);
+
+    variables['brand_mind_summary'] = brandMindParts.length > 0
+      ? brandMindParts.join('\n')
+      : '暂无AIPS/TI品牌心智数据';
+
+    // Add lingxi_screenshot_ref variable — actual screenshot paths from database
+    variables['lingxi_screenshot_ref'] = screenshotPaths.length > 0
+      ? screenshotPaths.map(s => `灵犀后台截图: ${s}`).join('\n')
+      : '暂无灵犀后台截图数据';
 
     // ── 10. 构建溯源数据 ──
     // 溯源展示数据库原始行数据 + 计算公式

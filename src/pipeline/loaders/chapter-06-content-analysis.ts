@@ -310,7 +310,7 @@ export class ContentAnalysisDataLoader extends BaseChapterDataLoader {
         kolFanNum = pugongying?.kolFanNum || 0;
         kolNickName = pugongying?.kolNickName || '';
         noteTitle = pugongying?.noteTitle || '';
-        coverImage = null;
+        coverImage = pugongying && Array.isArray(pugongying.coverImages) && pugongying.coverImages.length > 0 ? pugongying.coverImages[0] : null;
         noteLink = pugongying?.noteLink || null;
 
         // 非报备互动量
