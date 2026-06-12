@@ -182,7 +182,7 @@ export async function POST(request: Request) {
       const executionStartDate = body.executionStartDate ? new Date(body.executionStartDate) : null;
       const endDate = body.endDate ? new Date(body.endDate) : null;
 
-      // Use executionStartDate as startDate for backward compat with DB schema
+      // startDate is deprecated — use executionStartDate directly
       const project = await prisma.project.create({
         data: {
           category,
@@ -190,8 +190,7 @@ export async function POST(request: Request) {
           businessLine: businessLine || null,
           spuName: spuName || null,
           projectName,
-          startDate: executionStartDate ?? new Date(),
-          endDate: endDate ?? executionStartDate ?? new Date(),
+          endDate: endDate ?? undefined,
           executionStartDate,
           createdBy: createdBy || null,
           participants,
@@ -269,8 +268,8 @@ export async function POST(request: Request) {
           spuName: spuName || null,
           projectName,
           projectType,
-          startDate: new Date(startDate),
-          endDate: new Date(endDate),
+          startDate: startDate ? new Date(startDate) : undefined,
+          endDate: endDate ? new Date(endDate) : undefined,
           launchPhases: parsedLaunchPhases as Prisma.InputJsonValue,
           businessLine: businessLine || null,
           createdBy: createdBy || null,
@@ -309,7 +308,7 @@ export async function POST(request: Request) {
           projectName,
           projectType: projectType || undefined,
           startDate,
-          endDate: body.endDate ? new Date(body.endDate) : startDate,
+          endDate: body.endDate ? new Date(body.endDate) : undefined,
           executionStartDate: body.executionStartDate ? new Date(body.executionStartDate) : null,
           createdBy: createdBy || null,
           participants,
@@ -330,8 +329,7 @@ export async function POST(request: Request) {
         businessLine: businessLine || null,
         spuName: spuName || null,
         projectName,
-        startDate: executionStartDate ?? new Date(),
-        endDate: endDate ?? executionStartDate ?? new Date(),
+        endDate: endDate ?? undefined,
         executionStartDate,
         createdBy: createdBy || null,
         participants,

@@ -40,8 +40,8 @@ model Project {
   spuName           String?   @map("spu_name") @db.VarChar(200)
   projectName       String    @map("project_name") @db.VarChar(200)
   projectType       String    @default("日常种草") @map("project_type") @db.VarChar(50)
-  startDate         DateTime  @map("start_date") @db.Date
-  endDate           DateTime  @map("end_date") @db.Date
+  startDate         DateTime? @map("start_date") @db.Date
+  endDate           DateTime? @map("end_date") @db.Date
   executionStartDate DateTime? @map("execution_start_date") @db.Date
   launchPhases      Json?     @map("launch_phases")
   engagementConfig  Json      @default("{\"includeShare\": true, \"includeFollow\": true}") @map("engagement_config")

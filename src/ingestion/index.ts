@@ -224,7 +224,9 @@ export class DataIngestionService {
     const dateBase = now.toISOString().slice(0, 10);
 
     const execStart = new Date(project.executionStartDate).toISOString().slice(0, 10);
-    const execEnd = new Date(project.endDate).toISOString().slice(0, 10);
+    const execEnd = project.endDate
+      ? new Date(project.endDate).toISOString().slice(0, 10)
+      : dateBase; // If endDate is not set, use T-1 as the upper bound
 
     const currentEnd = dateBase <= execEnd ? dateBase : execEnd;
 
