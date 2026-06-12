@@ -330,8 +330,11 @@ export class ContentAnalysisDataLoader extends BaseChapterDataLoader {
 
       // TI人群（来自聚光）
       const tiUserNum = juguang?.tiUserNum ?? 0;
+      // 投流费用（聚光fee）加入总消费
+      const juguangFee = juguang?.fee ?? 0;
+      cost += juguangFee;
 
-      // CPE / CPTI
+      // CPE / CPTI（消费 = 内容费用 + 投流费用）
       const cpe = engagement > 0 ? cost / engagement : 0;
       const cpti = tiUserNum > 0 ? cost / tiUserNum : 0;
 

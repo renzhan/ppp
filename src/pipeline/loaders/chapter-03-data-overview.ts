@@ -353,19 +353,46 @@ export class DataOverviewDataLoader extends BaseChapterDataLoader {
     const totalViralCount = regViralCount + unregViralCount;
     const totalContentCost = regCost + unregCost;
 
-    // 整体效率指标（合并分子÷合并分母）
+    // ── 7. 聚光数据 (juguang_data) — 需要在计算CPM/CPC/CPE之前加载 ──
+    let jgFee = 0, jgImpression = 0, jgClick = 0, jgInteraction = 0, jgTiUserNum = 0;
+    try {
+      const juguangAgg = await this.prisma.juguangData.aggregate({
+        where: { projectId },
+        _sum: {
+          fee: true,
+          impression: true,
+          click: true,
+          interaction: true,
+          tiUserNum: true,
+        },
+      });
+      jgFee = Number(juguangAgg._sum.fee || 0);
+      jgImpression = Number(juguangAgg._sum.impression || 0);
+      jgClick = Number(juguangAgg._sum.click || 0);
+      jgInteraction = Number(juguangAgg._sum.interaction || 0);
+      jgTiUserNum = Number(juguangAgg._sum.tiUserNum || 0);
+    } catch (error) {
+      console.warn(`[DataOverviewDataLoader] Failed to load juguang_data: ${error}`);
+    }
+
+    // ── 8. 计算总消费（内容费用 + 投流费用）和效率指标 ──
+    // 总消费 = 内容费用（报备+非报备） + 投流费用（聚光fee）
+    const totalCost = totalContentCost + jgFee;
+
+    // 整体效率指标（消费=内容+投流，合并分子÷合并分母）
     const viralRate = totalNoteCount > 0 ? (totalViralCount / totalNoteCount) * 100 : 0;
     const ctr = totalImpressions > 0 ? (totalReads / totalImpressions) * 100 : 0;
-    const cpm = totalImpressions > 0 ? (totalContentCost / totalImpressions) * 1000 : 0;
-    const cpc = totalReads > 0 ? totalContentCost / totalReads : 0;
-    const cpe = totalEngagement > 0 ? totalContentCost / totalEngagement : 0;
+    const cpm = totalImpressions > 0 ? (totalCost / totalImpressions) * 1000 : 0;
+    const cpc = totalReads > 0 ? totalCost / totalReads : 0;
+    const cpe = totalEngagement > 0 ? totalCost / totalEngagement : 0;
 
     // 设置变量
     variables['note_count'] = String(totalNoteCount);
     variables['registered_note_count'] = String(registeredNoteBase.length);
     variables['unregistered_note_count'] = String(unregisteredNoteBase.length);
-    variables['total_cost'] = totalContentCost.toFixed(2);
+    variables['total_cost'] = totalCost.toFixed(2);
     variables['content_cost'] = totalContentCost.toFixed(2);
+    variables['traffic_cost'] = jgFee.toFixed(2);
     variables['registered_cost'] = regCost.toFixed(2);
     variables['unregistered_cost'] = unregCost.toFixed(2);
 
@@ -396,35 +423,13 @@ export class DataOverviewDataLoader extends BaseChapterDataLoader {
     variables['cpc'] = cpc.toFixed(2);
     variables['cpe'] = cpe.toFixed(2);
 
-    // ── 7. 聚光数据 (juguang_data) ──
-    let jgFee = 0, jgImpression = 0, jgClick = 0, jgInteraction = 0, jgTiUserNum = 0;
-    try {
-      const juguangAgg = await this.prisma.juguangData.aggregate({
-        where: { projectId },
-        _sum: {
-          fee: true,
-          impression: true,
-          click: true,
-          interaction: true,
-          tiUserNum: true,
-        },
-      });
-      jgFee = Number(juguangAgg._sum.fee || 0);
-      jgImpression = Number(juguangAgg._sum.impression || 0);
-      jgClick = Number(juguangAgg._sum.click || 0);
-      jgInteraction = Number(juguangAgg._sum.interaction || 0);
-      jgTiUserNum = Number(juguangAgg._sum.tiUserNum || 0);
+    variables['juguang_fee'] = jgFee.toFixed(2);
+    variables['juguang_impression'] = String(jgImpression);
+    variables['juguang_click'] = String(jgClick);
+    variables['juguang_interaction'] = String(jgInteraction);
+    variables['juguang_ti_user_num'] = String(jgTiUserNum);
 
-      variables['juguang_fee'] = jgFee.toFixed(2);
-      variables['juguang_impression'] = String(jgImpression);
-      variables['juguang_click'] = String(jgClick);
-      variables['juguang_interaction'] = String(jgInteraction);
-      variables['juguang_ti_user_num'] = String(jgTiUserNum);
-    } catch (error) {
-      console.warn(`[DataOverviewDataLoader] Failed to load juguang_data: ${error}`);
-    }
-
-    // ── 8. 自然流指标（仅对报备笔记有意义） ──
+    // ── 9. 自然流指标（仅对报备笔记有意义） ──
     const naturalImp = Math.max(0, regImpressions - jgImpression);
     const naturalRead = Math.max(0, regReads - jgClick);
     const naturalEng = Math.max(0, regEngagement - jgInteraction);
@@ -432,9 +437,9 @@ export class DataOverviewDataLoader extends BaseChapterDataLoader {
     variables['natural_impressions'] = String(naturalImp);
     variables['natural_reads'] = String(naturalRead);
     variables['natural_engagement'] = String(naturalEng);
-    variables['natural_cpm'] = naturalImp > 0 ? ((totalContentCost / naturalImp) * 1000).toFixed(2) : '0';
-    variables['natural_cpc'] = naturalRead > 0 ? (totalContentCost / naturalRead).toFixed(2) : '0';
-    variables['natural_cpe'] = naturalEng > 0 ? (totalContentCost / naturalEng).toFixed(2) : '0';
+    variables['natural_cpm'] = naturalImp > 0 ? ((totalCost / naturalImp) * 1000).toFixed(2) : '0';
+    variables['natural_cpc'] = naturalRead > 0 ? (totalCost / naturalRead).toFixed(2) : '0';
+    variables['natural_cpe'] = naturalEng > 0 ? (totalCost / naturalEng).toFixed(2) : '0';
     variables['natural_ctr'] = naturalImp > 0 ? ((naturalRead / naturalImp) * 100).toFixed(2) : '0';
 
     // ── 9. KPI目标与完成率 ──
@@ -532,15 +537,16 @@ export class DataOverviewDataLoader extends BaseChapterDataLoader {
       dataRows: [
         { category: '报备', noteCount: registeredNoteBase.length, cost: Number(regCost.toFixed(2)), impressions: regImpressions, reads: regReads, engagement: regEngagement, viralCount: regViralCount },
         { category: '非报备', noteCount: unregisteredNoteBase.length, cost: Number(unregCost.toFixed(2)), impressions: unregImpressions, reads: unregReads, engagement: unregEngagement, viralCount: unregViralCount },
-        { category: '合并', noteCount: totalNoteCount, cost: Number(totalContentCost.toFixed(2)), impressions: totalImpressions, reads: totalReads, engagement: totalEngagement, viralCount: totalViralCount },
+        { category: '合并', noteCount: totalNoteCount, cost: Number(totalCost.toFixed(2)), impressions: totalImpressions, reads: totalReads, engagement: totalEngagement, viralCount: totalViralCount },
       ],
       calculations: [
-        { metric: '内容金额口径', formula: `当前口径: ${contentCostCaliber}`, inputs: { '报备费用公式': contentCostCaliber === '资源含税成本价' ? 'SUM(kol_price+total_platform_price)' : 'SUM(note_base.content_settlement)', '非报备费用公式': contentCostCaliber === '资源含税成本价' ? 'SUM(note_base.content_cost)' : 'SUM(note_base.content_settlement)' }, result: `${totalContentCost.toFixed(2)}元` },
+        { metric: '内容金额口径', formula: `当前口径: ${contentCostCaliber}`, inputs: { '报备费用公式': contentCostCaliber === '资源含税成本价' ? 'SUM(kol_price+total_platform_price)' : 'SUM(note_base.content_settlement)', '非报备费用公式': contentCostCaliber === '资源含税成本价' ? 'SUM(note_base.content_cost)' : 'SUM(note_base.content_settlement)' }, result: `内容费用${totalContentCost.toFixed(2)}元` },
+        { metric: '总消费(含投流)', formula: '内容费用 + 投流费用(聚光fee)', inputs: { '内容费用': totalContentCost, '投流费用': jgFee }, result: `${totalCost.toFixed(2)}元` },
         { metric: '互动口径', formula: engagementMetric === 'include_follow' ? '含关注(赞+藏+评+分享+关注)' : '不含关注(赞+藏+评+分享)', inputs: { '报备互动': regEngagement, '非报备互动': unregEngagement }, result: totalEngagement },
         { metric: '爆文口径', formula: viralMetric === 'like_only' ? `赞≥${viralThreshold}` : `赞+藏+评≥${viralThreshold}`, inputs: { '报备爆文': regViralCount, '非报备爆文': unregViralCount }, result: totalViralCount },
-        { metric: '整体CPM', formula: '合并消费 / 合并曝光 × 1000', inputs: { '合并消费': totalContentCost, '合并曝光': totalImpressions }, result: Number(cpm.toFixed(2)) },
-        { metric: '整体CPC', formula: '合并消费 / 合并阅读', inputs: { '合并消费': totalContentCost, '合并阅读': totalReads }, result: Number(cpc.toFixed(2)) },
-        { metric: '整体CPE', formula: '合并消费 / 合并互动', inputs: { '合并消费': totalContentCost, '合并互动': totalEngagement }, result: Number(cpe.toFixed(2)) },
+        { metric: '整体CPM', formula: '总消费(内容+投流) / 合并曝光 × 1000', inputs: { '总消费': totalCost, '合并曝光': totalImpressions }, result: Number(cpm.toFixed(2)) },
+        { metric: '整体CPC', formula: '总消费(内容+投流) / 合并阅读', inputs: { '总消费': totalCost, '合并阅读': totalReads }, result: Number(cpc.toFixed(2)) },
+        { metric: '整体CPE', formula: '总消费(内容+投流) / 合并互动', inputs: { '总消费': totalCost, '合并互动': totalEngagement }, result: Number(cpe.toFixed(2)) },
         { metric: '整体CTR', formula: '合并阅读 / 合并曝光 × 100%', inputs: { '合并阅读': totalReads, '合并曝光': totalImpressions }, result: Number(ctr.toFixed(2)) },
         { metric: '整体爆文率', formula: '合并爆文数 / 合并发布数 × 100%', inputs: { '合并爆文数': totalViralCount, '合并发布数': totalNoteCount }, result: Number(viralRate.toFixed(1)) },
       ],

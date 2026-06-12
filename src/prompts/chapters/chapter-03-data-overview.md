@@ -17,6 +17,13 @@ system_prompt: |
   效率类指标（CPM/CPC/CPE/CTR）按大盘对比维度分析，使用优于/劣于大盘百分比+颜色标注。
   向客户说明整体项目花了多少钱、达到了什么量级的传播效果，各KPI完成率如何。
   重点突出超额完成的指标，对未完成的指标给出客观原因，说明整体投入产出是否合理。
+
+  关键说明：
+  - 报备笔记 = 内容形式 IN (视频报备, 图文报备)，数据来自蒲公英平台API
+  - 非报备笔记 = 内容形式 IN (视频软文, 图文软文)，数据来自业务底表
+  - 总消费 = 内容费用(报备+非报备) + 投流费用(聚光fee)
+  - CPM/CPC/CPE 的分子 = 总消费（含投流），分母 = 合并对应指标
+  - 合并值 = 报备 + 非报备，效率指标使用合并分子÷合并分母计算（非加权平均）
 fallback_text: "数据总览内容生成失败，请重试。"
 ---
 
@@ -24,10 +31,11 @@ fallback_text: "数据总览内容生成失败，请重试。"
 
 ## 一、整体投放数据
 - 总笔记篇数：{{note_count}}篇（报备：{{registered_note_count}}篇，非报备：{{unregistered_note_count}}篇）
-- 内容费用：{{total_cost}}元（口径：{{content_cost_caliber}}）
-  - 报备费用：{{registered_cost}}元
-  - 非报备费用：{{unregistered_cost}}元
-- 投流消耗（聚光）：{{juguang_fee}}元
+- 总消费：{{total_cost}}元（内容费用 + 投流费用）
+  - 内容费用：{{content_cost}}元（口径：{{content_cost_caliber}}）
+    - 报备费用：{{registered_cost}}元
+    - 非报备费用：{{unregistered_cost}}元
+  - 投流消耗（聚光）：{{traffic_cost}}元
 - 互动统计口径：{{engagement_metric}}
 - 爆文统计口径：{{viral_metric}}
 
@@ -55,7 +63,12 @@ fallback_text: "数据总览内容生成失败，请重试。"
 - CPC目标：{{kpi_cpc}}，完成率：{{cpc_completion}}%
 - CPE目标：{{kpi_cpe}}，完成率：{{cpe_completion}}%
 - CTR目标：{{kpi_ctr}}%，完成率：{{ctr_completion}}%
-- 爆文数：{{viral_count}}篇
+
+注：
+- 报备数据来源：蒲公英平台API（imp_num, read_num, like_num, fav_num, cmt_num, share_num）
+- 非报备数据来源：业务底表（曝光量, 阅读量, 点赞量, 收藏量, 评论量, 分享量, 关注量）
+- 总消费 = 内容费用（报备+非报备）+ 投流费用（聚光fee）
+- CPM/CPC/CPE = 总消费(含投流) / 合并对应指标（非分别计算后加权平均）
 
 ## 三、互动明细
 - 点赞：{{total_likes}}
