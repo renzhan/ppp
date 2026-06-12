@@ -62,7 +62,7 @@ export function Sidebar({ collapsed = false, showToggle = false, onToggle }: Sid
         )}
       >
         <img
-          src={collapsed ? '/images/logo-s.jpg' : '/images/logo.jpg'}
+          src={collapsed ? '/images/logo-s.jpg' : '/images/logo.svg'}
           alt="派盘盘"
           className={cn(
             'shrink-0 object-contain',

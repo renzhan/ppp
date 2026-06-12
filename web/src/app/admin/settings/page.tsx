@@ -18,8 +18,8 @@ export default function AdminSettingsPage() {
   return (
     <div className="space-y-6">
       <div className="space-y-1">
-        <h1 className="text-2xl font-bold tracking-tight text-gray-900">系统设置</h1>
-        <p className="text-sm text-gray-500">管理项目底表导入。</p>
+        <h1 className="text-2xl tracking-tight text-gray-900">系统设置</h1>
+
       </div>
       <ProjectBaseImportSection />
     </div>

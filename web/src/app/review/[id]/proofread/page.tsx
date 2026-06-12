@@ -8,14 +8,17 @@ import {
   AlertCircle,
   ChevronDown,
   Save,
-  FileText,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { Loading } from '@/components/ui/loading';
+import { Button } from '@/components/ui/button';
 import { ReportChapterNav } from '@/components/proofread/report-chapter-nav';
 import { ReportAiChat } from '@/components/proofread/report-ai-chat';
 import { TraceDataPanel } from '@/components/proofread/trace-data-panel';
 import { useChartRenderer } from '@/components/charts/echarts-renderer';
 import { useResizablePanel } from '@/hooks/use-resizable-panel';
+import { cn } from '@/lib/utils';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -82,6 +85,7 @@ export default function ProofreadPage({ params }: { params: { id: string } }) {
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
   const [activeTraceId, setActiveTraceId] = useState<string | null>(null);
   const [chapterStatuses, setChapterStatuses] = useState<ChapterStatus[]>([]);
+  const [aiPanelOpen, setAiPanelOpen] = useState(false);
 
   const eventSourceRef = useRef<EventSource | null>(null);
   const exportRef = useRef<HTMLDivElement>(null);
@@ -99,8 +103,15 @@ export default function ProofreadPage({ params }: { params: { id: string } }) {
   const activeChapterTraceIds = chapters.find((c) => c.id === activeChapterId)?.traceIds || [];
 
   // Resizable panels
-  const leftPanel = useResizablePanel({ defaultWidth: 160, minWidth: 120, maxWidth: 320, side: 'left' });
+  const leftPanel = useResizablePanel({ defaultWidth: 200, minWidth: 160, maxWidth: 360, side: 'left' });
   const rightPanel = useResizablePanel({ defaultWidth: 288, minWidth: 200, maxWidth: 500, side: 'right' });
+
+  // Open right panel when trace data is selected
+  useEffect(() => {
+    if (activeTraceId) {
+      setAiPanelOpen(true);
+    }
+  }, [activeTraceId]);
 
   // Scroll to top when switching chapters
   useEffect(() => {
@@ -416,81 +427,82 @@ export default function ProofreadPage({ params }: { params: { id: string } }) {
   const activeChapter = chapters.find((c) => c.id === activeChapterId) || chapters[0];
 
   return (
-    <div className="flex h-[calc(100vh-3rem)] flex-col">
-      {/* Top bar */}
-      <header className="flex items-center justify-between border-b bg-white px-4 py-2">
-        <div className="flex items-center gap-3">
-          <Link
-            href="/review"
-            className="text-xs text-gray-500 hover:text-gray-700"
-          >
-            复盘系统
-          </Link>
-          <span className="text-xs text-gray-300">/</span>
-          <span className="text-xs text-gray-700">审校台</span>
+    <div className="flex h-[calc(100vh-6.5rem)] flex-col">
+      {/* Title bar with actions */}
+      <div className="flex shrink-0 items-center justify-between border-b bg-white px-8 py-4">
+        <div className="min-w-0">
+          <h1 className="text-xl font-bold text-gray-900">
+            {review?.project.projectName || ''}-复盘
+          </h1>
+          <p className="mt-1 text-xs text-gray-500">
+            {review?.reportContent?.generatedAt
+              ? `${new Date(review.reportContent.generatedAt).toLocaleString('zh-CN')}`
+              : ''}
+            {review?.project.brand && ` · ${review.project.brand}`}
+          </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* Save button */}
-          <button
+        <div className="flex shrink-0 items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
             onClick={handleSave}
             disabled={isSaving || chapters.length === 0}
-            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-gray-200 px-3 text-xs font-medium text-gray-600 transition hover:bg-gray-50 disabled:opacity-50"
+            className="gap-1.5"
           >
             {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
             {isSaving ? '保存中' : '保存'}
-          </button>
+          </Button>
           {lastSavedAt && (
             <span className="text-[10px] text-gray-400">已保存 {lastSavedAt}</span>
           )}
 
-          {/* Export dropdown */}
           <div className="relative" ref={exportRef}>
-            <button
+            <Button
+              type="button"
+              variant="primary"
+              size="sm"
               onClick={() => setExportOpen(!exportOpen)}
               disabled={chapters.length === 0}
-              className="inline-flex h-8 items-center gap-1.5 rounded-md bg-brand px-3 text-xs font-medium text-white transition hover:bg-brand-600 disabled:opacity-50"
+              className="gap-1.5"
             >
               下载
               <ChevronDown size={12} />
-            </button>
+            </Button>
             {exportOpen && (
               <div className="absolute right-0 top-full z-50 mt-1 w-28 rounded-md border border-gray-200 bg-white py-1 shadow-lg">
-                <button
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
                   onClick={handleExportPDF}
-                  className="flex w-full items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                  className="h-auto w-full justify-start rounded-none px-3 py-2 text-xs font-normal text-gray-700"
                 >
                   PDF
-                </button>
-                <button
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
                   onClick={handleExportWord}
-                  className="flex w-full items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                  className="h-auto w-full justify-start rounded-none px-3 py-2 text-xs font-normal text-gray-700"
                 >
                   Word
-                </button>
+                </Button>
               </div>
             )}
           </div>
         </div>
-      </header>
-
-      {/* Report title area */}
-      <div className="border-b bg-white px-8 py-4">
-        <h1 className="text-xl font-bold text-gray-900">
-          {review?.project.projectName || ''}-复盘
-        </h1>
-        <p className="mt-1 text-xs text-gray-500">
-          {review?.reportContent?.generatedAt
-            ? `${new Date(review.reportContent.generatedAt).toLocaleString('zh-CN')}`
-            : ''}
-          {review?.project.brand && ` · ${review.project.brand}`}
-        </p>
       </div>
 
       {/* Three-panel layout */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="relative flex min-h-0 flex-1 overflow-hidden">
         {/* Left: Chapter navigation (resizable) */}
-        <div className="flex-shrink-0 overflow-y-auto" style={{ width: leftPanel.width }}>
+        <div
+          className="h-full flex-shrink-0 overflow-x-hidden overflow-y-auto"
+          style={{ width: leftPanel.width }}
+        >
           <ReportChapterNav
             chapterStatuses={chapterStatuses}
             chapters={chapters}
@@ -505,7 +517,7 @@ export default function ProofreadPage({ params }: { params: { id: string } }) {
         />
 
         {/* Center: Content editor */}
-        <main ref={mainRef} className="flex-1 overflow-y-auto bg-white px-8 py-6 min-w-0">
+        <main ref={mainRef} className="min-h-0 min-w-0 flex-1 overflow-y-auto bg-white px-8 py-6">
           {pageStatus === 'generating' && chapters.length === 0 ? (
             <div className="flex h-full flex-col items-center justify-center gap-4">
               <Loader2 size={32} className="animate-spin text-brand" />
@@ -620,26 +632,77 @@ export default function ProofreadPage({ params }: { params: { id: string } }) {
 
         {/* Right resize handle */}
         <div
-          className="w-1 cursor-col-resize bg-transparent hover:bg-blue-200 active:bg-blue-300 transition-colors flex-shrink-0"
-          onMouseDown={rightPanel.handleMouseDown}
-        />
-        {/* Right: AI Chat or Trace Panel (resizable) */}
-        <div className="flex-shrink-0 overflow-hidden" style={{ width: rightPanel.width }}>
-          {activeTraceId ? (
-            <TraceDataPanel
-              reviewId={id}
-              traceId={activeTraceId}
-              onClose={() => setActiveTraceId(null)}
-            />
-          ) : (
-            <ReportAiChat
-              reviewId={id}
-              chapterTitle={activeChapter?.title || ''}
-              chapterContent={activeChapter?.content || ''}
-              onApplySuggestion={handleApplySuggestion}
-            />
+          className={cn(
+            'flex-shrink-0 cursor-col-resize bg-transparent transition-all duration-300 ease-in-out hover:bg-blue-200 active:bg-blue-300',
+            aiPanelOpen ? 'w-1 opacity-100' : 'w-0 opacity-0'
           )}
+          onMouseDown={aiPanelOpen ? rightPanel.handleMouseDown : undefined}
+        />
+
+        {/* Right: AI Chat drawer */}
+        <div
+          className={cn(
+            'relative flex h-full min-h-0 flex-shrink-0 overflow-visible transition-[width] duration-300 ease-in-out',
+            !aiPanelOpen && 'pointer-events-none'
+          )}
+          style={{ width: aiPanelOpen ? rightPanel.width : 0 }}
+        >
+          <button
+            type="button"
+            onClick={() => setAiPanelOpen(false)}
+            className={cn(
+              'absolute -left-[22px] top-1/2 z-20 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 shadow-md transition-all duration-300 ease-in-out hover:border-brand hover:text-brand hover:shadow-lg',
+              aiPanelOpen ? 'scale-100 opacity-100' : 'pointer-events-none scale-75 opacity-0'
+            )}
+            aria-label="收起 AI 助手"
+            aria-hidden={!aiPanelOpen}
+            tabIndex={aiPanelOpen ? 0 : -1}
+          >
+            <ChevronRight size={24} strokeWidth={2} />
+          </button>
+          <div className="h-full min-h-0 overflow-hidden border-l">
+            <div
+              className={cn(
+                'flex h-full min-h-0 flex-col transition-[transform,opacity] duration-300 ease-in-out',
+                aiPanelOpen ? 'translate-x-0 opacity-100' : 'translate-x-6 opacity-0'
+              )}
+              style={{ width: rightPanel.width }}
+            >
+              {activeTraceId ? (
+                <TraceDataPanel
+                  reviewId={id}
+                  traceId={activeTraceId}
+                  onClose={() => {
+                    setActiveTraceId(null);
+                    setAiPanelOpen(false);
+                  }}
+                />
+              ) : (
+                <ReportAiChat
+                  reviewId={id}
+                  chapterTitle={activeChapter?.title || ''}
+                  chapterContent={activeChapter?.content || ''}
+                  onApplySuggestion={handleApplySuggestion}
+                />
+              )}
+            </div>
+          </div>
         </div>
+
+        {/* Drawer expand toggle */}
+        <button
+          type="button"
+          onClick={() => setAiPanelOpen(true)}
+          className={cn(
+            'absolute right-3 top-1/2 z-20 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 shadow-md transition-all duration-300 ease-in-out hover:border-brand hover:text-brand hover:shadow-lg',
+            aiPanelOpen ? 'pointer-events-none scale-75 opacity-0' : 'scale-100 opacity-100'
+          )}
+          aria-label="展开 AI 助手"
+          aria-hidden={aiPanelOpen}
+          tabIndex={aiPanelOpen ? -1 : 0}
+        >
+          <ChevronLeft size={24} strokeWidth={2} />
+        </button>
       </div>
     </div>
   );

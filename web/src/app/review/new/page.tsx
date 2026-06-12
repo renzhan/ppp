@@ -83,13 +83,27 @@ interface KpiTargets {
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const DEFAULT_INFLUENCER_TIERS: InfluencerTier[] = [
+function createEmptyInfluencerTier(): InfluencerTier {
+  return {
+    id: generateId(),
+    name: '',
+    fanRangeMin: 0,
+    fanRangeMax: 0,
+  };
+}
 
-];
+const DEFAULT_INFLUENCER_TIERS: InfluencerTier[] = [createEmptyInfluencerTier()];
 
-const DEFAULT_LAUNCH_PHASES: LaunchPhase[] = [
+function createEmptyLaunchPhase(): LaunchPhase {
+  return {
+    id: generateId(),
+    name: '',
+    startDate: '',
+    endDate: '',
+  };
+}
 
-];
+const DEFAULT_LAUNCH_PHASES: LaunchPhase[] = [createEmptyLaunchPhase()];
 
 const REPORT_MODULES = [
   { key: 'projectReview', label: '项目回顾' },
@@ -361,16 +375,12 @@ function NewReviewPageContent() {
 
   // ─── Handlers ────────────────────────────────────────────────────────────
   const handleAddTier = () => {
-    setInfluencerTiers([...influencerTiers, {
-      id: generateId(),
-      name: '',
-      fanRangeMin: 0,
-      fanRangeMax: 0,
-    }]);
+    setInfluencerTiers([...influencerTiers, createEmptyInfluencerTier()]);
   };
 
   const handleRemoveTier = (id: string) => {
-    setInfluencerTiers(influencerTiers.filter((t) => t.id !== id));
+    const remaining = influencerTiers.filter((t) => t.id !== id);
+    setInfluencerTiers(remaining.length > 0 ? remaining : [createEmptyInfluencerTier()]);
   };
 
   const handleTierChange = (id: string, field: keyof InfluencerTier, value: string | number) => {
@@ -380,16 +390,12 @@ function NewReviewPageContent() {
   };
 
   const handleAddPhase = () => {
-    setLaunchPhases([...launchPhases, {
-      id: generateId(),
-      name: '',
-      startDate: '',
-      endDate: '',
-    }]);
+    setLaunchPhases([...launchPhases, createEmptyLaunchPhase()]);
   };
 
   const handleRemovePhase = (id: string) => {
-    setLaunchPhases(launchPhases.filter((p) => p.id !== id));
+    const remaining = launchPhases.filter((p) => p.id !== id);
+    setLaunchPhases(remaining.length > 0 ? remaining : [createEmptyLaunchPhase()]);
   };
 
   const handlePhaseChange = (id: string, field: keyof LaunchPhase, value: string) => {
@@ -571,13 +577,17 @@ function NewReviewPageContent() {
     createReview.mutate({
       projectId: selectedProjectId,
       benchmark: parsedBenchmark,
-      influencerTiers,
+      influencerTiers: influencerTiers.filter(
+        (t) => t.name.trim() || t.fanRangeMin > 0 || t.fanRangeMax > 0
+      ),
       kpiTargets: parsedKpi,
       engagementMetric,
       viralMetric,
       viralThreshold: activeViralThreshold ? parseInt(activeViralThreshold) : null,
       modules: { ...modules, contentCostCaliber, trafficCostCaliber },
-      launchPhases,
+      launchPhases: launchPhases.filter(
+        (p) => p.name.trim() || p.startDate || p.endDate
+      ),
       hasUnofficialCooperation,
       executionPeriod: executionPeriodStart && executionPeriodEnd
         ? { start: executionPeriodStart, end: executionPeriodEnd }
@@ -704,23 +714,41 @@ function NewReviewPageContent() {
             <span className="ml-2 text-sm text-gray-500">加载项目信息...</span>
           </div>
         ) : projectInfo ? (
-          <div className="grid grid-cols-2 gap-4 rounded-md border border-gray-200 bg-gray-50 p-4 sm:grid-cols-4">
-            <div>
-              <span className="block text-xs text-gray-500">项目名称</span>
-              <span className="text-sm font-medium text-gray-800">{projectInfo.projectName || '-'}</span>
+          <div className="space-y-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <FormField label="品类">
+                <Select value={projectInfo.category || '-'} disabled>
+                  <SelectTrigger className="h-10 rounded-lg border-gray-200 focus-visible:ring-brand/20" />
+                  <SelectContent>
+                    <SelectItem value={projectInfo.category || '-'}>{projectInfo.category || '-'}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FormField>
+              <FormField label="品牌">
+                <Select value={projectInfo.brand || '-'} disabled>
+                  <SelectTrigger className="h-10 rounded-lg border-gray-200 focus-visible:ring-brand/20" />
+                  <SelectContent>
+                    <SelectItem value={projectInfo.brand || '-'}>{projectInfo.brand || '-'}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FormField>
+              <FormField label="业务线">
+                <Select value={projectInfo.businessLine || '-'} disabled>
+                  <SelectTrigger className="h-10 rounded-lg border-gray-200 focus-visible:ring-brand/20" />
+                  <SelectContent>
+                    <SelectItem value={projectInfo.businessLine || '-'}>{projectInfo.businessLine || '-'}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FormField>
             </div>
-            <div>
-              <span className="block text-xs text-gray-500">品类</span>
-              <span className="text-sm font-medium text-gray-800">{projectInfo.category || '-'}</span>
-            </div>
-            <div>
-              <span className="block text-xs text-gray-500">品牌</span>
-              <span className="text-sm font-medium text-gray-800">{projectInfo.brand || '-'}</span>
-            </div>
-            <div>
-              <span className="block text-xs text-gray-500">业务线</span>
-              <span className="text-sm font-medium text-gray-800">{projectInfo.businessLine || '-'}</span>
-            </div>
+            <FormField label="项目">
+              <Select value={projectInfo.projectName || '-'} disabled>
+                <SelectTrigger className="h-10 rounded-lg border-gray-200 focus-visible:ring-brand/20" />
+                <SelectContent>
+                  <SelectItem value={projectInfo.projectName || '-'}>{projectInfo.projectName || '-'}</SelectItem>
+                </SelectContent>
+              </Select>
+            </FormField>
           </div>
         ) : selectedProjectId ? (
           <div className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
@@ -815,8 +843,9 @@ function NewReviewPageContent() {
               value={hasUnofficialCooperation ? 'yes' : 'no'}
               onValueChange={(v) => setHasUnofficialCooperation(v === 'yes')}
             >
-              <RadioGroupItem value="yes">是</RadioGroupItem>
               <RadioGroupItem value="no">否</RadioGroupItem>
+              <RadioGroupItem value="yes">是</RadioGroupItem>
+
             </RadioGroup>
           </FormField>
 
@@ -953,41 +982,48 @@ function NewReviewPageContent() {
       </div>
 
       {/* Section: 模块配置 */}
-      <FormSection title="模块配置">
+      <FormSection
+        title="模块配置"
+        action={
+          <div className="flex items-center gap-2 text-sm">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setModules(selectAllModules(modules))}
+              className="h-auto px-2 py-1 text-gray-600 hover:text-brand"
+            >
+              全选
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setModules(deselectAllModules(modules))}
+              className="h-auto px-2 py-1 text-gray-600 hover:text-brand"
+            >
+              清空选择
+            </Button>
+          </div>
+        }
+      >
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {REPORT_MODULES.map((mod) => (
+          {REPORT_MODULES.map((mod, index) => (
             <label
               key={mod.key}
-              className="flex cursor-pointer items-center gap-2 rounded-md border border-gray-200 px-3 py-2 transition hover:bg-gray-50"
+              className="flex cursor-pointer items-center gap-2.5 rounded-md border border-gray-200 px-3 py-2.5 transition hover:bg-gray-50"
             >
               <Checkbox
                 checked={modules[mod.key] ?? true}
                 onCheckedChange={() => handleModuleToggle(mod.key)}
+                className="h-5 w-5 [&_svg]:h-3.5 [&_svg]:w-3.5"
               />
-              <span className="text-sm text-gray-700">{mod.label}</span>
+              <span className="text-sm text-gray-700">
+                <span className="mr-1.5 tabular-nums text-gray-400">{index + 1}.</span>
+                {mod.label}
+              </span>
             </label>
           ))}
-        </div>
-        <div className="mt-4 flex items-center justify-end gap-2 text-sm">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => setModules(selectAllModules(modules))}
-            className="h-auto px-2 py-1 text-gray-600 hover:text-brand"
-          >
-            全选
-          </Button>
-
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => setModules(deselectAllModules(modules))}
-            className="h-auto px-2 py-1 text-gray-600 hover:text-brand"
-          >
-            清空选择
-          </Button>
         </div>
       </FormSection>
 
@@ -1187,11 +1223,22 @@ function NewReviewPageContent() {
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
-function FormSection({ title, children }: { title: string; children: React.ReactNode }) {
+function FormSection({
+  title,
+  children,
+  action,
+}: {
+  title: string;
+  children: React.ReactNode;
+  action?: React.ReactNode;
+}) {
   return (
     <Card>
       <CardHeader className="pb-4">
-        <CardTitle>{title}</CardTitle>
+        <div className="flex items-center justify-between gap-4">
+          <CardTitle>{title}</CardTitle>
+          {action}
+        </div>
       </CardHeader>
       <CardContent>{children}</CardContent>
     </Card>

@@ -61,9 +61,9 @@ export function TraceDataPanel({ reviewId, traceId, onClose }: TraceDataPanelPro
   });
 
   return (
-    <div className="flex h-full flex-col border-l bg-white">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-white">
       {/* Header */}
-      <div className="flex items-center justify-between border-b px-4 py-3">
+      <div className="flex shrink-0 items-center justify-between border-b px-4 py-3">
         <div className="flex items-center gap-2">
           <Database size={14} className="text-blue-600" />
           <span className="text-sm font-medium text-slate-800">
@@ -79,7 +79,7 @@ export function TraceDataPanel({ reviewId, traceId, onClose }: TraceDataPanelPro
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto px-4 py-3">
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
         {isLoading && (
           <div className="flex items-center justify-center py-8">
             <span className="text-xs text-slate-400">加载中...</span>
