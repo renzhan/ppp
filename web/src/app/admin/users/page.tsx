@@ -48,6 +48,7 @@ interface User {
   username: string;
   phone: string | null;
   displayName: string | null;
+  realName: string | null;
   role: string;
   isActive: boolean;
   mustChangePassword: boolean;
@@ -69,6 +70,7 @@ const ROLE_OPTIONS = [
   { value: 'AM', label: 'AM' },
   { value: '组长', label: '组长' },
   { value: 'AE', label: 'AE' },
+  { value: '助理', label: '助理' },
   { value: 'admin', label: '管理员' },
 ] as const;
 
@@ -80,6 +82,7 @@ const ROLE_FILTER_OPTIONS = [
   { value: 'AM', label: 'AM' },
   { value: '组长', label: '组长' },
   { value: 'AE', label: 'AE' },
+  { value: '助理', label: '助理' },
 ] as const;
 
 const selectTriggerClass =
@@ -236,9 +239,9 @@ export default function AdminUsersPage() {
                   {users.map((user, index) => (
                     <TableRow key={user.id} className={listTableRowClass(index)}>
                       <TableCell className={cn(listTableCellClass, 'text-gray-600')}>
-                        {user.displayName || '-'}
+                        {user.realName || '-'}
                       </TableCell>
-                      <TableCell className={listTableCellClass}>{user.username}</TableCell>
+                      <TableCell className={listTableCellClass}>{user.displayName || user.username}</TableCell>
                       <TableCell className={cn(listTableCellClass, 'text-gray-500')}>{user.phone || '-'}</TableCell>
                       <TableCell className={listTableCellClass}>{formatRole(user.role)}</TableCell>
                       <TableCell className={listTableCellClass}>
