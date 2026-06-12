@@ -202,8 +202,11 @@ export default function NewProjectPage() {
     if (!form.projectName.trim()) nextErrors.projectName = '请输入项目名称';
     if (!form.executionStartDate) nextErrors.executionStartDate = '请选择开始执行日期';
     if (!form.endDate) nextErrors.endDate = '请选择项目结束日期';
-    if (form.executionStartDate && form.endDate && form.endDate < form.executionStartDate) {
-      nextErrors.endDate = '项目结束日期不能早于开始执行日期';
+    if (form.executionStartDate && form.endDate && form.endDate <= form.executionStartDate) {
+      nextErrors.endDate = '项目结束日期必须大于开始执行日期';
+    }
+    if (form.endDate && form.endDate > new Date().toISOString().split('T')[0]) {
+      nextErrors.endDate = '项目结束日期不能超过今天';
     }
     if (!form.lingxiTaxonomy.accountId) nextErrors.lingxiTaxonomy = '请配置灵犀ID';
     if (!pendingNoteFile) nextErrors.noteBase = '请上传业务底表';
