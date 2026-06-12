@@ -102,6 +102,9 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma ./prisma
 COPY package.json tsconfig.json prisma.config.ts ./
 
+# Also copy prisma schema directly from source to ensure it's present
+COPY prisma/ ./prisma/
+
 # Verify prisma files are present
 RUN ls -la prisma/schema.prisma && echo "✓ prisma/schema.prisma exists"
 
