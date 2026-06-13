@@ -19,7 +19,36 @@ import {
 import { Search, MessageCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Loading } from '@/components/ui/loading';
 import { WordCloud } from '@/components/ui/word-cloud';
+import { Button } from '@/components/ui/button';
+import { FilterField } from '@/components/ui/filter-field';
+import { CardFooter } from '@/components/ui/card';
+import {
+  listTableCellClass,
+  listTableHeadClass,
+  listTableHeaderRowClass,
+  listTableRowClass,
+  listTableWrapperClass,
+} from '@/components/ui/data-list';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+} from '@/components/ui/select';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { formatDate } from '@/lib/project-meta';
+import { generatePageNumbers } from '@/lib/pagination';
+import { cn } from '@/lib/utils';
+
+const selectTriggerClass =
+  'h-9 rounded border-gray-200 bg-white text-gray-900 focus-visible:ring-brand/25 disabled:bg-gray-50 disabled:text-gray-400';
 
 interface TreeNode {
   id: string;
@@ -224,6 +253,11 @@ function SentimentPageContent() {
     }));
   }, [sentimentData]);
 
+  const pieChartTotal = useMemo(
+    () => pieChartData.reduce((sum, item) => sum + item.value, 0),
+    [pieChartData]
+  );
+
   // Parse trend data for bar chart
   const trendChartData = useMemo(() => {
     if (!sentimentData?.trend?.length) {
@@ -299,76 +333,87 @@ function SentimentPageContent() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-gray-900">舆情系统</h1>
-        <p className="mt-1 text-sm text-gray-500">查看项目评论分析、情感分布和关键词统计。</p>
+        <h1 className="text-2xl tracking-tight text-gray-900">舆情系统</h1>
       </div>
 
       {/* Filter Bar */}
-      <div className="rounded-lg border bg-white p-4">
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="min-w-[140px]">
-            <label className="mb-1 block text-xs font-medium text-gray-600">品类</label>
-            <select
-              value={filters.category}
-              onChange={(e) => handleCategoryChange(e.target.value)}
-              className="h-9 w-full rounded-md border border-gray-200 px-3 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
-            >
-              <option value="">全部品类</option>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <FilterField label="品类：">
+          <Select value={filters.category} onValueChange={handleCategoryChange}>
+            <SelectTrigger className={selectTriggerClass} />
+            <SelectContent>
+              <SelectItem value="">请选择</SelectItem>
               {(treeData ?? []).map((node) => (
-                <option key={node.id} value={node.id}>{node.label}</option>
+                <SelectItem key={node.id} value={node.id}>
+                  {node.label}
+                </SelectItem>
               ))}
-            </select>
-          </div>
-          <div className="min-w-[140px]">
-            <label className="mb-1 block text-xs font-medium text-gray-600">品牌</label>
-            <select
-              value={filters.brand}
-              onChange={(e) => handleBrandChange(e.target.value)}
-              disabled={!filters.category}
-              className="h-9 w-full rounded-md border border-gray-200 px-3 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20 disabled:cursor-not-allowed disabled:bg-gray-50"
-            >
-              <option value="">全部品牌</option>
+            </SelectContent>
+          </Select>
+        </FilterField>
+
+        <FilterField label="品牌：">
+          <Select
+            value={filters.brand}
+            onValueChange={handleBrandChange}
+            disabled={!filters.category}
+          >
+            <SelectTrigger className={selectTriggerClass} />
+            <SelectContent>
+              <SelectItem value="">请选择</SelectItem>
               {brandOptions.map((node) => (
-                <option key={node.id} value={node.id}>{node.label}</option>
+                <SelectItem key={node.id} value={node.id}>
+                  {node.label}
+                </SelectItem>
               ))}
-            </select>
-          </div>
-          <div className="min-w-[140px]">
-            <label className="mb-1 block text-xs font-medium text-gray-600">业务线</label>
-            <select
-              value={filters.businessLine}
-              onChange={(e) => handleBusinessLineChange(e.target.value)}
-              disabled={!filters.brand}
-              className="h-9 w-full rounded-md border border-gray-200 px-3 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20 disabled:cursor-not-allowed disabled:bg-gray-50"
-            >
-              <option value="">全部业务线</option>
+            </SelectContent>
+          </Select>
+        </FilterField>
+
+        <FilterField label="业务线：">
+          <Select
+            value={filters.businessLine}
+            onValueChange={handleBusinessLineChange}
+            disabled={!filters.brand}
+          >
+            <SelectTrigger className={selectTriggerClass} />
+            <SelectContent>
+              <SelectItem value="">请选择</SelectItem>
               {businessLineOptions.map((node) => (
-                <option key={node.id} value={node.id}>{node.label}</option>
+                <SelectItem key={node.id} value={node.id}>
+                  {node.label}
+                </SelectItem>
               ))}
-            </select>
-          </div>
-          <div className="min-w-[180px]">
-            <label className="mb-1 block text-xs font-medium text-gray-600">项目名称</label>
-            <select
-              value={selectedProjectId}
-              onChange={(e) => handleProjectChange(e.target.value)}
-              className="h-9 w-full rounded-md border border-gray-200 px-3 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
-            >
-              <option value="">选择项目</option>
+            </SelectContent>
+          </Select>
+        </FilterField>
+
+        <FilterField label="项目名称：">
+          <Select value={selectedProjectId} onValueChange={handleProjectChange}>
+            <SelectTrigger className={selectTriggerClass} />
+            <SelectContent>
+              <SelectItem value="">请选择</SelectItem>
               {(projectsData?.items ?? []).map((project) => (
-                <option key={project.id} value={project.id}>{project.projectName}</option>
+                <SelectItem key={project.id} value={project.id}>
+                  {project.projectName}
+                </SelectItem>
               ))}
-            </select>
-          </div>
-          <button
+            </SelectContent>
+          </Select>
+        </FilterField>
+
+        <div className="flex min-w-0 items-center">
+          <Button
             type="button"
+            variant="primary"
+            size="sm"
+            className="w-full shrink-0 gap-1 px-4"
             onClick={handleViewSentiment}
             disabled={!selectedProjectId}
-            className="inline-flex h-9 items-center gap-1.5 rounded-md bg-brand px-4 text-sm font-medium text-white transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <Search size={14} />
+            <Search size={16} />
             查看舆情
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -409,9 +454,14 @@ function SentimentPageContent() {
                     </Pie>
                     <Tooltip formatter={(value) => [Number(value).toLocaleString(), '数量']} />
                     <Legend
-                      formatter={(value, entry) => {
+                      formatter={(value) => {
                         const item = pieChartData.find((d) => d.name === value);
-                        return `${value} ${item?.value ?? 0}`;
+                        const count = item?.value ?? 0;
+                        const pct =
+                          pieChartTotal > 0
+                            ? ((count / pieChartTotal) * 100).toFixed(1)
+                            : '0.0';
+                        return `${value} ${count} (${pct}%)`;
                       }}
                     />
                   </PieChart>
@@ -504,7 +554,7 @@ function SentimentPageContent() {
                     onClick={() => { setCommentFilter(tab); setCommentPage(1); }}
                     className={`px-4 py-2 text-sm font-medium transition border-b-2 -mb-px ${
                       isActive
-                        ? (tab === 'all' ? 'text-brand border-blue-600' : SENTIMENT_TAB_COLORS[tab])
+                        ? (tab === 'all' ? 'text-gray-900 border-gray-900' : SENTIMENT_TAB_COLORS[tab])
                         : 'text-gray-500 border-transparent hover:text-gray-700'
                     }`}
                   >
@@ -515,90 +565,91 @@ function SentimentPageContent() {
             </div>
 
             {/* Comments Table */}
-            {paginatedComments.length > 0 ? (
+            {filteredComments.length > 0 ? (
               <>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b bg-gray-50 text-left">
-                        <th className="whitespace-nowrap px-3 py-2 font-medium text-gray-600">时间</th>
-                        <th className="px-3 py-2 font-medium text-gray-600">描述</th>
-                        <th className="whitespace-nowrap px-3 py-2 font-medium text-gray-600">情感倾向</th>
-                        <th className="whitespace-nowrap px-3 py-2 text-right font-medium text-gray-600">评论点赞数量</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y">
-                      {paginatedComments.map((comment) => (
-                        <tr key={comment.id} className="hover:bg-gray-50">
-                          <td className="whitespace-nowrap px-3 py-3 text-sm text-brand">{comment.date || '-'}</td>
-                          <td className="max-w-[400px] px-3 py-3 text-sm text-gray-800">{comment.content}</td>
-                          <td className="whitespace-nowrap px-3 py-3">
+                <div className={cn('overflow-x-auto', listTableWrapperClass)}>
+                  <Table>
+                    <TableHeader>
+                      <TableRow className={listTableHeaderRowClass}>
+                        <TableHead className={listTableHeadClass}>情感倾向</TableHead>
+                        <TableHead className={listTableHeadClass}>评论内容</TableHead>
+                        <TableHead className={listTableHeadClass}>发布者</TableHead>
+                        <TableHead className={listTableHeadClass}>发布时间</TableHead>
+                        <TableHead className={listTableHeadClass}>评论点赞数</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {paginatedComments.map((comment, index) => (
+                        <TableRow key={comment.id} className={listTableRowClass(index)}>
+                          <TableCell className={cn(listTableCellClass, 'whitespace-nowrap')}>
                             <span
                               className="text-sm"
                               style={{ color: SENTIMENT_COLORS[comment.sentiment] }}
                             >
                               {SENTIMENT_LABELS[comment.sentiment]}
                             </span>
-                          </td>
-                          <td className="whitespace-nowrap px-3 py-3 text-right text-sm text-gray-700">{comment.likes}</td>
-                        </tr>
+                          </TableCell>
+                          <TableCell className={cn(listTableCellClass, 'max-w-[400px]')}>
+                            {comment.content}
+                          </TableCell>
+                          <TableCell className={cn(listTableCellClass, 'whitespace-nowrap')}>
+                            {comment.author}
+                          </TableCell>
+                          <TableCell className={cn(listTableCellClass, 'whitespace-nowrap text-gray-800')}>
+                            {comment.date || '-'}
+                          </TableCell>
+                          <TableCell className={cn(listTableCellClass, 'whitespace-nowrap')}>
+                            {comment.likes}
+                          </TableCell>
+                        </TableRow>
                       ))}
-                    </tbody>
-                  </table>
+                    </TableBody>
+                  </Table>
                 </div>
 
-                {/* Pagination */}
-                {totalPages > 1 && (
-                  <div className="mt-4 flex items-center justify-between border-t pt-3">
-                    <span className="text-xs text-gray-500">
-                      共 {filteredComments.length} 条，每页 {PAGE_SIZE} 条
-                    </span>
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => setCommentPage((p) => Math.max(1, p - 1))}
-                        disabled={commentPage <= 1}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded border text-gray-600 transition hover:bg-gray-50 disabled:opacity-30"
-                      >
-                        <ChevronLeft size={14} />
-                      </button>
-                      {Array.from({ length: Math.min(7, totalPages) }, (_, i) => {
-                        let page: number;
-                        if (totalPages <= 7) {
-                          page = i + 1;
-                        } else if (commentPage <= 4) {
-                          page = i + 1;
-                        } else if (commentPage >= totalPages - 3) {
-                          page = totalPages - 6 + i;
-                        } else {
-                          page = commentPage - 3 + i;
-                        }
-                        return (
-                          <button
-                            key={page}
-                            type="button"
-                            onClick={() => setCommentPage(page)}
-                            className={`inline-flex h-8 w-8 items-center justify-center rounded text-sm transition ${
-                              page === commentPage
-                                ? 'bg-brand text-white'
-                                : 'border text-gray-600 hover:bg-gray-50'
-                            }`}
-                          >
-                            {page}
-                          </button>
-                        );
-                      })}
-                      <button
-                        type="button"
-                        onClick={() => setCommentPage((p) => Math.min(totalPages, p + 1))}
-                        disabled={commentPage >= totalPages}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded border text-gray-600 transition hover:bg-gray-50 disabled:opacity-30"
-                      >
-                        <ChevronRight size={14} />
-                      </button>
-                    </div>
+                <CardFooter className="flex flex-wrap items-center justify-between gap-3 px-0 pb-0 pt-4">
+                  <p className="text-sm text-gray-500">
+                    共 {filteredComments.length} 条记录，第 {commentPage}/{totalPages} 页
+                  </p>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon-sm"
+                      onClick={() => setCommentPage((p) => Math.max(1, p - 1))}
+                      disabled={commentPage <= 1}
+                    >
+                      <ChevronLeft size={16} />
+                    </Button>
+                    {generatePageNumbers(commentPage, totalPages).map((p, idx) =>
+                      p === '...' ? (
+                        <span key={`ellipsis-${idx}`} className="px-1 text-gray-400">
+                          ...
+                        </span>
+                      ) : (
+                        <Button
+                          key={p}
+                          type="button"
+                          variant={commentPage === p ? 'primary' : 'outline'}
+                          size="icon-sm"
+                          onClick={() => setCommentPage(p as number)}
+                          className={cn('text-sm', commentPage === p && 'pointer-events-none')}
+                        >
+                          {p}
+                        </Button>
+                      )
+                    )}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon-sm"
+                      onClick={() => setCommentPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={commentPage >= totalPages}
+                    >
+                      <ChevronRight size={16} />
+                    </Button>
                   </div>
-                )}
+                </CardFooter>
               </>
             ) : (
               <p className="py-8 text-center text-sm text-gray-400">暂无评论数据</p>

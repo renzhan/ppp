@@ -208,7 +208,7 @@ export default function ProjectListPage() {
             </Select>
           </FilterField>
 
-          <FilterField label="品牌业务线：">
+          <FilterField label="业务线：">
             <Select
               value={filters.businessLine}
               onValueChange={handleBusinessLineChange}
@@ -299,22 +299,22 @@ export default function ProjectListPage() {
               <Table className="min-w-[960px] text-sm">
                 <TableHeader>
                   <TableRow className={listTableHeaderRowClass}>
+                    <TableHead className={listTableHeadClass}>品类</TableHead>
+                    <TableHead className={listTableHeadClass}>品牌</TableHead>
+                    <TableHead className={listTableHeadClass}>业务线</TableHead>
                     <TableHead className={cn(listTableHeadClass, 'min-w-[220px]')}>项目名称</TableHead>
-                    <TableHead className={listTableHeadClass}>品牌名称</TableHead>
-                    <TableHead className={listTableHeadClass}>品牌业务线</TableHead>
-                    <TableHead className={listTableHeadClass}>品牌行业类目</TableHead>
                     <TableHead className={listTableHeadClass}>创建者</TableHead>
                     <TableHead className={listTableHeadClass}>笔记数量</TableHead>
                     <TableHead className={listTableHeadClass}>项目结束日期</TableHead>
-                    <TableHead className={listTableHeadClass}>参与者</TableHead>
+                    <TableHead className={listTableHeadClass}>参与人数</TableHead>
                     <TableHead className={listTableActionHeadClass}>操作</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {data.items.map((project, index) => (
                     <TableRow key={project.id} className={listTableRowClass(index)}>
-                      <TableCell title={project.projectName} className={cn(listTableCellClass, 'max-w-[280px] truncate')}>
-                        {project.projectName}
+                      <TableCell className={cn(listTableCellClass, 'whitespace-nowrap')}>
+                        {project.category || '-'}
                       </TableCell>
                       <TableCell className={cn(listTableCellClass, 'whitespace-nowrap')}>
                         {project.brand || '-'}
@@ -322,8 +322,8 @@ export default function ProjectListPage() {
                       <TableCell className={cn(listTableCellClass, 'whitespace-nowrap')}>
                         {project.businessLine || '-'}
                       </TableCell>
-                      <TableCell className={cn(listTableCellClass, 'whitespace-nowrap')}>
-                        {project.category || '-'}
+                      <TableCell title={project.projectName} className={cn(listTableCellClass, 'max-w-[280px] truncate')}>
+                        {project.projectName}
                       </TableCell>
                       <TableCell className={cn(listTableCellClass, 'whitespace-nowrap')}>
                         {project.createdByDisplayName || '-'}

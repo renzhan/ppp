@@ -82,6 +82,7 @@ export default function ProofreadPage({ params }: { params: { id: string } }) {
   const [activeChapterId, setActiveChapterId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
   const [activeTraceId, setActiveTraceId] = useState<string | null>(null);
   const [chapterStatuses, setChapterStatuses] = useState<ChapterStatus[]>([]);
@@ -344,23 +345,19 @@ export default function ProofreadPage({ params }: { params: { id: string } }) {
   // ─── Export Functions ────────────────────────────────────────────────────
 
   const handleExportPDF = async () => {
+    if (isExportingPdf) return;
     setExportOpen(false);
-    const { buildFullExportHtml } = await import('@/lib/report-export');
-    const fullHtml = buildFullExportHtml(chapters, review?.project.projectName + '-复盘' || '复盘报告');
-
-    // Use browser's native print engine which properly handles CSS page-break rules.
-    // User selects "Save as PDF" in the print dialog.
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      alert('请允许弹出窗口以导出 PDF');
-      return;
+    setIsExportingPdf(true);
+    try {
+      const { exportChaptersToPdf } = await import('@/lib/pdf-export');
+      const title = review?.project.projectName ? `${review.project.projectName}-复盘` : '复盘报告';
+      const filename = review?.project.projectName || '复盘报告';
+      await exportChaptersToPdf(chapters, title, filename);
+    } catch {
+      alert('PDF 导出失败，请重试');
+    } finally {
+      setIsExportingPdf(false);
     }
-    printWindow.document.write(fullHtml);
-    printWindow.document.close();
-    // Wait for ECharts to render then trigger print
-    setTimeout(() => {
-      printWindow.print();
-    }, 2500);
   };
 
   const handleExportWord = async () => {
@@ -464,11 +461,12 @@ export default function ProofreadPage({ params }: { params: { id: string } }) {
               variant="primary"
               size="sm"
               onClick={() => setExportOpen(!exportOpen)}
-              disabled={chapters.length === 0}
+              disabled={chapters.length === 0 || isExportingPdf}
               className="gap-1.5"
             >
-              下载
-              <ChevronDown size={12} />
+              {isExportingPdf ? <Loader2 size={14} className="animate-spin" /> : null}
+              {isExportingPdf ? '导出中' : '下载'}
+              {!isExportingPdf && <ChevronDown size={12} />}
             </Button>
             {exportOpen && (
               <div className="absolute right-0 top-full z-50 mt-1 w-28 rounded-md border border-gray-200 bg-white py-1 shadow-lg">
@@ -477,6 +475,7 @@ export default function ProofreadPage({ params }: { params: { id: string } }) {
                   variant="ghost"
                   size="sm"
                   onClick={handleExportPDF}
+                  disabled={isExportingPdf}
                   className="h-auto w-full justify-start rounded-none px-3 py-2 text-xs font-normal text-gray-700"
                 >
                   PDF
