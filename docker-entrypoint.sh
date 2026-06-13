@@ -9,15 +9,24 @@ env | grep -E '^(DATABASE_URL|LLM_|QWEN_|JWT_|PAICHACHA_|ENCRYPTION_KEY|NODE_ENV
   echo "$line"
 done > /app/.env
 
-# Wait for database to be ready (max 30 seconds)
+# Wait for database to be ready (max 60 seconds)
 echo "Waiting for database to be ready..."
-MAX_RETRIES=30
+MAX_RETRIES=60
 RETRY=0
-DB_HOST=$(echo "$DATABASE_URL" | sed -n 's|.*@\([^:]*\):.*|\1|p')
-DB_PORT=$(echo "$DATABASE_URL" | sed -n 's|.*:\([0-9]*\)/.*|\1|p')
+# Parse host and port from DATABASE_URL: postgresql://user:pass@host:port/db
+DB_HOST=$(echo "$DATABASE_URL" | sed -n 's|.*@\([^:/]*\).*|\1|p')
+DB_PORT=$(echo "$DATABASE_URL" | sed -n 's|.*@[^:]*:\([0-9]*\).*|\1|p')
 DB_HOST=${DB_HOST:-localhost}
 DB_PORT=${DB_PORT:-5432}
-until node -e "const net=require('net');const s=net.connect({host:'${DB_HOST}',port:${DB_PORT}},()=>{s.end();process.exit(0)});s.on('error',()=>process.exit(1))" 2>/dev/null; do
+echo "  Target: ${DB_HOST}:${DB_PORT}"
+until node -e "
+const net = require('net');
+const s = net.connect({host: '${DB_HOST}', port: ${DB_PORT}});
+s.setTimeout(2000);
+s.on('connect', () => { s.destroy(); process.exit(0); });
+s.on('timeout', () => { s.destroy(); process.exit(1); });
+s.on('error', () => { process.exit(1); });
+" 2>&1; do
   RETRY=$((RETRY + 1))
   if [ $RETRY -ge $MAX_RETRIES ]; then
     echo "ERROR: Database not reachable at ${DB_HOST}:${DB_PORT} after ${MAX_RETRIES}s. Continuing anyway..."
