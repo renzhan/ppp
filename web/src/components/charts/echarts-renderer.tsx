@@ -29,6 +29,158 @@ echarts.use([
 ]);
 
 /**
+ * 多折线趋势图配置构建器（双Y轴 + 阶段背景色块）
+ *
+ * 数据格式（直接数组）：
+ * [{date: "2025-01-15", cpm: 52.3, cpc: 1.8, cpe: 18.2, fee: 5000, period: "预热期"}]
+ *
+ * 或对象格式：
+ * {data: [...同上], phases: [{name: "预热期", startDate: "2025-01-15", endDate: "2025-01-20"}]}
+ */
+const PHASE_COLORS = [
+  'rgba(254, 243, 199, 0.4)',  // 黄色 - 预热期
+  'rgba(220, 252, 231, 0.4)',  // 绿色 - 爆发期
+  'rgba(219, 234, 254, 0.4)',  // 蓝色 - 持续期
+  'rgba(243, 232, 255, 0.4)',  // 紫色
+  'rgba(255, 228, 230, 0.4)',  // 粉色
+];
+
+function buildMultiLineTrendOption(
+  chartTitle: string,
+  chartData: Record<string, unknown>,
+): echarts.EChartsCoreOption {
+  // 支持两种数据格式
+  let dataPoints: Array<{ date: string; cpm: number; cpc: number; cpe: number; fee?: number; period?: string }>;
+
+  if (Array.isArray(chartData)) {
+    dataPoints = chartData as typeof dataPoints;
+  } else if (chartData.data && Array.isArray(chartData.data)) {
+    dataPoints = chartData.data as typeof dataPoints;
+  } else {
+    // 尝试解析 — 如果 chartData 本身就是包含 date 字段的数组格式
+    dataPoints = [];
+  }
+
+  if (dataPoints.length === 0) return {};
+
+  const dates = dataPoints.map((d) => {
+    // 简化日期显示：M/D 格式
+    const parts = d.date.split('-');
+    return parts.length >= 3 ? `${parseInt(parts[1])}/${parseInt(parts[2])}` : d.date;
+  });
+  const cpmValues = dataPoints.map((d) => d.cpm ?? 0);
+  const cpcValues = dataPoints.map((d) => d.cpc ?? 0);
+  const cpeValues = dataPoints.map((d) => d.cpe ?? 0);
+
+  // 提取阶段色块数据
+  const markAreaData: Array<[Record<string, unknown>, Record<string, unknown>]> = [];
+  const phases = new Map<string, { start: number; end: number }>();
+
+  dataPoints.forEach((d, idx) => {
+    if (d.period && d.period !== '其他') {
+      const existing = phases.get(d.period);
+      if (existing) {
+        existing.end = idx;
+      } else {
+        phases.set(d.period, { start: idx, end: idx });
+      }
+    }
+  });
+
+  let phaseIdx = 0;
+  for (const [name, range] of phases) {
+    const color = PHASE_COLORS[phaseIdx % PHASE_COLORS.length];
+    markAreaData.push([
+      {
+        xAxis: dates[range.start],
+        itemStyle: { color },
+        label: {
+          show: true,
+          position: 'insideTop',
+          formatter: name,
+          fontSize: 11,
+          color: '#64748b',
+          fontWeight: 'bold',
+        },
+      },
+      { xAxis: dates[range.end] },
+    ]);
+    phaseIdx++;
+  }
+
+  return {
+    title: { text: chartTitle, left: 'center', top: 10, textStyle: { fontSize: 14, color: '#334155' } },
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: { type: 'cross' },
+    },
+    legend: {
+      top: 40,
+      data: ['CPM（元/千次展现）', 'CPC（元/次点击）', 'CPE（元/次互动）'],
+    },
+    grid: { left: 60, right: 60, bottom: 40, top: 80 },
+    xAxis: {
+      type: 'category',
+      data: dates,
+      axisLabel: { fontSize: 10, rotate: dates.length > 15 ? 30 : 0 },
+      boundaryGap: false,
+    },
+    yAxis: [
+      {
+        type: 'value',
+        name: 'CPM / CPE（元）',
+        nameTextStyle: { fontSize: 11, color: '#64748b' },
+        axisLabel: {
+          fontSize: 10,
+          formatter: (v: number) => `${v}元`,
+        },
+        splitLine: { lineStyle: { type: 'dashed', color: '#e2e8f0' } },
+      },
+      {
+        type: 'value',
+        name: 'CPC（元）',
+        nameTextStyle: { fontSize: 11, color: '#64748b' },
+        axisLabel: {
+          fontSize: 10,
+          formatter: (v: number) => `${v}元`,
+        },
+        splitLine: { show: false },
+      },
+    ],
+    series: [
+      {
+        name: 'CPM（元/千次展现）',
+        type: 'line',
+        data: cpmValues,
+        smooth: true,
+        yAxisIndex: 0,
+        lineStyle: { width: 2, color: '#3b82f6' },
+        itemStyle: { color: '#3b82f6' },
+        markArea: markAreaData.length > 0 ? { silent: true, data: markAreaData } : undefined,
+      },
+      {
+        name: 'CPC（元/次点击）',
+        type: 'line',
+        data: cpcValues,
+        smooth: true,
+        yAxisIndex: 1,
+        lineStyle: { width: 2, color: '#16a34a', type: 'dashed' },
+        itemStyle: { color: '#16a34a' },
+      },
+      {
+        name: 'CPE（元/次互动）',
+        type: 'line',
+        data: cpeValues,
+        smooth: true,
+        yAxisIndex: 0,
+        lineStyle: { width: 2, color: '#b45309' },
+        itemStyle: { color: '#b45309' },
+      },
+    ],
+  };
+}
+
+/**
  * 四象限散点图配置构建器
  *
  * 数据格式：
@@ -264,20 +416,32 @@ export function useChartRenderer(containerRef: React.RefObject<HTMLElement | nul
           }],
         };
       } else if (chartType === 'line') {
-        option = {
-          title: { text: chartTitle, left: 'center', textStyle: { fontSize: 14, color: '#334155' } },
-          tooltip: { trigger: 'axis' },
-          xAxis: { type: 'category', data: (chartData.labels as string[]) || [] },
-          yAxis: { type: 'value' },
-          series: [{ type: 'line', data: (chartData.values as number[]) || [], smooth: true, itemStyle: { color: '#3b82f6' } }],
-          grid: { left: 60, right: 20, bottom: 40, top: 50 },
-        };
+        // 检查是否为多折线趋势数据格式（[{date, cpm, cpc, cpe, ...}]）
+        if (Array.isArray(chartData) && chartData.length > 0 && 'date' in (chartData[0] as Record<string, unknown>)) {
+          // 转发到 multiline 处理
+          option = buildMultiLineTrendOption(chartTitle, chartData as unknown as Record<string, unknown>);
+          container.style.height = '420px';
+        } else {
+          option = {
+            title: { text: chartTitle, left: 'center', textStyle: { fontSize: 14, color: '#334155' } },
+            tooltip: { trigger: 'axis' },
+            xAxis: { type: 'category', data: (chartData.labels as string[]) || [] },
+            yAxis: { type: 'value' },
+            series: [{ type: 'line', data: (chartData.values as number[]) || [], smooth: true, itemStyle: { color: '#3b82f6' } }],
+            grid: { left: 60, right: 20, bottom: 40, top: 50 },
+          };
+        }
       } else if (chartType === 'scatter') {
         // 四象限散点图
         // 数据格式: { points: [{x, y, label, quadrant}], xAvg, yAvg, quadrants: [{name, count, avgCpe}] }
         option = buildQuadrantScatterOption(chartTitle, chartData);
         // 四象限散点图需要更大的高度
         container.style.height = '480px';
+      } else if (chartType === 'multiline' || chartType === 'trend') {
+        // 多折线趋势图（双Y轴 + 阶段背景色块）
+        // 数据格式: [{date, cpm, cpc, cpe, fee?, period?}] 或 {data: [...], phases: [...]}
+        option = buildMultiLineTrendOption(chartTitle, chartData);
+        container.style.height = '420px';
       }
 
       chart.setOption(option);

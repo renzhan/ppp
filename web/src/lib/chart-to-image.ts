@@ -138,6 +138,9 @@ function renderChartToBase64(
     } else if (chartType === 'scatter') {
       container.style.height = '480px';
       option = buildScatterOptionForExport(chartTitle, chartData);
+    } else if (chartType === 'multiline' || chartType === 'trend') {
+      container.style.height = '420px';
+      option = buildMultiLineOptionForExport(chartTitle, chartData);
     }
 
     chart.setOption(option);
@@ -157,6 +160,74 @@ function renderChartToBase64(
   } catch {
     return null;
   }
+}
+
+/**
+ * Build ECharts option for multi-line trend chart (used in image export)
+ */
+function buildMultiLineOptionForExport(
+  chartTitle: string,
+  chartData: Record<string, unknown>,
+): echarts.EChartsCoreOption {
+  let dataPoints: Array<{ date: string; cpm: number; cpc: number; cpe: number; period?: string }>;
+
+  if (Array.isArray(chartData)) {
+    dataPoints = chartData as typeof dataPoints;
+  } else if (chartData.data && Array.isArray(chartData.data)) {
+    dataPoints = chartData.data as typeof dataPoints;
+  } else {
+    dataPoints = [];
+  }
+
+  if (dataPoints.length === 0) return {};
+
+  const dates = dataPoints.map((d) => {
+    const parts = d.date.split('-');
+    return parts.length >= 3 ? `${parseInt(parts[1])}/${parseInt(parts[2])}` : d.date;
+  });
+
+  const phaseColors = [
+    'rgba(254, 243, 199, 0.4)',
+    'rgba(220, 252, 231, 0.4)',
+    'rgba(219, 234, 254, 0.4)',
+    'rgba(243, 232, 255, 0.4)',
+  ];
+
+  const phases = new Map<string, { start: number; end: number }>();
+  dataPoints.forEach((d, idx) => {
+    if (d.period && d.period !== '其他') {
+      const existing = phases.get(d.period);
+      if (existing) { existing.end = idx; }
+      else { phases.set(d.period, { start: idx, end: idx }); }
+    }
+  });
+
+  const markAreaData: Array<[Record<string, unknown>, Record<string, unknown>]> = [];
+  let pIdx = 0;
+  for (const [name, range] of phases) {
+    markAreaData.push([
+      { xAxis: dates[range.start], itemStyle: { color: phaseColors[pIdx % phaseColors.length] }, label: { show: true, position: 'insideTop', formatter: name, fontSize: 11, color: '#64748b' } },
+      { xAxis: dates[range.end] },
+    ]);
+    pIdx++;
+  }
+
+  return {
+    title: { text: chartTitle, left: 'center', top: 10, textStyle: { fontSize: 14, color: '#334155' } },
+    legend: { top: 40, data: ['CPM', 'CPC', 'CPE'] },
+    grid: { left: 60, right: 60, bottom: 40, top: 80 },
+    xAxis: { type: 'category', data: dates, boundaryGap: false },
+    yAxis: [
+      { type: 'value', name: 'CPM / CPE（元）', axisLabel: { formatter: '{value}元' } },
+      { type: 'value', name: 'CPC（元）', axisLabel: { formatter: '{value}元' }, splitLine: { show: false } },
+    ],
+    series: [
+      { name: 'CPM', type: 'line', data: dataPoints.map(d => d.cpm ?? 0), smooth: true, yAxisIndex: 0, lineStyle: { color: '#3b82f6' }, itemStyle: { color: '#3b82f6' }, markArea: markAreaData.length > 0 ? { silent: true, data: markAreaData } : undefined },
+      { name: 'CPC', type: 'line', data: dataPoints.map(d => d.cpc ?? 0), smooth: true, yAxisIndex: 1, lineStyle: { color: '#16a34a', type: 'dashed' }, itemStyle: { color: '#16a34a' } },
+      { name: 'CPE', type: 'line', data: dataPoints.map(d => d.cpe ?? 0), smooth: true, yAxisIndex: 0, lineStyle: { color: '#b45309' }, itemStyle: { color: '#b45309' } },
+    ],
+    animation: false,
+  };
 }
 
 /**

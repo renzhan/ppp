@@ -39,11 +39,12 @@ const HTML_OUTPUT_INSTRUCTION = `
 1. 章节标题用 <h2 class="chapter-title">，子标题用 <h3>
 2. 数据表格用 <table class="report-table">，表头用 <thead>，数据行用 <tbody>
 3. 需要图表展示的数据，在表格后添加图表占位：
-   <div class="chart-placeholder" data-chart-type="bar|pie|line|scatter" data-chart-title="图表标题" data-chart-data='JSON数据'>图表加载中...</div>
+   <div class="chart-placeholder" data-chart-type="bar|pie|line|scatter|multiline" data-chart-title="图表标题" data-chart-data='JSON数据'>图表加载中...</div>
    其中 data-chart-data 为 JSON 格式：
    - bar/line: {"labels":["A","B"],"values":[100,200]}
    - pie: {"items":[{"name":"A","value":100}]}
    - scatter（四象限散点图）: {"points":[{"x":0.8,"y":0.9,"label":"昵称","index":1,"quadrant":"核心资产"}],"xAvg":0.5,"yAvg":0.5}
+   - multiline（多折线趋势图，双Y轴+阶段色块）: [{"date":"2025-01-15","cpm":52,"cpc":1.8,"cpe":18,"period":"预热期"}]
 4. 重要数据用 <strong class="highlight"> 标记
 5. 分析段落用 <p>，列表用 <ul>/<li> 或 <ol>/<li>
 6. 完成率超过100%的用 <span class="text-green">，低于100%的用 <span class="text-red">

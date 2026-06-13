@@ -86,8 +86,9 @@ fallback_text: "投流分析内容生成失败，请重试。"
 - 数据解读（AI文字总结，综合分析投流整体表现、核心指标达成情况及关键发现）
 
 ### 2. 投流趋势（日维度）
-- 基于 daily_trend_data 中的JSON数据，输出以下HTML图表占位标签（必须输出，前端会渲染为折线图）：
-  `<div class="chart-placeholder" data-chart-type="line" data-chart-title="投流成本趋势（按投放周期）" data-chart-data='这里填入daily_trend_data的JSON内容'>图表加载中...</div>`
+- 基于 daily_trend_data 中的JSON数据，输出以下HTML图表占位标签（必须输出，前端会渲染为多折线趋势图）：
+  `<div class="chart-placeholder" data-chart-type="multiline" data-chart-title="投流成本趋势（按投放周期）" data-chart-data='这里填入daily_trend_data的JSON内容'>图表加载中...</div>`
+  注意：data-chart-data的值必须是daily_trend_data的完整JSON数组（格式如[{"date":"2025-05-25","cpm":33.5,"cpc":0.16,"cpe":1.8,"fee":500,"period":"预热期"}...]），不要修改其内容
 - 图表说明：X轴为日期，左Y轴=CPM/CPE（元），右Y轴=CPC（元），按投放阶段划分背景色区域
 - 在图表下方附趋势变化分析文字：每个投放阶段的CPM/CPC/CPE均值变化、成本趋势判断，每段2-3句话
 
