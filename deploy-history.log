@@ -17,3 +17,8 @@
   - Merge branch 'main' of github.com:renzhan/ppp
   - fixbug
   - feat: optimize user import + make startDate/endDate optional
+
+2026-06-14 01:11:32 | ppp-app:20260614-f503cb54 | f503cb54 | fix: 修复复盘页面图表闪烁问题，用 MutationObserver 替代 setTimeout
+  Changes:
+- fix: 修复复盘页面图表闪烁问题，用 MutationObserver 替代 setTimeout
+  - chore: log deploy 20260614-8214a108
