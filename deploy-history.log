@@ -1,0 +1,5 @@
+# Deploy History
+# Format: timestamp | image:tag | commit-sha | commit-message
+
+2026-06-13 | ppp-app:20260613-dc7b8dcf | dc7b8dcf | fix: skip oldPassword validation on first login password change
+  Summary: 本次发版主要修复了多项问题：1）修复首次登录改密时旧密码校验逻辑；2）修复Docker容器健康检查在Node 22下的兼容性问题；3）修复项目导入流程中预览表头、保存校验、同步条件等多个校验缺陷；4）修复编辑页面底表展示和指标标签显示问题；5）优化用户导入功能（角色映射、真名/手机号展示、startDate/endDate改为可选）。

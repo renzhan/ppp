@@ -30,6 +30,42 @@ if ($LASTEXITCODE -eq 0) {
     $Size = [math]::Round((Get-Item $TarFile).Length / 1MB, 1)
     Write-Host "Done! $TarFile ($Size MB)" -ForegroundColor Green
     Write-Host "  Image tags: $Tag, latest" -ForegroundColor Gray
+
+    # 记录发版历史
+    $Timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    $CommitMsg = git log -1 --format="%s" HEAD
+
+    # 收集上次发版以来的所有变更摘要
+    $LastDeploySha = ""
+    if (Test-Path "deploy-history.log") {
+        $LastLine = Get-Content "deploy-history.log" | Where-Object { $_ -match "^\d{4}-\d{2}-\d{2}" } | Select-Object -Last 1
+        if ($LastLine -match "\|\s*([a-f0-9]{8})\s*\|") {
+            $LastDeploySha = $Matches[1]
+        }
+    }
+
+    # 生成变更列表
+    if ($LastDeploySha) {
+        $Changes = git log --format="  - %s" "$LastDeploySha..HEAD" 2>$null
+    } else {
+        $Changes = git log --format="  - %s" -10 HEAD
+    }
+    $ChangeSummary = ($Changes | Out-String).Trim()
+
+    $LogLine = "$Timestamp | $ImageName | $SHA | $CommitMsg"
+    Add-Content -Path "deploy-history.log" -Value ""
+    Add-Content -Path "deploy-history.log" -Value $LogLine
+    if ($ChangeSummary) {
+        Add-Content -Path "deploy-history.log" -Value "  Changes:"
+        Add-Content -Path "deploy-history.log" -Value $ChangeSummary
+    }
+    Write-Host "  Logged to deploy-history.log" -ForegroundColor Gray
+
+    # 自动提交发版记录
+    git add deploy-history.log
+    git commit -m "chore: log deploy $Tag" --no-verify
+    git push 2>$null
+    Write-Host "  Pushed deploy log to remote" -ForegroundColor Gray
 } else {
     Write-Host "Save failed!" -ForegroundColor Red
 }
