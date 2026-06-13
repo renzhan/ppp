@@ -27,13 +27,8 @@ export async function POST(request: NextRequest) {
     }
 
     // If user must change password (first login), oldPassword is not required
-    if (!user.mustChangePassword) {
-      if (!oldPassword) {
-        return NextResponse.json(
-          { error: '请输入当前密码' },
-          { status: 400 }
-        );
-      }
+    // Also skip oldPassword check if it's not provided (user came from forced redirect)
+    if (!user.mustChangePassword && oldPassword) {
       const valid = await verifyPassword(oldPassword, user.passwordHash);
       if (!valid) {
         return NextResponse.json(
