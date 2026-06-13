@@ -151,18 +151,18 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
   const validate = () => {
     if (!form) return false;
     const nextErrors: FormErrors = {};
+    // 5 required fields only: 品类, 品牌, 业务线, 项目名称, 创建者
     if (!form.cascade.category) nextErrors.category = '请选择品类';
     if (!form.cascade.brand) nextErrors.brand = '请选择品牌';
+    if (!form.cascade.businessLine) nextErrors.businessLine = '请选择业务线';
     if (!form.projectName.trim()) nextErrors.projectName = '请输入项目名称';
-    if (!form.executionStartDate) nextErrors.executionStartDate = '请选择开始执行日期';
+    // Date-range check only when both dates are filled
     if (form.executionStartDate && form.endDate && form.endDate <= form.executionStartDate) {
       nextErrors.endDate = '项目结束日期必须大于开始执行日期';
     }
     if (form.endDate && form.endDate > new Date().toISOString().split('T')[0]) {
       nextErrors.endDate = '项目结束日期不能超过今天';
     }
-    if (!form.lingxiTaxonomy.accountId) nextErrors.lingxiTaxonomy = '请配置灵犀ID';
-    if (project && project.noteCount === 0) nextErrors.noteBase = '请上传业务底表';
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
   };
@@ -346,7 +346,7 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
 
             {/* 开始执行日期 & 项目结束日期 */}
             <div className="grid grid-cols-2 gap-4">
-              <FormField label="开始执行日期 *" htmlFor="executionStartDate">
+              <FormField label="开始执行日期" htmlFor="executionStartDate">
                 <Input
                   id="executionStartDate"
                   type="date"
@@ -374,7 +374,7 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
             </div>
 
             {/* 灵犀数据获取 */}
-            <FormField label="灵犀数据获取 *">
+            <FormField label="灵犀数据获取">
               <LingxiTaxonomySelector
                 value={form.lingxiTaxonomy}
                 onChange={(val) => setForm((prev) => prev ? { ...prev, lingxiTaxonomy: val } : prev)}
@@ -385,7 +385,7 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
             {/* 业务底表 */}
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <Label className="font-normal text-gray-500">业务底表 *</Label>
+                <Label className="font-normal text-gray-500">业务底表</Label>
                 <a
                   href="/down/projects-template.xlsx"
                   download
