@@ -28,7 +28,7 @@ export class QuadrantAnalysisDataLoader extends BaseChapterDataLoader {
   chapterName = '综合分析';
   requiredDataSources = ['notes', 'juguang_data'];
   requiredFields = [
-    'quadrant_cards', 'scatter_data', 'detail_table', 'quadrant_summary',
+    'quadrant_cards', 'scatter_data', 'scatter_chart_json', 'detail_table', 'quadrant_summary',
     'total_analyzed_notes', 'excluded_notes',
   ];
 
@@ -250,12 +250,28 @@ export class QuadrantAnalysisDataLoader extends BaseChapterDataLoader {
     });
     variables['quadrant_cards'] = quadrantCards.join('\n');
 
-    // scatter_data: 编号 + 坐标
+    // scatter_data: 编号 + 坐标 (文本格式供LLM参考)
     const scatterData = classifiedNotes.map((n, i) => {
       const idx = i + 1;
       return `${idx}. ${n.kolNickName}（X=${n.xScore.toFixed(3)}, Y=${n.yScore.toFixed(3)}, 象限=${n.quadrant}）`;
     });
     variables['scatter_data'] = scatterData.join('\n');
+
+    // scatter_chart_json: 预构建的散点图 JSON 数据，LLM 可直接嵌入 chart-placeholder
+    const yScoresForAvg = classifiedNotes.map((n) => n.yScore);
+    const xScoresForAvg = classifiedNotes.map((n) => n.xScore);
+    const scatterChartJson = JSON.stringify({
+      points: classifiedNotes.map((n, i) => ({
+        x: Math.round(n.xScore * 1000) / 1000,
+        y: Math.round(n.yScore * 1000) / 1000,
+        label: n.kolNickName,
+        index: i + 1,
+        quadrant: n.quadrant,
+      })),
+      xAvg: Math.round((xScoresForAvg.reduce((s, v) => s + v, 0) / xScoresForAvg.length) * 1000) / 1000,
+      yAvg: Math.round((yScoresForAvg.reduce((s, v) => s + v, 0) / yScoresForAvg.length) * 1000) / 1000,
+    });
+    variables['scatter_chart_json'] = scatterChartJson;
 
     // detail_table: 编号|创作者昵称|互动率|投流CPE|资源含税成本价|投流消耗|象限归属
     const tableHeader = '| 编号 | 创作者昵称 | 互动率 | 投流CPE | 资源含税成本价 | 投流消耗 | 象限归属 |';

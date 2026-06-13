@@ -6,12 +6,14 @@
  */
 
 import * as echarts from 'echarts/core';
-import { BarChart, PieChart, LineChart } from 'echarts/charts';
+import { BarChart, PieChart, LineChart, ScatterChart } from 'echarts/charts';
 import {
   TitleComponent,
   TooltipComponent,
   GridComponent,
   LegendComponent,
+  MarkLineComponent,
+  MarkAreaComponent,
 } from 'echarts/components';
 import { CanvasRenderer } from 'echarts/renderers';
 
@@ -20,10 +22,13 @@ echarts.use([
   BarChart,
   PieChart,
   LineChart,
+  ScatterChart,
   TitleComponent,
   TooltipComponent,
   GridComponent,
   LegendComponent,
+  MarkLineComponent,
+  MarkAreaComponent,
   CanvasRenderer,
 ]);
 
@@ -130,6 +135,9 @@ function renderChartToBase64(
         grid: { left: 60, right: 20, bottom: 40, top: 50 },
         animation: false,
       };
+    } else if (chartType === 'scatter') {
+      container.style.height = '480px';
+      option = buildScatterOptionForExport(chartTitle, chartData);
     }
 
     chart.setOption(option);
@@ -149,6 +157,84 @@ function renderChartToBase64(
   } catch {
     return null;
   }
+}
+
+/**
+ * Build ECharts option for quadrant scatter chart (used in image export)
+ */
+const QUADRANT_COLORS_EXPORT: Record<string, string> = {
+  '核心资产': '#16a34a',
+  '潜力内容': '#3b82f6',
+  '流量消耗': '#f97316',
+  '淘汰候选': '#6b7280',
+};
+
+const CIRCLE_NUMBERS_EXPORT = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '⑩',
+  '⑪', '⑫', '⑬', '⑭', '⑮', '⑯', '⑰', '⑱', '⑲', '⑳',
+  '㉑', '㉒', '㉓', '㉔', '㉕', '㉖', '㉗', '㉘', '㉙', '㉚'];
+
+function buildScatterOptionForExport(
+  chartTitle: string,
+  chartData: Record<string, unknown>,
+): echarts.EChartsCoreOption {
+  const points = (chartData.points as Array<{
+    x: number; y: number; label: string; index: number; quadrant: string;
+  }>) || [];
+  const xAvg = (chartData.xAvg as number) ?? 0.5;
+  const yAvg = (chartData.yAvg as number) ?? 0.5;
+
+  const seriesMap: Record<string, Array<[number, number, string, number]>> = {
+    '核心资产': [], '潜力内容': [], '流量消耗': [], '淘汰候选': [],
+  };
+
+  for (const p of points) {
+    const key = seriesMap[p.quadrant] ? p.quadrant : '淘汰候选';
+    seriesMap[key].push([p.x, p.y, p.label, p.index]);
+  }
+
+  const series = Object.entries(seriesMap).map(([name, data]) => ({
+    name,
+    type: 'scatter' as const,
+    data,
+    symbolSize: 32,
+    itemStyle: { color: QUADRANT_COLORS_EXPORT[name] || '#6b7280' },
+    label: {
+      show: true,
+      formatter: (params: { data: [number, number, string, number] }) => {
+        const idx = params.data[3] - 1;
+        return idx < CIRCLE_NUMBERS_EXPORT.length ? CIRCLE_NUMBERS_EXPORT[idx] : `${params.data[3]}`;
+      },
+      fontSize: 12,
+      fontWeight: 'bold' as const,
+      color: '#fff',
+    },
+  }));
+
+  if (series.length > 0) {
+    (series[0] as Record<string, unknown>).markLine = {
+      silent: true,
+      lineStyle: { type: 'dashed', color: '#94a3b8', width: 1 },
+      label: { show: false },
+      data: [{ xAxis: xAvg }, { yAxis: yAvg }],
+      animation: false,
+    };
+  }
+
+  return {
+    title: { text: chartTitle, left: 'center', top: 10, textStyle: { fontSize: 14, color: '#334155' } },
+    legend: { bottom: 10, data: ['核心资产', '潜力内容', '流量消耗', '淘汰候选'] },
+    grid: { left: 70, right: 30, bottom: 60, top: 80 },
+    xAxis: {
+      type: 'value', name: '投流效率（X，越右CPE越低）', nameLocation: 'center', nameGap: 30,
+      min: -0.05, max: 1.05, splitLine: { show: false },
+    },
+    yAxis: {
+      type: 'value', name: '内容质量（Y，越上互动率越高）', nameLocation: 'center', nameGap: 45,
+      min: -0.05, max: 1.05, splitLine: { show: false },
+    },
+    series,
+    animation: false,
+  };
 }
 
 /**

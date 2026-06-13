@@ -2,12 +2,14 @@
 
 import { useEffect, useRef, useCallback } from 'react';
 import * as echarts from 'echarts/core';
-import { BarChart, PieChart, LineChart } from 'echarts/charts';
+import { BarChart, PieChart, LineChart, ScatterChart } from 'echarts/charts';
 import {
   TitleComponent,
   TooltipComponent,
   GridComponent,
   LegendComponent,
+  MarkLineComponent,
+  MarkAreaComponent,
 } from 'echarts/components';
 import { CanvasRenderer } from 'echarts/renderers';
 
@@ -16,12 +18,164 @@ echarts.use([
   BarChart,
   PieChart,
   LineChart,
+  ScatterChart,
   TitleComponent,
   TooltipComponent,
   GridComponent,
   LegendComponent,
+  MarkLineComponent,
+  MarkAreaComponent,
   CanvasRenderer,
 ]);
+
+/**
+ * 四象限散点图配置构建器
+ *
+ * 数据格式：
+ * {
+ *   points: [{ x: number, y: number, label: string, index: number, quadrant: string }],
+ *   xAvg: number,   // X轴分界线（均值）
+ *   yAvg: number,   // Y轴分界线（均值）
+ *   quadrants: [{ name: string, count: number, avgCpe: number }]  // 四象限汇总
+ * }
+ */
+const QUADRANT_COLORS: Record<string, string> = {
+  '核心资产': '#16a34a',  // green
+  '潜力内容': '#3b82f6',  // blue
+  '流量消耗': '#f97316',  // orange
+  '淘汰候选': '#6b7280',  // gray
+};
+
+const CIRCLE_NUMBERS = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '⑩',
+  '⑪', '⑫', '⑬', '⑭', '⑮', '⑯', '⑰', '⑱', '⑲', '⑳',
+  '㉑', '㉒', '㉓', '㉔', '㉕', '㉖', '㉗', '㉘', '㉙', '㉚'];
+
+function buildQuadrantScatterOption(
+  chartTitle: string,
+  chartData: Record<string, unknown>,
+): echarts.EChartsCoreOption {
+  const points = (chartData.points as Array<{
+    x: number; y: number; label: string; index: number; quadrant: string;
+  }>) || [];
+  const xAvg = (chartData.xAvg as number) ?? 0.5;
+  const yAvg = (chartData.yAvg as number) ?? 0.5;
+
+  // 按象限分组
+  const seriesMap: Record<string, Array<[number, number, string, number]>> = {
+    '核心资产': [],
+    '潜力内容': [],
+    '流量消耗': [],
+    '淘汰候选': [],
+  };
+
+  for (const p of points) {
+    const key = seriesMap[p.quadrant] ? p.quadrant : '淘汰候选';
+    seriesMap[key].push([p.x, p.y, p.label, p.index]);
+  }
+
+  const series = Object.entries(seriesMap).map(([name, data]) => ({
+    name,
+    type: 'scatter' as const,
+    data,
+    symbolSize: 36,
+    itemStyle: { color: QUADRANT_COLORS[name] || '#6b7280' },
+    label: {
+      show: true,
+      formatter: (params: { data: [number, number, string, number] }) => {
+        const idx = params.data[3] - 1;
+        return idx < CIRCLE_NUMBERS.length ? CIRCLE_NUMBERS[idx] : `${params.data[3]}`;
+      },
+      fontSize: 13,
+      fontWeight: 'bold' as const,
+      color: '#fff',
+    },
+  }));
+
+  // 添加分割线作为第一个series的markLine
+  if (series.length > 0) {
+    (series[0] as Record<string, unknown>).markLine = {
+      silent: true,
+      lineStyle: { type: 'dashed', color: '#94a3b8', width: 1 },
+      label: { show: false },
+      data: [
+        { xAxis: xAvg },
+        { yAxis: yAvg },
+      ],
+    };
+
+    // 添加四象限区域标注
+    (series[0] as Record<string, unknown>).markArea = {
+      silent: true,
+      data: [
+        // 右上 - 核心资产（浅绿）
+        [{
+          xAxis: xAvg, yAxis: yAvg,
+          itemStyle: { color: 'rgba(22, 163, 74, 0.04)' },
+        }, {
+          xAxis: 1.05, yAxis: 1.05,
+        }],
+        // 左上 - 潜力内容（浅蓝）
+        [{
+          xAxis: -0.05, yAxis: yAvg,
+          itemStyle: { color: 'rgba(59, 130, 246, 0.04)' },
+        }, {
+          xAxis: xAvg, yAxis: 1.05,
+        }],
+        // 右下 - 流量消耗（浅橙）
+        [{
+          xAxis: xAvg, yAxis: -0.05,
+          itemStyle: { color: 'rgba(249, 115, 22, 0.04)' },
+        }, {
+          xAxis: 1.05, yAxis: yAvg,
+        }],
+        // 左下 - 淘汰候选（浅灰）
+        [{
+          xAxis: -0.05, yAxis: -0.05,
+          itemStyle: { color: 'rgba(107, 114, 128, 0.04)' },
+        }, {
+          xAxis: xAvg, yAxis: yAvg,
+        }],
+      ],
+    };
+  }
+
+  return {
+    title: { text: chartTitle, left: 'center', top: 10, textStyle: { fontSize: 14, color: '#334155' } },
+    tooltip: {
+      trigger: 'item',
+      formatter: (params: { data: [number, number, string, number] }) => {
+        const [x, y, label, idx] = params.data;
+        return `<b>${CIRCLE_NUMBERS[idx - 1] || idx} ${label}</b><br/>投流效率: ${x.toFixed(3)}<br/>内容质量: ${y.toFixed(3)}`;
+      },
+    },
+    legend: {
+      bottom: 10,
+      data: ['核心资产', '潜力内容', '流量消耗', '淘汰候选'],
+    },
+    grid: { left: 70, right: 30, bottom: 60, top: 80 },
+    xAxis: {
+      type: 'value',
+      name: '投流效率（X，越右CPE越低=越省钱）',
+      nameLocation: 'center',
+      nameGap: 30,
+      nameTextStyle: { fontSize: 12, color: '#64748b' },
+      min: -0.05,
+      max: 1.05,
+      splitLine: { show: false },
+    },
+    yAxis: {
+      type: 'value',
+      name: '内容质量（Y，越上互动率越高）',
+      nameLocation: 'center',
+      nameGap: 45,
+      nameTextStyle: { fontSize: 12, color: '#64748b' },
+      min: -0.05,
+      max: 1.05,
+      splitLine: { show: false },
+    },
+    series,
+  };
+}
 
 /**
  * Hook: 在指定容器内查找 .chart-placeholder 元素，
@@ -118,6 +272,12 @@ export function useChartRenderer(containerRef: React.RefObject<HTMLElement | nul
           series: [{ type: 'line', data: (chartData.values as number[]) || [], smooth: true, itemStyle: { color: '#3b82f6' } }],
           grid: { left: 60, right: 20, bottom: 40, top: 50 },
         };
+      } else if (chartType === 'scatter') {
+        // 四象限散点图
+        // 数据格式: { points: [{x, y, label, quadrant}], xAvg, yAvg, quadrants: [{name, count, avgCpe}] }
+        option = buildQuadrantScatterOption(chartTitle, chartData);
+        // 四象限散点图需要更大的高度
+        container.style.height = '480px';
       }
 
       chart.setOption(option);
