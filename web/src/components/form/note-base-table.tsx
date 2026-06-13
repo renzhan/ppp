@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { DISPLAY_ONLY_COLUMN_MAP } from '@/lib/note-base-parser';
 
 interface NoteBaseRecord {
   id: string;
@@ -34,10 +33,46 @@ export interface NoteBaseTableProps {
   projectId: string;
 }
 
-/** Reverse map: field key → Chinese label */
-const METRICS_LABELS: Record<string, string> = Object.fromEntries(
-  Object.entries(DISPLAY_ONLY_COLUMN_MAP).map(([label, key]) => [key, label])
-);
+/** Reverse map: field key → Chinese label (canonical display names) */
+const METRICS_LABELS: Record<string, string> = {
+  impNum: '曝光量',
+  readNum: '阅读量',
+  engageNum: '互动量',
+  likeNum: '点赞量',
+  favNum: '收藏量',
+  cmtNum: '评论量',
+  shareNum: '分享量',
+  followNum: '关注量',
+  isViral1kEngage: '是否千互',
+  isViral1kLike: '是否千赞',
+  ctr: 'CTR',
+  cpm: 'CPM',
+  cpc: 'CPC',
+  cpe: 'CPE',
+  totalCpm: '总CPM',
+  totalCpe: '总CPE',
+  totalCpc: '总CPC',
+  organicImpNum: '自然曝光量',
+  organicReadNum: '自然阅读量',
+  organicEngageNum: '自然互动',
+  organicCtr: '自然CTR',
+  organicCpm: '自然流CPM',
+  organicCpe: '自然流CPE',
+  organicCpc: '自然流CPC',
+  heatImpNum: '推广曝光量',
+  heatReadNum: '推广阅读量',
+  heatEngageNum: '投流互动量',
+  heatCtr: '投流CTR',
+  heatCpm: '投流CPM',
+  heatCpe: '投流CPE',
+  heatCpc: '投流CPC',
+  heatNewTi: '投流新增TI',
+  heatCpti: '投流CPTI',
+  searchCount: '回搜数',
+  searchRate: '回搜率',
+  notePublishDate: '笔记发布日期',
+  dataUpdateDate: '数据更新日期',
+};
 
 /** Get all unique metric keys from records */
 function getMetricKeys(records: NoteBaseRecord[]): string[] {
@@ -105,14 +140,12 @@ export function NoteBaseTable({ projectId }: NoteBaseTableProps) {
           <thead>
             <tr className="border-b bg-gray-50">
               <th className="sticky left-0 z-10 bg-gray-50 whitespace-nowrap px-3 py-2.5 text-center text-xs font-medium text-gray-600 border-r border-gray-200 min-w-[36px]">#</th>
-              <th className="whitespace-nowrap px-3 py-2.5 text-left text-xs font-medium text-gray-600">博主昵称</th>
-              <th className="whitespace-nowrap px-3 py-2.5 text-left text-xs font-medium text-gray-600">笔记ID</th>
-              <th className="whitespace-nowrap px-3 py-2.5 text-left text-xs font-medium text-gray-600">是否报备</th>
-              <th className="whitespace-nowrap px-3 py-2.5 text-left text-xs font-medium text-gray-600">合作形式</th>
+              <th className="whitespace-nowrap px-3 py-2.5 text-left text-xs font-medium text-gray-600">笔记Id</th>
+              <th className="whitespace-nowrap px-3 py-2.5 text-left text-xs font-medium text-gray-600">内容形式</th>
               <th className="whitespace-nowrap px-3 py-2.5 text-left text-xs font-medium text-gray-600">内容方向</th>
-              <th className="whitespace-nowrap px-3 py-2.5 text-right text-xs font-medium text-gray-600">达人金额</th>
-              <th className="whitespace-nowrap px-3 py-2.5 text-right text-xs font-medium text-gray-600">投流金额</th>
-              <th className="whitespace-nowrap px-3 py-2.5 text-right text-xs font-medium text-gray-600">总消耗</th>
+              <th className="whitespace-nowrap px-3 py-2.5 text-left text-xs font-medium text-gray-600">笔记类型</th>
+              <th className="whitespace-nowrap px-3 py-2.5 text-right text-xs font-medium text-gray-600">资源含税成本价</th>
+              <th className="whitespace-nowrap px-3 py-2.5 text-right text-xs font-medium text-gray-600">资源含税售价</th>
               {/* Dynamic metric columns from metrics JSON */}
               {metricKeys.map((key) => (
                 <th key={key} className="whitespace-nowrap px-3 py-2.5 text-right text-xs font-medium text-gray-600">
@@ -124,15 +157,15 @@ export function NoteBaseTable({ projectId }: NoteBaseTableProps) {
           <tbody>
             {isLoading ? (
               <tr>
-                <td colSpan={9 + metricKeys.length} className="px-4 py-8 text-center text-gray-400">加载中...</td>
+                <td colSpan={7 + metricKeys.length} className="px-4 py-8 text-center text-gray-400">加载中...</td>
               </tr>
             ) : isError ? (
               <tr>
-                <td colSpan={9 + metricKeys.length} className="px-4 py-8 text-center text-red-500">加载失败，请刷新重试</td>
+                <td colSpan={7 + metricKeys.length} className="px-4 py-8 text-center text-red-500">加载失败，请刷新重试</td>
               </tr>
             ) : paginatedRecords.length === 0 ? (
               <tr>
-                <td colSpan={9 + metricKeys.length} className="px-4 py-8 text-center text-gray-400">暂无数据</td>
+                <td colSpan={7 + metricKeys.length} className="px-4 py-8 text-center text-gray-400">暂无数据</td>
               </tr>
             ) : (
               paginatedRecords.map((record, idx) => (
@@ -140,7 +173,6 @@ export function NoteBaseTable({ projectId }: NoteBaseTableProps) {
                   <td className="sticky left-0 z-10 bg-white whitespace-nowrap px-3 py-2 text-center text-xs text-gray-500 border-r border-gray-200">
                     {(page - 1) * pageSize + idx + 1}
                   </td>
-                  <td className="whitespace-nowrap px-3 py-2 text-xs text-gray-700">{record.kolNickName || '-'}</td>
                   <td className="whitespace-nowrap px-3 py-2">
                     {record.noteLink ? (
                       <a href={record.noteLink} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-xs font-mono">
@@ -150,12 +182,11 @@ export function NoteBaseTable({ projectId }: NoteBaseTableProps) {
                       <span className="text-xs font-mono text-gray-600">{record.noteId}</span>
                     )}
                   </td>
-                  <td className="whitespace-nowrap px-3 py-2 text-xs text-gray-700">{record.isRegistered ? '是' : '否'}</td>
                   <td className="whitespace-nowrap px-3 py-2 text-xs text-gray-700">{record.cooperationForm || '-'}</td>
                   <td className="whitespace-nowrap px-3 py-2 text-xs text-gray-700">{record.contentDirection || '-'}</td>
+                  <td className="whitespace-nowrap px-3 py-2 text-xs text-gray-700">{record.kolType || '-'}</td>
                   <td className="whitespace-nowrap px-3 py-2 text-right text-xs tabular-nums text-gray-700">{Number(record.contentCost).toLocaleString()}</td>
-                  <td className="whitespace-nowrap px-3 py-2 text-right text-xs tabular-nums text-gray-700">{Number(record.adSpend).toLocaleString()}</td>
-                  <td className="whitespace-nowrap px-3 py-2 text-right text-xs tabular-nums text-gray-700">{Number(record.totalCost).toLocaleString()}</td>
+                  <td className="whitespace-nowrap px-3 py-2 text-right text-xs tabular-nums text-gray-700">{Number(record.contentSettlement).toLocaleString()}</td>
                   {/* Dynamic metric values */}
                   {metricKeys.map((key) => (
                     <td key={key} className="whitespace-nowrap px-3 py-2 text-right text-xs tabular-nums text-gray-700">
