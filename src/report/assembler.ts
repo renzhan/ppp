@@ -182,8 +182,8 @@ interface AssemblyContext {
     brand: string;
     spuName: string | null;
     projectName: string;
-    startDate: Date;
-    endDate: Date;
+    startDate: Date | null;
+    endDate: Date | null;
     engagementConfig: unknown;
     cooperationPolicy: unknown;
   };

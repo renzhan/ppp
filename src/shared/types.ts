@@ -78,8 +78,8 @@ export interface Project {
   brand: string;                 // 合作品牌（必填）
   spuName?: string;              // SPU/产品名称
   projectName: string;           // 项目名称（必填）
-  startDate: Date;               // 项目开始日期（必填）
-  endDate: Date;                 // 项目结束日期（必填）
+  startDate?: Date | null;       // 项目开始日期（已废弃，使用 executionStartDate）
+  endDate?: Date | null;         // 项目结束日期
   engagementConfig: EngagementConfig;
   cooperationPolicy: CooperationPolicy;
 }

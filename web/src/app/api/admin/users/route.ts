@@ -7,6 +7,8 @@ const USER_SELECT = {
   id: true,
   username: true,
   displayName: true,
+  realName: true,
+  phone: true,
   role: true,
   mustChangePassword: true,
   isActive: true,

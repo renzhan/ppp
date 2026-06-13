@@ -222,13 +222,11 @@ export async function POST(request: Request) {
     let importedCount = 0;
     for (const row of parsedRows) {
       try {
-        // Parse startDate
-        let startDate: Date;
+        // Parse startDate → executionStartDate (startDate field is deprecated)
+        let executionStartDate: Date | null = null;
         if (row.startDate) {
           const parsed = new Date(row.startDate);
-          startDate = isNaN(parsed.getTime()) ? new Date() : parsed;
-        } else {
-          startDate = new Date();
+          executionStartDate = isNaN(parsed.getTime()) ? null : parsed;
         }
 
         // Resolve createdBy realName to UUID
@@ -252,14 +250,14 @@ export async function POST(request: Request) {
             isImported: true,
             lingxiAccountId: row.lingxiAccountId || undefined,
             createdBy: resolvedCreatedBy,
+            executionStartDate: executionStartDate ?? undefined,
           },
           create: {
             category: row.category,
             brand: row.brand,
             businessLine: row.businessLine ?? null,
             projectName: row.projectName,
-            startDate: startDate,
-            endDate: startDate, // Default endDate same as startDate for imported projects
+            executionStartDate,
             isImported: true,
             lingxiAccountId: row.lingxiAccountId || null,
             createdBy: resolvedCreatedBy,

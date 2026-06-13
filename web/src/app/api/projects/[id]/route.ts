@@ -111,8 +111,8 @@ export async function PUT(
 
       const range = getProjectDateRange(launchPhases);
       updateData.launchPhases = normalized as Prisma.InputJsonValue;
-      updateData.startDate = new Date(range.startDate);
-      updateData.endDate = new Date(range.endDate);
+      if (range.startDate) updateData.startDate = new Date(range.startDate);
+      if (range.endDate) updateData.endDate = new Date(range.endDate);
     } else {
       if (body.startDate !== undefined) {
         const startDate = new Date(body.startDate);
