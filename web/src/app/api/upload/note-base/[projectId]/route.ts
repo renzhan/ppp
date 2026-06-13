@@ -134,23 +134,64 @@ export async function POST(
       return count;
     }, { timeout: 30000 });
 
-    // 同步等待蒲公英+灵犀数据爬取完成（确保首次创建项目后数据立即可用）
+    // 蒲公英同步：仅在底表解析出有效笔记ID时触发
+    const parsedNoteIds = uniqueRecords.map((r) => r.noteId).filter(Boolean);
     let ingestionResult: { pugongyingNotes: { length: number }; errors: string[] } | null = null;
-    try {
-      const { DataIngestionService } = await import('@/ingestion/index');
-      const ingestionService = new DataIngestionService();
-      console.log(`[NoteBaseUpload] 开始同步拉取蒲公英+灵犀数据 (project: ${projectId}, noteCount: ${noteCount})`);
-      const ingestionStart = Date.now();
-      ingestionResult = await ingestionService.ingestBaseData(projectId);
-      const elapsed = ((Date.now() - ingestionStart) / 1000).toFixed(1);
-      if (ingestionResult.errors.length > 0) {
-        console.warn(`[NoteBaseUpload] 蒲公英/灵犀爬取部分失败 (project: ${projectId}, ${elapsed}s):`, ingestionResult.errors);
-      } else {
-        console.log(`[NoteBaseUpload] 蒲公英/灵犀爬取完成 (project: ${projectId}, ${elapsed}s): ${ingestionResult.pugongyingNotes.length} 篇笔记`);
+
+    // 灵犀同步条件检查：需要同时满足所有条件
+    // - lingxiAccountId 已配置
+    // - lingxiTaxonomyPath (taxonomyPath) 非空（已选择行业）
+    // - executionStartDate 已填写
+    // - endDate 已填写
+    // - noteCount > 0（已上传过底表）
+    const updatedProject = await prisma.project.findUnique({
+      where: { id: projectId },
+      select: {
+        lingxiAccountId: true,
+        lingxiTaxonomyPath: true,
+        executionStartDate: true,
+        endDate: true,
+        noteCount: true,
+      },
+    });
+
+    // Extract condition values for Lingxi sync guard
+    const lingxiAccountId = updatedProject?.lingxiAccountId;
+    const taxonomyPath = updatedProject?.lingxiTaxonomyPath;
+    const shouldTriggerLingxiSync = !!(
+      updatedProject &&
+      lingxiAccountId &&
+      taxonomyPath &&
+      updatedProject.executionStartDate &&
+      updatedProject.endDate &&
+      updatedProject.noteCount && updatedProject.noteCount > 0
+    );
+
+    if (parsedNoteIds.length > 0) {
+      try {
+        const { DataIngestionService } = await import('@/ingestion/index');
+        const ingestionService = new DataIngestionService();
+
+        if (shouldTriggerLingxiSync) {
+          console.log(`[NoteBaseUpload] 开始同步拉取蒲公英+灵犀数据 (project: ${projectId}, noteCount: ${noteCount}, noteIds: ${parsedNoteIds.length})`);
+        } else {
+          console.log(`[NoteBaseUpload] 开始同步拉取蒲公英数据（灵犀条件不满足，跳过灵犀同步）(project: ${projectId}, noteCount: ${noteCount}, noteIds: ${parsedNoteIds.length})`);
+        }
+
+        const ingestionStart = Date.now();
+        ingestionResult = await ingestionService.ingestBaseData(projectId);
+        const elapsed = ((Date.now() - ingestionStart) / 1000).toFixed(1);
+        if (ingestionResult.errors.length > 0) {
+          console.warn(`[NoteBaseUpload] 蒲公英/灵犀爬取部分失败 (project: ${projectId}, ${elapsed}s):`, ingestionResult.errors);
+        } else {
+          console.log(`[NoteBaseUpload] 蒲公英/灵犀爬取完成 (project: ${projectId}, ${elapsed}s): ${ingestionResult.pugongyingNotes.length} 篇笔记`);
+        }
+      } catch (ingestionErr) {
+        const msg = ingestionErr instanceof Error ? ingestionErr.message : String(ingestionErr);
+        console.error(`[NoteBaseUpload] 蒲公英/灵犀爬取异常 (project: ${projectId}):`, msg);
       }
-    } catch (ingestionErr) {
-      const msg = ingestionErr instanceof Error ? ingestionErr.message : String(ingestionErr);
-      console.error(`[NoteBaseUpload] 蒲公英/灵犀爬取异常 (project: ${projectId}):`, msg);
+    } else {
+      console.log(`[NoteBaseUpload] 跳过蒲公英同步：底表未解析出有效笔记ID (project: ${projectId})`);
     }
 
     return NextResponse.json({

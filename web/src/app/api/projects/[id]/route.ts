@@ -166,6 +166,38 @@ export async function PUT(
       data: updateData,
     });
 
+    // 灵犀同步条件检查：ALL 5 conditions must be met
+    // - lingxiAccountId non-empty (from DB after update)
+    // - lingxiTaxonomyPath non-empty (from DB after update)
+    // - executionStartDate filled (from DB after update)
+    // - endDate filled (from DB after update)
+    // - noteCount > 0 (project already has uploaded notes)
+    const lingxiAccountIdFilled = updated.lingxiAccountId && updated.lingxiAccountId.trim();
+    const lingxiTaxonomyPathFilled = updated.lingxiTaxonomyPath && updated.lingxiTaxonomyPath.trim();
+    const executionStartDateFilled = updated.executionStartDate;
+    const endDateFilled = updated.endDate;
+    const hasNotes = updated.noteCount && updated.noteCount > 0;
+
+    const shouldTriggerLingxiSync = !!(
+      lingxiAccountIdFilled &&
+      lingxiTaxonomyPathFilled &&
+      executionStartDateFilled &&
+      endDateFilled &&
+      hasNotes
+    );
+
+    if (shouldTriggerLingxiSync) {
+      try {
+        const { DataIngestionService } = await import('@/ingestion/index');
+        const ingestionService = new DataIngestionService();
+        console.log(`[ProjectUpdate] 触发灵犀同步 (project: ${params.id})`);
+        await ingestionService.ingestBaseData(params.id);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[ProjectUpdate] 灵犀同步异常 (project: ${params.id}):`, msg);
+      }
+    }
+
     return NextResponse.json(updated);
   } catch (error) {
     // Handle unique constraint violation (P2002)

@@ -200,6 +200,34 @@ export async function POST(request: Request) {
         },
       });
 
+      // 灵犀同步条件检查：ALL 5 conditions must be met
+      // - lingxiAccountId provided in this request
+      // - lingxiTaxonomyPath non-empty
+      // - executionStartDate filled
+      // - endDate filled
+      // - noteCount > 0 (project already has uploaded notes)
+      const lingxiAccountIdValue = typeof body.lingxiAccountId === 'string' ? body.lingxiAccountId.trim() : '';
+      const lingxiTaxonomyPathValue = typeof body.lingxiTaxonomyPath === 'string' ? body.lingxiTaxonomyPath.trim() : '';
+      const shouldTriggerLingxiSync = !!(
+        lingxiAccountIdValue &&
+        lingxiTaxonomyPathValue &&
+        executionStartDate &&
+        endDate &&
+        project.noteCount && project.noteCount > 0
+      );
+
+      if (shouldTriggerLingxiSync) {
+        try {
+          const { DataIngestionService } = await import('@/ingestion/index');
+          const ingestionService = new DataIngestionService();
+          console.log(`[ProjectCreate] 触发灵犀同步 (project: ${project.id})`);
+          await ingestionService.ingestBaseData(project.id);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.error(`[ProjectCreate] 灵犀同步异常 (project: ${project.id}):`, msg);
+        }
+      }
+
       return NextResponse.json(project, { status: 201 });
     }
 
@@ -333,8 +361,34 @@ export async function POST(request: Request) {
         executionStartDate,
         createdBy: createdBy || null,
         participants,
+        lingxiAccountId: typeof body.lingxiAccountId === 'string' ? body.lingxiAccountId.trim() || null : null,
+        lingxiTaxonomyCode: typeof body.lingxiTaxonomyCode === 'string' ? body.lingxiTaxonomyCode.trim() || null : null,
+        lingxiTaxonomyPath: typeof body.lingxiTaxonomyPath === 'string' ? body.lingxiTaxonomyPath.trim() || null : null,
       },
     });
+
+    // 灵犀同步条件检查：ALL 5 conditions must be met
+    const lingxiAccountIdVal = typeof body.lingxiAccountId === 'string' ? body.lingxiAccountId.trim() : '';
+    const lingxiTaxonomyPathVal = typeof body.lingxiTaxonomyPath === 'string' ? body.lingxiTaxonomyPath.trim() : '';
+    const shouldTriggerLingxi = !!(
+      lingxiAccountIdVal &&
+      lingxiTaxonomyPathVal &&
+      executionStartDate &&
+      endDate &&
+      project.noteCount && project.noteCount > 0
+    );
+
+    if (shouldTriggerLingxi) {
+      try {
+        const { DataIngestionService } = await import('@/ingestion/index');
+        const ingestionService = new DataIngestionService();
+        console.log(`[ProjectCreate] 触发灵犀同步 (project: ${project.id})`);
+        await ingestionService.ingestBaseData(project.id);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[ProjectCreate] 灵犀同步异常 (project: ${project.id}):`, msg);
+      }
+    }
 
     return NextResponse.json(project, { status: 201 });
   } catch (error) {

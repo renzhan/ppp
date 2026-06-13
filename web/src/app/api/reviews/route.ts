@@ -158,10 +158,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check project exists and has notes
+    // Check project exists and has required fields for review creation
     const project = await prisma.project.findUnique({
       where: { id: projectId },
-      select: { id: true, noteCount: true },
+      select: { id: true, noteCount: true, executionStartDate: true, endDate: true, lingxiAccountId: true },
     });
 
     if (!project) {
@@ -171,9 +171,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validate project has all required fields for review creation
+    const missingFields: string[] = [];
+    if (!project.executionStartDate) {
+      missingFields.push('开始执行日期');
+    }
+    if (!project.endDate) {
+      missingFields.push('结束日期');
+    }
+    if (!project.lingxiAccountId) {
+      missingFields.push('灵犀ID');
+    }
     if (project.noteCount === 0) {
+      missingFields.push('业务底表');
+    }
+
+    if (missingFields.length > 0) {
       return NextResponse.json(
-        { error: '请先上传笔记底表', code: 'NOTES_REQUIRED' },
+        {
+          error: `项目缺少必填信息，请先在项目设置中补充以下字段：${missingFields.join('、')}`,
+          code: 'PROJECT_INCOMPLETE',
+          missingFields,
+        },
         { status: 400 }
       );
     }

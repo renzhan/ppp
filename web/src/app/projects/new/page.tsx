@@ -197,19 +197,19 @@ export default function NewProjectPage() {
 
   const validate = () => {
     const nextErrors: FormErrors = {};
+    // 5 required fields only: 品类, 品牌, 业务线, 项目名称, 创建者
     if (!form.cascade.category) nextErrors.category = '请选择品类';
     if (!form.cascade.brand) nextErrors.brand = '请选择品牌';
+    if (!form.cascade.businessLine) nextErrors.businessLine = '请选择业务线';
     if (!form.projectName.trim()) nextErrors.projectName = '请输入项目名称';
-    if (!form.executionStartDate) nextErrors.executionStartDate = '请选择开始执行日期';
-    if (!form.endDate) nextErrors.endDate = '请选择项目结束日期';
+    if (!currentUser) nextErrors.createdBy = '创建者信息缺失';
+    // Date-range check only when both dates are filled
     if (form.executionStartDate && form.endDate && form.endDate <= form.executionStartDate) {
       nextErrors.endDate = '项目结束日期必须大于开始执行日期';
     }
     if (form.endDate && form.endDate > new Date().toISOString().split('T')[0]) {
       nextErrors.endDate = '项目结束日期不能超过今天';
     }
-    if (!form.lingxiTaxonomy.accountId) nextErrors.lingxiTaxonomy = '请配置灵犀ID';
-    if (!pendingNoteFile) nextErrors.noteBase = '请上传业务底表';
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
   };
@@ -225,6 +225,7 @@ export default function NewProjectPage() {
       const next = { ...prev };
       delete next.category;
       delete next.brand;
+      delete next.businessLine;
       return next;
     });
   };
@@ -259,8 +260,8 @@ export default function NewProjectPage() {
           <div className="mx-auto  space-y-6">
             {/* 品类/品牌/业务线 */}
             <CascadeSelector value={form.cascade} onChange={handleCascadeChange} />
-            {(errors.category || errors.brand) && (
-              <p className="text-xs text-rose-500">{errors.category || errors.brand}</p>
+            {(errors.category || errors.brand || errors.businessLine) && (
+              <p className="text-xs text-rose-500">{errors.category || errors.brand || errors.businessLine}</p>
             )}
 
             {/* 项目名称 */}
@@ -320,6 +321,7 @@ export default function NewProjectPage() {
                 disabled
                 className="bg-gray-50 text-gray-500"
               />
+              {errors.createdBy && <p className="text-xs text-rose-500">{errors.createdBy}</p>}
             </FormField>
 
             {/* 参与者 */}
@@ -413,7 +415,7 @@ export default function NewProjectPage() {
 
             {/* 开始执行日期 & 项目结束日期 */}
             <div className="grid grid-cols-2 gap-4">
-              <FormField label="开始执行日期 *" htmlFor="executionStartDate">
+              <FormField label="开始执行日期" htmlFor="executionStartDate">
                 <Input
                   id="executionStartDate"
                   type="date"
@@ -422,12 +424,10 @@ export default function NewProjectPage() {
                   value={form.executionStartDate}
                   onChange={(e) => {
                     setForm((prev) => ({ ...prev, executionStartDate: e.target.value }));
-                    setErrors((prev) => { const n = { ...prev }; delete n.executionStartDate; return n; });
                   }}
                 />
-                {errors.executionStartDate && <p className="text-xs text-rose-500">{errors.executionStartDate}</p>}
               </FormField>
-              <FormField label="项目结束日期 *" htmlFor="endDate">
+              <FormField label="项目结束日期" htmlFor="endDate">
                 <Input
                   id="endDate"
                   type="date"
@@ -444,18 +444,17 @@ export default function NewProjectPage() {
             </div>
 
             {/* 灵犀数据获取 */}
-            <FormField label="灵犀数据获取 *">
+            <FormField label="灵犀数据获取">
               <LingxiTaxonomySelector
                 value={form.lingxiTaxonomy}
                 onChange={(val) => setForm((prev) => ({ ...prev, lingxiTaxonomy: val }))}
               />
-              {errors.lingxiTaxonomy && <p className="text-xs text-rose-500">{errors.lingxiTaxonomy}</p>}
             </FormField>
 
             {/* 业务底表 */}
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <Label className="font-normal text-gray-500">业务底表 *</Label>
+                <Label className="font-normal text-gray-500">业务底表</Label>
                 <a
                   href="/down/projects-template.xlsx"
                   download
@@ -542,7 +541,6 @@ export default function NewProjectPage() {
                   {parseWarnings.map((w, i) => <p key={i}>{w}</p>)}
                 </div>
               )}
-              {errors.noteBase && <p className="text-xs text-rose-500">{errors.noteBase}</p>}
             </div>
 
             {createProjectMutation.isError && (

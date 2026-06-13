@@ -282,19 +282,104 @@ describe('POST /api/reviews', () => {
 
   it('returns 400 when project has noteCount === 0', async () => {
     mockGetSession.mockResolvedValue({ sub: 'user-1', role: 'admin', username: 'admin' });
-    mockProjectFindUnique.mockResolvedValue({ id: projectId, noteCount: 0 });
+    mockProjectFindUnique.mockResolvedValue({
+      id: projectId,
+      noteCount: 0,
+      executionStartDate: new Date('2025-01-01'),
+      endDate: new Date('2025-03-01'),
+      lingxiAccountId: 'lingxi-123',
+    });
 
     const res = await POST(makePostRequest({ projectId }));
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.code).toBe('NOTES_REQUIRED');
-    expect(json.error).toBe('请先上传笔记底表');
+    expect(json.code).toBe('PROJECT_INCOMPLETE');
+    expect(json.missingFields).toContain('业务底表');
+  });
+
+  it('returns 400 when project is missing executionStartDate', async () => {
+    mockGetSession.mockResolvedValue({ sub: 'user-1', role: 'admin', username: 'admin' });
+    mockProjectFindUnique.mockResolvedValue({
+      id: projectId,
+      noteCount: 10,
+      executionStartDate: null,
+      endDate: new Date('2025-03-01'),
+      lingxiAccountId: 'lingxi-123',
+    });
+
+    const res = await POST(makePostRequest({ projectId }));
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.code).toBe('PROJECT_INCOMPLETE');
+    expect(json.missingFields).toContain('开始执行日期');
+  });
+
+  it('returns 400 when project is missing endDate', async () => {
+    mockGetSession.mockResolvedValue({ sub: 'user-1', role: 'admin', username: 'admin' });
+    mockProjectFindUnique.mockResolvedValue({
+      id: projectId,
+      noteCount: 10,
+      executionStartDate: new Date('2025-01-01'),
+      endDate: null,
+      lingxiAccountId: 'lingxi-123',
+    });
+
+    const res = await POST(makePostRequest({ projectId }));
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.code).toBe('PROJECT_INCOMPLETE');
+    expect(json.missingFields).toContain('结束日期');
+  });
+
+  it('returns 400 when project is missing lingxiAccountId', async () => {
+    mockGetSession.mockResolvedValue({ sub: 'user-1', role: 'admin', username: 'admin' });
+    mockProjectFindUnique.mockResolvedValue({
+      id: projectId,
+      noteCount: 10,
+      executionStartDate: new Date('2025-01-01'),
+      endDate: new Date('2025-03-01'),
+      lingxiAccountId: null,
+    });
+
+    const res = await POST(makePostRequest({ projectId }));
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.code).toBe('PROJECT_INCOMPLETE');
+    expect(json.missingFields).toContain('灵犀ID');
+  });
+
+  it('returns 400 listing all missing fields when project has multiple missing fields', async () => {
+    mockGetSession.mockResolvedValue({ sub: 'user-1', role: 'admin', username: 'admin' });
+    mockProjectFindUnique.mockResolvedValue({
+      id: projectId,
+      noteCount: 0,
+      executionStartDate: null,
+      endDate: null,
+      lingxiAccountId: null,
+    });
+
+    const res = await POST(makePostRequest({ projectId }));
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.code).toBe('PROJECT_INCOMPLETE');
+    expect(json.missingFields).toEqual(['开始执行日期', '结束日期', '灵犀ID', '业务底表']);
+    expect(json.error).toContain('项目缺少必填信息');
   });
 
   it('creates review config and returns 201 on success', async () => {
     mockGetSession.mockResolvedValue({ sub: 'user-1', role: 'admin', username: 'admin' });
-    mockProjectFindUnique.mockResolvedValue({ id: projectId, noteCount: 50 });
+    mockProjectFindUnique.mockResolvedValue({
+      id: projectId,
+      noteCount: 50,
+      executionStartDate: new Date('2025-01-01'),
+      endDate: new Date('2025-03-01'),
+      lingxiAccountId: 'lingxi-123',
+    });
 
     const createdReview = {
       id: 'review-new',
@@ -328,7 +413,13 @@ describe('POST /api/reviews', () => {
 
   it('passes correct data to prisma create', async () => {
     mockGetSession.mockResolvedValue({ sub: 'user-1', role: 'admin', username: 'admin' });
-    mockProjectFindUnique.mockResolvedValue({ id: projectId, noteCount: 10 });
+    mockProjectFindUnique.mockResolvedValue({
+      id: projectId,
+      noteCount: 10,
+      executionStartDate: new Date('2025-01-01'),
+      endDate: new Date('2025-03-01'),
+      lingxiAccountId: 'lingxi-123',
+    });
     mockReviewConfigCreate.mockResolvedValue({ id: 'review-new' });
 
     const body = {
@@ -363,7 +454,13 @@ describe('POST /api/reviews', () => {
 
   it('uses default values when optional fields are not provided', async () => {
     mockGetSession.mockResolvedValue({ sub: 'user-1', role: 'admin', username: 'admin' });
-    mockProjectFindUnique.mockResolvedValue({ id: projectId, noteCount: 5 });
+    mockProjectFindUnique.mockResolvedValue({
+      id: projectId,
+      noteCount: 5,
+      executionStartDate: new Date('2025-01-01'),
+      endDate: new Date('2025-03-01'),
+      lingxiAccountId: 'lingxi-123',
+    });
     mockReviewConfigCreate.mockResolvedValue({ id: 'review-new' });
 
     await POST(makePostRequest({ projectId }));
@@ -387,7 +484,13 @@ describe('POST /api/reviews', () => {
 
   it('returns 500 on unexpected database error', async () => {
     mockGetSession.mockResolvedValue({ sub: 'user-1', role: 'admin', username: 'admin' });
-    mockProjectFindUnique.mockResolvedValue({ id: projectId, noteCount: 10 });
+    mockProjectFindUnique.mockResolvedValue({
+      id: projectId,
+      noteCount: 10,
+      executionStartDate: new Date('2025-01-01'),
+      endDate: new Date('2025-03-01'),
+      lingxiAccountId: 'lingxi-123',
+    });
     mockReviewConfigCreate.mockRejectedValue(new Error('DB connection lost'));
 
     const res = await POST(makePostRequest({ projectId }));

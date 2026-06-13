@@ -1,34 +1,75 @@
 'use client';
 
-import { ParsedNoteBaseRow, DISPLAY_ONLY_COLUMN_MAP } from '@/lib/note-base-parser';
+import { ParsedNoteBaseRow } from '@/lib/note-base-parser';
 
 interface NoteBasePreviewProps {
   records: ParsedNoteBaseRow[];
   warnings?: string[];
 }
 
-/** Reverse map: field key → Chinese label */
-const METRICS_LABELS: Record<string, string> = Object.fromEntries(
-  Object.entries(DISPLAY_ONLY_COLUMN_MAP).map(([label, key]) => [key, label])
-);
+/** Reverse map: field key → Chinese label (canonical display names) */
+const METRICS_LABELS: Record<string, string> = {
+  // 基础数据指标 — 使用最终版底表规范的全称
+  impNum: '曝光量',
+  readNum: '阅读量',
+  engageNum: '互动量',
+  likeNum: '点赞量',
+  favNum: '收藏量',
+  cmtNum: '评论量',
+  shareNum: '分享量',
+  followNum: '关注量',
+  // 爆文标记
+  isViral1kEngage: '是否千互',
+  isViral1kLike: '是否千赞',
+  // 效率指标
+  ctr: 'CTR',
+  cpm: 'CPM',
+  cpc: 'CPC',
+  cpe: 'CPE',
+  totalCpm: '总CPM',
+  totalCpe: '总CPE',
+  totalCpc: '总CPC',
+  // 自然流量
+  organicImpNum: '自然曝光量',
+  organicReadNum: '自然阅读量',
+  organicEngageNum: '自然互动',
+  organicCtr: '自然CTR',
+  organicCpm: '自然流CPM',
+  organicCpe: '自然流CPE',
+  organicCpc: '自然流CPC',
+  // 推广/投流数据
+  heatImpNum: '推广曝光量',
+  heatReadNum: '推广阅读量',
+  heatEngageNum: '投流互动量',
+  heatCtr: '投流CTR',
+  heatCpm: '投流CPM',
+  heatCpe: '投流CPE',
+  heatCpc: '投流CPC',
+  heatNewTi: '投流新增TI',
+  heatCpti: '投流CPTI',
+  // 回搜
+  searchCount: '回搜数',
+  searchRate: '回搜率',
+  // 日期
+  notePublishDate: '笔记发布日期',
+  dataUpdateDate: '数据更新日期',
+};
 
 /**
- * 核心字段列定义 — 对应 Excel 中有映射关系的列
- * 按 Excel 中实际出现的顺序排列
+ * 核心字段列定义 — 对应最终版底表规范的核心列
+ * 笔记Id、内容形式、内容方向、笔记类型
  */
 const CORE_COLUMNS: { key: string; label: string; getValue: (r: ParsedNoteBaseRow) => string }[] = [
-  { key: 'kolNickName', label: '博主昵称', getValue: (r) => r.kolNickName || '-' },
-  { key: 'noteId', label: '笔记ID', getValue: (r) => r.noteId },
-  { key: 'isRegistered', label: '是否报备', getValue: (r) => r.isRegistered ? '是' : '否' },
-  { key: 'cooperationForm', label: '合作形式', getValue: (r) => r.cooperationForm || '-' },
+  { key: 'noteId', label: '笔记Id', getValue: (r) => r.noteId },
+  { key: 'cooperationForm', label: '内容形式', getValue: (r) => r.cooperationForm || '-' },
   { key: 'contentDirection', label: '内容方向', getValue: (r) => r.contentDirection || '-' },
+  { key: 'kolType', label: '笔记类型', getValue: (r) => r.kolType || '-' },
 ];
 
-/** 费用列 */
+/** 费用列 — 对应最终版底表规范的费用列 */
 const COST_COLUMNS: { key: string; label: string; getValue: (r: ParsedNoteBaseRow) => string }[] = [
-  { key: 'contentCost', label: '达人金额', getValue: (r) => formatNum(r.contentCost) },
-  { key: 'adSpend', label: '投流金额', getValue: (r) => formatNum(r.adSpend) },
-  { key: 'totalCost', label: '总消耗', getValue: (r) => formatNum(r.totalCost) },
+  { key: 'contentCost', label: '资源含税成本价', getValue: (r) => formatNum(r.contentCost) },
+  { key: 'contentSettlement', label: '资源含税售价', getValue: (r) => formatNum(r.contentSettlement) },
 ];
 
 /** Get all unique metric keys from records, preserving a consistent order */
