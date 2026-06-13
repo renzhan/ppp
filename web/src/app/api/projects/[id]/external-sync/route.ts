@@ -9,7 +9,7 @@ export async function POST(
   try {
     const project = await prisma.project.findUnique({
       where: { id: params.id },
-      select: { id: true, brand: true, category: true, projectType: true, startDate: true, endDate: true },
+      select: { id: true, brand: true, category: true, projectType: true, executionStartDate: true, endDate: true },
     });
 
     if (!project) {
@@ -29,7 +29,7 @@ export async function POST(
         projectId: project.id,
         dataType: 'brand',
         dataContent: payload as object,
-        periodStart: project.startDate,
+        periodStart: project.executionStartDate,
         periodEnd: project.endDate,
       },
     });

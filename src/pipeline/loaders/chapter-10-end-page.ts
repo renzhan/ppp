@@ -23,14 +23,12 @@ export class EndPageDataLoader extends BaseChapterDataLoader {
         where: { id: projectId },
         select: {
           executionStartDate: true,
-          startDate: true,
           endDate: true,
         },
       });
 
       if (project) {
         if (project.executionStartDate) variables['start_date'] = project.executionStartDate.toISOString().split('T')[0];
-        else if (project.startDate) variables['start_date'] = project.startDate.toISOString().split('T')[0];
         if (project.endDate) variables['end_date'] = project.endDate.toISOString().split('T')[0];
       }
     } catch (error) {

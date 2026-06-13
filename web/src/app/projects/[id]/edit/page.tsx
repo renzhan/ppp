@@ -59,6 +59,11 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
   const [participantSearch, setParticipantSearch] = useState('');
   const participantRef = useRef<HTMLDivElement>(null);
 
+  // Reset form when projectId changes (navigating between projects)
+  useEffect(() => {
+    setForm(null);
+  }, [projectId]);
+
   // Fetch project detail
   const { data: project, isLoading: projectLoading } = useQuery<ProjectDetail>({
     queryKey: ['project', projectId],
@@ -144,6 +149,7 @@ export default function EditProjectPage({ params }: { params: { id: string } }) 
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
+      queryClient.invalidateQueries({ queryKey: ['project', projectId] });
       router.push('/');
     },
   });

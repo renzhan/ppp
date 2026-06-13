@@ -35,7 +35,6 @@ export class CoverDataLoader extends BaseChapterDataLoader {
           brand: true,
           businessLine: true,
           projectName: true,
-          startDate: true,
           endDate: true,
           executionStartDate: true,
         },
@@ -47,7 +46,6 @@ export class CoverDataLoader extends BaseChapterDataLoader {
         if (project.businessLine) variables['business_line'] = project.businessLine;
         if (project.projectName) variables['project_name'] = project.projectName;
         if (project.executionStartDate) variables['start_date'] = project.executionStartDate.toISOString().split('T')[0];
-        else if (project.startDate) variables['start_date'] = project.startDate.toISOString().split('T')[0];
         if (project.endDate) variables['end_date'] = project.endDate.toISOString().split('T')[0];
       }
     } catch (error) {

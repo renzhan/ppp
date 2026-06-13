@@ -118,7 +118,7 @@ export async function assembleReport(projectId: string): Promise<Report> {
     brand: project.brand,
     spuName: project.spuName ?? undefined,
     projectName: project.projectName,
-    startDate: project.startDate,
+    startDate: project.executionStartDate,
     endDate: project.endDate,
     engagementConfig: project.engagementConfig as unknown as Project['engagementConfig'],
     cooperationPolicy: project.cooperationPolicy as unknown as Project['cooperationPolicy'],

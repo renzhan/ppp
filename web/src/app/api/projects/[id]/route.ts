@@ -111,28 +111,22 @@ export async function PUT(
 
       const range = getProjectDateRange(launchPhases);
       updateData.launchPhases = normalized as Prisma.InputJsonValue;
-      if (range.startDate) updateData.startDate = new Date(range.startDate);
+      if (range.startDate) updateData.executionStartDate = new Date(range.startDate);
       if (range.endDate) updateData.endDate = new Date(range.endDate);
     } else {
-      if (body.startDate !== undefined) {
-        const startDate = new Date(body.startDate);
-        if (Number.isNaN(startDate.getTime())) {
-          return NextResponse.json(
-            { error: 'Invalid startDate format', fields: { startDate: 'startDate must be a valid date' } },
-            { status: 400 }
-          );
-        }
-        updateData.startDate = startDate;
-      }
       if (body.endDate !== undefined) {
-        const endDate = new Date(body.endDate);
-        if (Number.isNaN(endDate.getTime())) {
-          return NextResponse.json(
-            { error: 'Invalid endDate format', fields: { endDate: 'endDate must be a valid date' } },
-            { status: 400 }
-          );
+        if (body.endDate === null || body.endDate === '') {
+          updateData.endDate = null;
+        } else {
+          const endDate = new Date(body.endDate);
+          if (Number.isNaN(endDate.getTime())) {
+            return NextResponse.json(
+              { error: 'Invalid endDate format', fields: { endDate: 'endDate must be a valid date' } },
+              { status: 400 }
+            );
+          }
+          updateData.endDate = endDate;
         }
-        updateData.endDate = endDate;
       }
     }
 
