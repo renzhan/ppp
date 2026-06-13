@@ -28,9 +28,13 @@ echarts.use([
  * 解析 data-chart-* 属性并用 ECharts 渲染图表。
  *
  * 用于审校台分章节显示时，将 LLM 生成的图表占位符渲染为真实图表。
+ *
+ * 使用 MutationObserver 监听 DOM 变化，确保在 dangerouslySetInnerHTML
+ * 更新完成后再渲染图表，避免 setTimeout 导致的时序竞争问题。
  */
 export function useChartRenderer(containerRef: React.RefObject<HTMLElement | null>, content: string) {
   const chartsRef = useRef<echarts.ECharts[]>([]);
+  const renderScheduledRef = useRef(false);
 
   const renderCharts = useCallback(() => {
     // Dispose previous charts
@@ -50,6 +54,8 @@ export function useChartRenderer(containerRef: React.RefObject<HTMLElement | nul
     });
 
     const placeholders = containerRef.current.querySelectorAll('.chart-placeholder');
+    if (placeholders.length === 0) return;
+
     placeholders.forEach((el, idx) => {
       const chartType = el.getAttribute('data-chart-type') || 'bar';
       const chartTitle = el.getAttribute('data-chart-title') || '';
@@ -119,19 +125,59 @@ export function useChartRenderer(containerRef: React.RefObject<HTMLElement | nul
     });
   }, [containerRef]);
 
-  // Re-render charts when content changes
+  /**
+   * 使用 requestAnimationFrame 调度渲染，确保在浏览器下一帧绘制前
+   * DOM 已经稳定，同时通过 renderScheduledRef 去重避免重复渲染。
+   */
+  const scheduleRender = useCallback(() => {
+    if (renderScheduledRef.current) return;
+    renderScheduledRef.current = true;
+    requestAnimationFrame(() => {
+      renderScheduledRef.current = false;
+      renderCharts();
+    });
+  }, [renderCharts]);
+
+  // 使用 MutationObserver 监听容器 DOM 变化，发现 placeholder 后渲染
   useEffect(() => {
-    // Delay to ensure DOM is fully updated after dangerouslySetInnerHTML
-    const timer = setTimeout(renderCharts, 300);
-    // Also try a second render in case the first was too early
-    const timer2 = setTimeout(renderCharts, 800);
+    if (!containerRef.current) return;
+
+    // 初始渲染：DOM 已就绪时立即检查
+    scheduleRender();
+
+    // 监听容器内的 DOM 变化（innerHTML 更新会触发 childList 变化）
+    const observer = new MutationObserver((mutations) => {
+      // 检查是否有新增的 chart-placeholder 节点
+      const hasNewPlaceholders = mutations.some((mutation) => {
+        for (const node of Array.from(mutation.addedNodes)) {
+          if (node instanceof HTMLElement) {
+            if (
+              node.classList?.contains('chart-placeholder') ||
+              node.querySelector?.('.chart-placeholder')
+            ) {
+              return true;
+            }
+          }
+        }
+        return false;
+      });
+
+      if (hasNewPlaceholders) {
+        scheduleRender();
+      }
+    });
+
+    observer.observe(containerRef.current, {
+      childList: true,
+      subtree: true,
+    });
+
     return () => {
-      clearTimeout(timer);
-      clearTimeout(timer2);
+      observer.disconnect();
       chartsRef.current.forEach((chart) => chart.dispose());
       chartsRef.current = [];
     };
-  }, [content, renderCharts]);
+  }, [content, containerRef, scheduleRender]);
 
   // Handle window resize
   useEffect(() => {
