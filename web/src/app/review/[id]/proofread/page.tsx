@@ -629,23 +629,22 @@ export default function ProofreadPage({ params }: { params: { id: string } }) {
           )}
         </main>
 
-        {/* Right resize handle */}
+        {/* Floating AI drawer — overlays content, does not squeeze layout */}
         <div
           className={cn(
-            'flex-shrink-0 cursor-col-resize bg-transparent transition-all duration-300 ease-in-out hover:bg-blue-200 active:bg-blue-300',
-            aiPanelOpen ? 'w-1 opacity-100' : 'w-0 opacity-0'
+            'absolute inset-y-0 right-0 z-30 flex overflow-visible transition-transform duration-300 ease-in-out',
+            aiPanelOpen ? 'translate-x-0' : 'pointer-events-none translate-x-full'
           )}
-          onMouseDown={aiPanelOpen ? rightPanel.handleMouseDown : undefined}
-        />
-
-        {/* Right: AI Chat drawer */}
-        <div
-          className={cn(
-            'relative flex h-full min-h-0 flex-shrink-0 overflow-visible transition-[width] duration-300 ease-in-out',
-            !aiPanelOpen && 'pointer-events-none'
-          )}
-          style={{ width: aiPanelOpen ? rightPanel.width : 0 }}
+          style={{ width: rightPanel.width }}
         >
+          {/* Left resize handle */}
+          <div
+            className={cn(
+              'w-1 flex-shrink-0 cursor-col-resize bg-transparent transition-opacity hover:bg-blue-200 active:bg-blue-300',
+              aiPanelOpen ? 'opacity-100' : 'opacity-0'
+            )}
+            onMouseDown={aiPanelOpen ? rightPanel.handleMouseDown : undefined}
+          />
           <button
             type="button"
             onClick={() => setAiPanelOpen(false)}
@@ -659,14 +658,8 @@ export default function ProofreadPage({ params }: { params: { id: string } }) {
           >
             <ChevronRight size={24} strokeWidth={2} />
           </button>
-          <div className="h-full min-h-0 overflow-hidden border-l">
-            <div
-              className={cn(
-                'flex h-full min-h-0 flex-col transition-[transform,opacity] duration-300 ease-in-out',
-                aiPanelOpen ? 'translate-x-0 opacity-100' : 'translate-x-6 opacity-0'
-              )}
-              style={{ width: rightPanel.width }}
-            >
+          <div className="h-full min-h-0 flex-1 overflow-hidden border-l bg-white shadow-[-4px_0_16px_rgba(0,0,0,0.08)]">
+            <div className="flex h-full min-h-0 flex-col">
               {activeTraceId ? (
                 <TraceDataPanel
                   reviewId={id}
